@@ -1,0 +1,21 @@
+/* Global Document Tooltip for Mind Map Nodes */
+#document-tooltip {
+    position: fixed;
+    display: none;
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    pointer-events: none;
+    z-index: 100000;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#document-tooltip.visible {
+    display: block;
+}

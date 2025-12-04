@@ -1,0 +1,13 @@
+.Dialog-overlay {
+    background: rgba(#121212, 0.2);
+    display: grid;
+    place-items: center;
+    z-index: 10000; // Ensure dialogs appear above all content (PDF highlights: 100, toolbars: 1000, laser-pointer: 2022)
+}
+
+.Dialog {
+    margin: 15px;
+    background-color: white;
+    padding: 15px;
+    border-radius: 4px;
+}

@@ -1,0 +1,117 @@
+.drawnix-tutorial {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Noto Sans', 'Noto Sans CJK SC', 'Microsoft Yahei', 'Hiragino Sans GB', Arial, sans-serif;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  background-color: transparent;
+  p {
+    margin: 0;
+    font-size: 14px;
+    color: #888;
+    line-height: 1.5;
+  }
+
+  .tutorial-overlay {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .tutorial-content {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .brand-title {
+    font-size: 72px;
+    font-weight: 400;
+    color: #333;
+    letter-spacing: 2px;
+    margin: 0;
+    margin-bottom: 25px;
+  }
+
+  .brand-description {
+    font-size: 18px;
+    color: #333;
+    text-align: center;
+    max-width: 600px;
+    line-height: 1.6;
+    font-style: italic;
+    margin-bottom: 25px;
+  }
+
+  .brand-tooltip {
+    color: #888;
+    text-align: center;
+    max-width: 600px;
+    line-height: 1.6;
+    margin-bottom: 40px;
+  }
+
+  .feature-pointer {
+    position: absolute;
+  }
+
+  .top-left {
+    position: absolute;
+    top: 100px;
+    left: 60px;
+    .pointer-content {
+      position: absolute;
+      top: 100px;
+      width: 100%;
+      text-align: center;
+      left: 20px;
+    }
+  }
+
+  .top-center {
+    top: 100px;
+    left: 50%;
+    width: 200px;
+    transform: translateX(-50%);
+    .pointer-content {
+      position: absolute;
+      width: 100%;
+      top: 50px;
+      left: 60px;
+    }
+  }
+
+  .bottom-right {
+    bottom: 70px;
+    right: 40px;
+    .pointer-content {
+      position: absolute;
+      top: -30px;
+      right: 80px;
+      width: 100%;
+    }
+  }
+}
+
+@media screen and (max-width: 768px){
+  .drawnix-tutorial {
+    .tutorial-content {
+      width: 95%;
+      height: 95%;
+    }
+    
+    .feature-pointer {
+      display: none;
+    }
+  }
+}

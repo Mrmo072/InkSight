@@ -1,0 +1,48 @@
+    removeHighlightOverlays(highlightId) {
+        console.log('[PDFReader] removeHighlightOverlays called with ID:', highlightId);
+        
+        const overlays = this.container.querySelectorAll(`[data-highlight-id="${highlightId}"]`);
+        console.log('[PDFReader] Found overlays:', overlays.length);
+        
+        if (overlays.length === 0) {
+            console.warn('[PDFReader] No overlays found for highlightId:', highlightId);
+            return;
+        }
+        
+        // Try multiple removal strategies
+        overlays.forEach(overlay => {
+            console.log('[PDFReader] Removing overlay:', overlay);
+            const parent = overlay.parentElement;
+            
+            // Strategy 1: Standard remove
+            overlay.remove();
+            
+            // Strategy 2: Parent removeChild (if still attached)
+            if (parent && parent.contains(overlay)) {
+                parent.removeChild(overlay);
+            }
+            
+            // Strategy 3: Set display none as fallback
+            overlay.style.display = 'none';
+            overlay.style.visibility = 'hidden';
+            
+            // Force reflow
+            if (parent) {
+                void parent.offsetHeight;
+            }
+        });
+        
+        console.log(`[PDFReader] Removed ${overlays.length} overlay(s)`);
+        
+        // Verification at multiple intervals
+        [100, 500, 1000].forEach(delay => {
+            setTimeout(() => {
+                const remaining = this.container.querySelectorAll(`[data-highlight-id="${highlightId}"]`);
+                if (remaining.length > 0) {
+                    console.error(`[PDFReader] ERROR at ${delay}ms: ${remaining.length} overlay(s) still exist!`, remaining);
+                } else {
+                    console.log(`[PDFReader] ✓ Verified at ${delay}ms: Overlays removed`);
+                }
+            }, delay);
+        });
+    }

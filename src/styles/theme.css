@@ -1,0 +1,51 @@
+/* Premium UI Theme - Modern, Clean, Sophisticated */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+/* Override Default Theme Variables */
+:root,
+:root[data-theme="default"] {
+    /* Base Variables Override */
+    --primary: #4f46e5;
+    --primary-hover: #4338ca;
+    --bg-main: #f8fafc;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #f1f5f9;
+    --border: #e2e8f0;
+    --text-main: #0f172a;
+    --text-secondary: #64748b;
+    --surface: #ffffff;
+    --surface-hover: #f8fafc;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+    /* Typography */
+    --font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+
+    /* Spacing */
+    --radius-sm: 6px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+
+    /* Toolbar Background Default */
+    --toolbar-bg: rgba(30, 41, 59, 0.95);
+    --toolbar-text: rgba(255, 255, 255, 0.9);
+    --toolbar-divider: rgba(255, 255, 255, 0.2);
+}
+
+/* Colorful Theme */
+:root[data-theme="colorful"] {
+    --toolbar-bg: rgba(255, 255, 255, 0.95);
+    --toolbar-text: rgba(30, 41, 59, 0.8);
+    --toolbar-divider: rgba(30, 41, 59, 0.1);
+}
+
+/* Soft Theme */
+:root[data-theme="soft"] {
+    --toolbar-bg: rgba(255, 240, 245, 0.95);
+    --toolbar-text: rgba(70, 20, 50, 0.9);
+    --toolbar-divider: rgba(70, 20, 50, 0.1);
+}

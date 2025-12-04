@@ -1,0 +1,185 @@
+/* Glassmorphism & Layout Upgrades */
+.sidebar {
+    background-color: var(--theme-bg-secondary) !important;
+    border-right: 1px solid var(--theme-border) !important;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.02);
+    z-index: 20;
+}
+
+.sidebar-header {
+    height: 64px !important;
+    /* Taller header */
+    background-color: transparent !important;
+    border-bottom: 1px solid var(--theme-border) !important;
+    padding: 0 20px !important;
+}
+
+.notes-header {
+    height: 64px !important;
+    /* Taller header */
+    background-color: transparent !important;
+    border-bottom: 1px solid var(--theme-border) !important;
+    padding: 0 20px !important;
+}
+
+.brand h2 {
+    font-family: var(--theme-font-main) !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, #4f46e5 0%, #2563eb 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.file-item {
+    border-radius: var(--theme-radius-md) !important;
+    margin: 4px 12px !important;
+    padding: 12px 16px !important;
+    border: 1px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.file-item:hover {
+    background-color: var(--theme-surface-hover) !important;
+    transform: translateX(4px);
+}
+
+.file-item.active {
+    background-color: #e0e7ff !important;
+    /* Indigo 100 */
+    color: #4f46e5 !important;
+    /* Indigo 600 */
+    border-color: rgba(79, 70, 229, 0.1);
+    box-shadow: var(--theme-shadow-sm);
+}
+
+/* Viewer Container */
+.viewer {
+    background-color: var(--theme-bg-main) !important;
+    padding: 32px !important;
+}
+
+#viewer .page {
+    box-shadow: var(--theme-shadow-lg) !important;
+    border-radius: 4px;
+    transition: transform 0.3s ease;
+}
+
+/* Smooth Sidebar & Notes Animation */
+.sidebar,
+.notes-panel {
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+}
+
+.sidebar.collapsed,
+.notes-panel.collapsed {
+    width: 0 !important;
+    min-width: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    border: none !important;
+    opacity: 0;
+}
+
+/* Disable transitions during resize to prevent lag */
+.resizing {
+    transition: none !important;
+}
+
+/* Empty State */
+.empty-state {
+    background: white;
+    padding: 48px;
+    border-radius: 24px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+    border: 1px solid var(--theme-border);
+}
+
+.empty-state .material-icons-round {
+    background: linear-gradient(135deg, #4f46e5 0%, #2563eb 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 4px 6px rgba(79, 70, 229, 0.2));
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+    -webkit-background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background-color: #94a3b8;
+}
+
+/* Document Source Badge in Mind Map Header */
+.doc-source-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 12px;
+    background-color: rgba(79, 70, 229, 0.1);
+    /* Indigo 100 equivalent with opacity */
+    color: #4f46e5;
+    /* Indigo 600 */
+    border-radius: 16px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-left: 16px;
+    border: 1px solid rgba(79, 70, 229, 0.2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+    animation: fadeIn 0.3s ease;
+}
+
+.doc-source-badge::before {
+    content: 'description';
+    font-family: 'Material Icons Round';
+    font-size: 14px;
+    margin-right: 4px;
+    vertical-align: middle;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-2px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.mindmap-footer {
+    height: 48px !important;
+    background-color: transparent !important;
+    border-top: 1px solid var(--theme-border) !important;
+    padding: 0 20px !important;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+/* Override margin for badge in footer */
+.mindmap-footer .doc-source-badge {
+    margin-left: 0 !important;
+}

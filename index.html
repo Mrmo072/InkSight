@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>InkSight</title>
+  <!-- PDF.js CSS - CRITICAL for textLayer rendering -->
+  <link rel="stylesheet" href="https://unpkg.com/pdfjs-dist@4.10.38/web/pdf_viewer.css" />
+  <link rel="stylesheet" href="./src/styles/styles.css" />
+  <link rel="stylesheet" href="./src/styles/styles-enhanced.css" />
+  <link rel="stylesheet" href="./src/styles/themes.css" />
+  <link rel="stylesheet" href="./src/styles/themes-override.css" />
+  <link rel="stylesheet" href="./src/styles/styles-premium.css" />
+  <!-- Material Icons -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+  <!-- Google Fonts -->
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Noto+Serif+SC:wght@400;700&display=swap"
+    rel="stylesheet">
+  <script>
+    window.onerror = function (msg, url, line, col, error) {
+      alert('Error: ' + msg + '\\nurl: ' + url + '\\nline: ' + line);
+      console.error('Global Error:', error);
+      return false;
+    };
+    window.addEventListener('error', function (e) {
+      if (e.target.tagName === 'SCRIPT') {
+        alert('Script loading error: ' + e.target.src);
+      }
+    }, true);
+  </script>
+</head>
+
+<body>
+  <div id="app-layout" class="app-layout">
+    <!-- Left Sidebar: Library & Navigation -->
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-header">
+        <div class="brand" style="display: flex; align-items: center;">
+          <img src="/logo.svg" alt="InkSight Logo" class="logo" style="width: 32px; height: 32px; margin-right: 8px;">
+          <h2 style="margin: 0;">InkSight</h2>
+        </div>
+        <label for="file-input" id="add-file-btn" class="icon-btn" title="Import File" style="cursor: pointer;">
+          <span class="material-icons-round">add</span>
+          <input type="file" id="file-input" accept=".pdf,.epub,.txt,.md" class="hidden-input" />
+        </label>
+      </div>
+      <div id="file-list" class="file-list">
+        <!-- File items will be injected here -->
+      </div>
+    </aside>
+
+    <!-- Resizer Left -->
+    <div id="resizer-left" class="resizer"></div>
+
+    <!-- Main Content: Reader View -->
+    <main id="reader-container" class="reader-container">
+      <div id="reader-toolbar" class="toolbar">
+        <button id="toggle-sidebar" class="icon-btn" title="Toggle Sidebar">
+          <span class="material-icons-round">menu_open</span>
+        </button>
+        <span id="doc-title">No document open</span>
+        <div class="spacer"></div>
+        <button id="prev-page" class="icon-btn" disabled>
+          <span class="material-icons-round">chevron_left</span>
+        </button>
+        <span id="page-info">-- / --</span>
+        <button id="next-page" class="icon-btn" disabled>
+          <span class="material-icons-round">chevron_right</span>
+        </button>
+
+        <div class="spacer"></div>
+
+        <!-- Selection Mode Controls -->
+        <div class="selection-mode-group">
+          <button id="text-mode" class="icon-btn mode-btn active" title="文本选择">
+            <span class="material-icons-round">text_fields</span>
+          </button>
+          <button id="rect-mode" class="icon-btn mode-btn" title="矩形选择">
+            <span class="material-icons-round">crop_square</span>
+          </button>
+          <button id="ellipse-mode" class="icon-btn mode-btn" title="椭圆选择">
+            <span class="material-icons-round">circle</span>
+          </button>
+          <button id="highlighter-mode" class="icon-btn mode-btn" data-mode="highlighter" title="荧光笔">
+            <span class="material-icons-round">edit</span>
+          </button>
+        </div>
+
+        <!-- Highlighter Settings Panel -->
+        <div id="highlighter-panel" class="highlighter-panel">
+          <div class="panel-title">荧光笔粗细</div>
+          <div class="slider-container">
+            <div class="slider-track-visual"></div>
+            <input type="range" id="highlighter-height" min="8" max="48" value="16" step="4">
+          </div>
+          <div class="height-labels">
+            <span>细</span>
+            <span>中</span>
+            <span>粗</span>
+          </div>
+        </div>
+
+        <div class="spacer"></div>
+        <button id="toggle-notes" class="icon-btn" title="Toggle Notes">
+          <span class="material-icons-round">vertical_split</span>
+        </button>
+      </div>
+      <div id="viewer" class="viewer">
+        <div class="empty-state">
+          <span class="material-icons-round" style="font-size: 48px; color: var(--text-secondary);">library_books</span>
+          <p>Select or import a document to start reading</p>
+        </div>
+      </div>
+    </main>
+
+    <!-- Resizer Right -->
+    <div id="resizer-right" class="resizer"></div>
+
+    <!-- Right Panel: Mind Map & Notes -->
+    <aside id="notes-panel" class="notes-panel">
+      <div class="notes-header">
+        <h3>Mind Map</h3>
+        <div class="actions">
+          <button id="layout-btn" class="icon-btn" title="Auto Layout">
+            <span class="material-icons-round">auto_graph</span>
+          </button>
+        </div>
+      </div>
+      <div id="mindmap-container" class="mindmap-container">
+        <!-- Canvas or SVG for mindmap will go here -->
+        <div class="mindmap-placeholder">
+          <p>Select text to create cards</p>
+          <p>Drag cards here to build map</p>
+        </div>
+      </div>
+      <div id="mindmap-footer" class="mindmap-footer">
+        <div id="mindmap-doc-info" class="doc-source-badge" style="display: none;"></div>
+      </div>
+    </aside>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+
+</html>

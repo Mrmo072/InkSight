@@ -1,0 +1,69 @@
+/* Toolbar Upgrade */
+.toolbar {
+    height: 64px !important;
+    background-color: rgba(255, 255, 255, 0.9) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--theme-border) !important;
+    padding: 0 32px !important;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.toolbar h1 {
+    font-family: var(--theme-font-main) !important;
+    font-weight: 600 !important;
+    color: var(--theme-text-main) !important;
+    font-size: 18px !important;
+}
+
+.toolbar button {
+    height: 40px !important;
+    padding: 0 20px !important;
+    border-radius: var(--theme-radius-md) !important;
+    font-weight: 500 !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.toolbar button:hover {
+    transform: translateY(-1px);
+}
+
+/* Primary Action Button (Add File) */
+#add-file-btn {
+    background: linear-gradient(135deg, #4f46e5 0%, #2563eb 100%) !important;
+    color: white !important;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+}
+
+#add-file-btn:hover {
+    box-shadow: 0 6px 16px rgba(79, 70, 229, 0.4);
+    transform: translateY(-2px);
+}
+
+/* Selection Mode Group */
+.selection-mode-group {
+    background-color: var(--theme-bg-tertiary) !important;
+    padding: 4px !important;
+    border-radius: 10px !important;
+    border: 1px solid var(--theme-border) !important;
+    gap: 4px !important;
+}
+
+.mode-btn {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 8px !important;
+    background-color: transparent !important;
+}
+
+.mode-btn.active {
+    background-color: white !important;
+    color: var(--theme-primary) !important;
+    box-shadow: var(--theme-shadow-sm) !important;
+}
+
+.mode-btn:hover:not(.active) {
+    background-color: rgba(0, 0, 0, 0.05) !important;
+}

@@ -1,0 +1,124 @@
+/* Global Theme System - CSS Variables for all 6 themes */
+
+/* Default & Colorful Themes (Clean white) */
+:root[data-theme="default"],
+:root[data-theme="colorful"] {
+    --theme-bg-main: #ffffff;
+    --theme-bg-secondary: #f8fafc;
+    --theme-bg-tertiary: #f1f5f9;
+    --theme-border: #e2e8f0;
+    --theme-text-main: #0f172a;
+    --theme-text-secondary: #64748b;
+    --theme-shadow: rgba(0, 0, 0, 0.1);
+    --theme-shadow-sm: rgba(0, 0, 0, 0.05);
+    --theme-shadow-md: rgba(0, 0, 0, 0.12);
+    --theme-primary: #2563eb;
+    --theme-primary-hover: #1d4ed8;
+}
+
+/* Soft Theme (Gentle gray) */
+:root[data-theme="soft"] {
+    --theme-bg-main: #f5f5f5;
+    --theme-bg-secondary: #ebebeb;
+    --theme-bg-tertiary: #e0e0e0;
+    --theme-border: #d0d0d0;
+    --theme-text-main: #2c2c2c;
+    --theme-text-secondary: #5c5c5c;
+    --theme-shadow: rgba(0, 0, 0, 0.08);
+    --theme-shadow-sm: rgba(0, 0, 0, 0.04);
+    --theme-shadow-md: rgba(0, 0, 0, 0.1);
+    --theme-primary: #4a90e2;
+    --theme-primary-hover: #357abd;
+}
+
+/* Retro Theme (Vintage warm) */
+:root[data-theme="retro"] {
+    --theme-bg-main: #f9f8ed;
+    --theme-bg-secondary: #f0ede0;
+    --theme-bg-tertiary: #e8e4d3;
+    --theme-border: #d4cdb6;
+    --theme-text-main: #3d3520;
+    --theme-text-secondary: #6b6040;
+    --theme-shadow: rgba(61, 53, 32, 0.12);
+    --theme-shadow-sm: rgba(61, 53, 32, 0.06);
+    --theme-shadow-md: rgba(61, 53, 32, 0.15);
+    --theme-primary: #8b7355;
+    --theme-primary-hover: #6d5940;
+}
+
+/* Dark Theme (Dark mode) */
+:root[data-theme="dark"] {
+    --theme-bg-main: #141414;
+    --theme-bg-secondary: #1e1e1e;
+    --theme-bg-tertiary: #2a2a2a;
+    --theme-border: #3d3d3d;
+    --theme-text-main: #e0e0e0;
+    --theme-text-secondary: #b0b0b0;
+    --theme-shadow: rgba(0, 0, 0, 0.5);
+    --theme-shadow-sm: rgba(0, 0, 0, 0.3);
+    --theme-shadow-md: rgba(0, 0, 0, 0.6);
+    --theme-primary: #6698ff;
+    --theme-primary-hover: #80acff;
+}
+
+/* Starry Theme (Deep blue-black) */
+:root[data-theme="starry"] {
+    --theme-bg-main: #0d2537;
+    --theme-bg-secondary: #162f44;
+    --theme-bg-tertiary: #1f3a52;
+    --theme-border: #2d4a63;
+    --theme-text-main: #e8f0f8;
+    --theme-text-secondary: #b4d0e7;
+    --theme-shadow: rgba(0, 0, 0, 0.7);
+    --theme-shadow-sm: rgba(0, 0, 0, 0.4);
+    --theme-shadow-md: rgba(0, 0, 0, 0.8);
+    --theme-primary: #4a9eff;
+    --theme-primary-hover: #6bb0ff;
+}
+
+/* Ensure smooth theme transitions */
+body,
+.sidebar,
+.sidebar-header,
+.toolbar,
+.reader-container,
+.viewer,
+.notes-panel,
+.notes-header,
+.file-list,
+.file-item,
+.mindmap-container,
+.empty-state,
+.icon-btn {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Special handling: Keep PDF pages white in dark themes for readability */
+:root[data-theme="dark"] .pdf-page-wrapper,
+:root[data-theme="dark"] #viewer .page,
+:root[data-theme="starry"] .pdf-page-wrapper,
+:root[data-theme="starry"] #viewer .page {
+    background-color: #ffffff !important;
+}
+
+/* Adjust viewer background in dark themes */
+:root[data-theme="dark"] .viewer,
+:root[data-theme="starry"] .viewer {
+    background-color: var(--theme-bg-tertiary) !important;
+}
+
+/* Mind map grid pattern - adjust for dark themes */
+:root[data-theme="dark"] .mindmap-container,
+:root[data-theme="starry"] .mindmap-container {
+    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.15) 1px, transparent 1px) !important;
+}
+
+:root[data-theme="soft"] .mindmap-container {
+    background-image: radial-gradient(circle, #cbd5e1 1px, transparent 1px) !important;
+    background-color: var(--theme-bg-secondary) !important;
+}
+
+:root[data-theme="retro"] .mindmap-container {
+    background-image: radial-gradient(circle, #d4cdb6 1px, transparent 1px) !important;
+    background-color: var(--theme-bg-secondary) !important;
+}

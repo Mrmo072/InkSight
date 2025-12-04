@@ -1,0 +1,77 @@
+/* Styles Override - Apply Theme Variables */
+
+/* Update body with theme */
+body {
+    color: var(--theme-text-main, var(--text-main)) !important;
+    background-color: var(--theme-bg-main, var(--bg-main)) !important;
+}
+
+/* Update sidebar */
+.sidebar {
+    background-color: var(--theme-bg-secondary, var(--bg-secondary)) !important;
+    border-right: 1px solid var(--theme-border, var(--border)) !important;
+}
+
+.sidebar-header {
+    border-bottom: 1px solid var(--theme-border, var(--border)) !important;
+    background-color: var(--theme-bg-main, white) !important;
+    color: var(--theme-text-main, var(--text-main)) !important;
+}
+
+/* Update file items */
+.file-item {
+    color: var(--theme-text-secondary, var(--text-secondary)) !important;
+}
+
+.file-item:hover {
+    background-color: var(--theme-bg-tertiary, var(--bg-tertiary)) !important;
+    color: var(--theme-text-main, var(--text-main)) !important;
+}
+
+/* Update toolbar */
+.toolbar {
+    border-bottom: 1px solid var(--theme-border, var(--border)) !important;
+    background-color: var(--theme-bg-main, white) !important;
+    box-shadow: 0 1px 2px var(--theme-shadow-sm, rgba(0, 0, 0, 0.05)) !important;
+    color: var(--theme-text-main, var(--text-main)) !important;
+}
+
+#doc-title {
+    color: var(--theme-text-main, var(--text-main)) !important;
+}
+
+/* Update viewer background */
+.viewer {
+    background-color: var(--theme-bg-tertiary, #f3f4f6) !important;
+}
+
+.empty-state {
+    color: var(--theme-text-secondary, var(--text-secondary)) !important;
+}
+
+/* Update notes panel */
+.notes-panel {
+    background-color: var(--theme-bg-secondary, var(--bg-secondary)) !important;
+    border-left: 1px solid var(--theme-border, var(--border)) !important;
+}
+
+.notes-header {
+    border-bottom: 1px solid var(--theme-border, var(--border)) !important;
+    background-color: var(--theme-bg-main, white) !important;
+    color: var(--theme-text-main, var(--text-main)) !important;
+}
+
+/* Update icon buttons */
+.icon-btn {
+    color: var(--theme-text-secondary, var(--text-secondary)) !important;
+}
+
+.icon-btn:hover {
+    background-color: var(--theme-bg-tertiary, var(--bg-tertiary)) !important;
+    color: var(--theme-text-main, var(--text-main)) !important;
+}
+
+/* Update page info text */
+#page-info {
+    color: var(--theme-text-main, var(--text-main)) !important;
+}

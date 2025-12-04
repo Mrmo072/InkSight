@@ -1,0 +1,191 @@
+/* Redesigned Highlighter Panel */
+.modern-highlight-toolbar .highlighter-panel {
+    position: absolute;
+    /* Top will be set dynamically via JS or relative to parent */
+    background: rgba(255, 255, 255, 0.95) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.5) !important;
+    border-radius: 12px !important;
+    padding: 12px 16px !important;
+    width: 220px !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+    z-index: 1000;
+
+    /* Animation States */
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(10px) scale(0.95);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+
+    /* Reset display none from previous styles */
+    display: block !important;
+}
+
+.modern-highlight-toolbar .highlighter-panel.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+
+.modern-highlight-toolbar .highlighter-panel .panel-title {
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: var(--theme-text-main) !important;
+    margin-bottom: 12px !important;
+    display: flex;
+    align-items: center;
+    justify-content: center !important;
+    text-align: center !important;
+    background: transparent !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+.modern-highlight-toolbar .highlighter-panel .slider-container {
+    position: relative !important;
+    height: 24px !important;
+    display: flex !important;
+    align-items: center !important;
+    margin: 12px 0 !important;
+}
+
+.modern-highlight-toolbar .highlighter-panel .slider-track-visual {
+    position: absolute !important;
+    left: 0 !important;
+    right: 0 !important;
+    height: 100% !important;
+    background: var(--theme-primary) !important;
+    clip-path: polygon(0 45%, 100% 0, 100% 100%, 0 55%) !important;
+    opacity: 0.2 !important;
+    border-radius: 4px !important;
+}
+
+.modern-highlight-toolbar .highlighter-panel input[type="range"] {
+    position: absolute !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: transparent !important;
+    appearance: none !important;
+    outline: none !important;
+    margin: 0 !important;
+    z-index: 2 !important;
+    cursor: pointer !important;
+}
+
+.modern-highlight-toolbar .highlighter-panel input[type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    background: var(--theme-primary);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 0 2px white, 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: transform 0.1s ease;
+}
+
+.modern-highlight-toolbar .highlighter-panel input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+}
+
+.modern-highlight-toolbar .height-labels {
+    display: flex !important;
+    justify-content: space-between !important;
+    font-size: 11px !important;
+    font-weight: 500 !important;
+    color: var(--theme-text-secondary) !important;
+}
+
+/* Color Picker Overrides for Stack Component */
+.pdf-color-picker-wrapper .stack_vertical {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+}
+
+.pdf-color-picker-wrapper .stack_horizontal {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 8px !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+}
+
+.pdf-color-picker-wrapper .color-select-item {
+    width: 24px !important;
+    height: 24px !important;
+    min-width: 24px !important;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    padding: 0 !important;
+    background: transparent;
+}
+
+.pdf-color-picker-wrapper .color-select-item:hover {
+    transform: scale(1.15);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    z-index: 1;
+}
+
+.pdf-color-picker-wrapper .color-select-item.active {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--primary);
+    z-index: 2;
+}
+
+.pdf-color-picker-wrapper .color-select-item .material-icons-round {
+    font-size: 14px;
+    color: white;
+    opacity: 0;
+    transition: opacity 0.2s;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.pdf-color-picker-wrapper .color-select-item.active .material-icons-round {
+    opacity: 1;
+}
+
+/* Adjust toolbar width for grid */
+.modern-highlight-toolbar {
+    width: auto;
+    background: var(--surface);
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    animation: popIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 1000;
+}
+
+.modern-highlight-toolbar ::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.modern-highlight-toolbar ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+    -webkit-background-clip: content-box;
+}
+
+.modern-highlight-toolbar ::-webkit-scrollbar-thumb:hover {
+    background-color: #94a3b8;
+}
+
+/* Override drawnix global styles that interfere with the toolbar */
+.modern-highlight-toolbar.drawnix {
+    height: auto !important;
+    width: max-content !important;
+    font-family: var(--theme-font-main) !important;
+}

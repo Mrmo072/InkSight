@@ -1,0 +1,52 @@
+{
+  "name": "inksight",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@floating-ui/react": "^0.27.16",
+    "@plait-board/markdown-to-drawnix": "^0.0.7",
+    "@plait-board/mermaid-to-drawnix": "^0.0.7",
+    "@plait/common": "^0.91.1",
+    "@plait/core": "^0.91.1",
+    "@plait/draw": "^0.91.1",
+    "@plait/layouts": "^0.91.1",
+    "@plait/mind": "^0.91.1",
+    "@plait/text-plugins": "^0.91.1",
+    "@vitejs/plugin-react": "^5.1.1",
+    "ahooks": "^3.9.6",
+    "browser-fs-access": "^0.38.0",
+    "classnames": "^2.5.1",
+    "epubjs": "^0.3.93",
+    "idb": "^8.0.0",
+    "immer": "^11.0.0",
+    "is-hotkey": "^0.2.0",
+    "laser-pen": "^1.0.1",
+    "localforage": "^1.10.0",
+    "marked": "^12.0.0",
+    "mobile-detect": "^1.4.5",
+    "open-color": "^1.9.1",
+    "pdfjs-dist": "^4.0.379",
+    "points-on-curve": "^1.0.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "roughjs": "^4.6.6",
+    "sass": "^1.94.2",
+    "slate": "^0.118.1",
+    "slate-dom": "^0.119.0",
+    "slate-history": "^0.113.1",
+    "slate-react": "^0.119.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "vite": "^5.0.0"
+  }
+}

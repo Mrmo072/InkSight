@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="500" height="500" viewBox="110 160 260 260">
+  <defs>
+    <linearGradient id="blue-crystal-gradient-pop" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2962FF;stop-opacity:1" /> <stop offset="100%" style="stop-color:#00B8D4;stop-opacity:1" /> </linearGradient>
+    
+    <filter id="drop-shadow-blue-pop" height="150%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="5"/>
+      <feOffset dx="0" dy="6" result="offsetblur"/>
+      <feFlood flood-color="#0D47A1" flood-opacity="0.3"/>
+      <feComposite in2="offsetblur" operator="in"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect x="120" y="220" width="240" height="160" rx="12" ry="12" fill="#E3F2FD" stroke="#BBDEFB" stroke-width="2"/>
+  
+  <g stroke="#90CAF9" stroke-width="3" stroke-linecap="square" shape-rendering="crispEdges">
+      <line x1="160" y1="220" x2="160" y2="380" />
+      <line x1="200" y1="220" x2="200" y2="380" />
+      <line x1="280" y1="220" x2="280" y2="380" />
+      <line x1="320" y1="220" x2="320" y2="380" />
+      <line x1="120" y1="260" x2="360" y2="260" />
+      <line x1="120" y1="300" x2="360" y2="300" />
+      <line x1="120" y1="340" x2="360" y2="340" />
+  </g>
+
+  <polygon points="220,240 260,240 280,280 260,320 220,320 200,280" fill="#E3F2FD" stroke="none"/>
+  
+  <g stroke="#1976D2" stroke-width="4" stroke-linecap="round">
+      <line x1="200" y1="260" x2="215" y2="255" />
+      <line x1="200" y1="300" x2="215" y2="305" />
+      <line x1="280" y1="260" x2="265" y2="255" />
+      <line x1="280" y1="300" x2="265" y2="305" />
+      <line x1="240" y1="240" x2="240" y2="225" />
+      <line x1="240" y1="320" x2="240" y2="335" />
+  </g>
+
+
+  <g filter="url(#drop-shadow-blue-pop)" transform="translate(240, 250)">
+      <path d="M 0 -50 L 50 -20 L 0 10 L -50 -20 Z" fill="#40C4FF"/> <path d="M -50 -20 L 0 10 L 0 70 L -50 40 Z" fill="url(#blue-crystal-gradient-pop)"/> <path d="M 50 -20 L 0 10 L 0 70 L 50 40 Z" fill="#01579B"/> <g stroke="#FFFFFF" stroke-width="4" stroke-linecap="round">
+          <line x1="0" y1="10" x2="0" y2="-50" />
+          <line x1="0" y1="10" x2="-50" y2="-20" />
+          <line x1="0" y1="10" x2="50" y2="-20" />
+          <circle cx="0" cy="10" r="7" fill="#FFFFFF"/>
+      </g>
+  </g>
+</svg>

@@ -1,0 +1,187 @@
+/* Enhanced UI Styles - Supplementary to styles.css */
+
+/* Better icon button transitions */
+.icon-btn {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    padding: 8px !important;
+    border-radius: 8px !important;
+}
+
+.icon-btn:hover {
+    transform: translateY(-1px);
+}
+
+.icon-btn:active {
+    transform: translateY(0);
+}
+
+.icon-btn:disabled {
+    opacity: 0.4 !important;
+}
+
+.icon-btn:disabled:hover {
+    transform: none !important;
+    background: none !important;
+}
+
+/* Enhanced toolbar shadow */
+.toolbar {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Better selection mode buttons */
+.mode-btn {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.mode-btn.active {
+    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+}
+
+/* Enhanced panel headers */
+.sidebar-header,
+.notes-header {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Smoother transitions for file items */
+.file-item {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.file-item.active {
+    box-shadow: 0 1px 3px rgba(37, 99, 235, 0.1);
+}
+
+/* Better mind map background */
+.mindmap-container {
+    background-image: radial-gradient(circle, #cbd5e1 1px, transparent 1px) !important;
+}
+
+/* Enhanced page shadows */
+#viewer .page,
+.pdf-page-wrapper {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12) !important;
+    transition: box-shadow 0.2s ease;
+}
+
+#viewer .page:hover,
+.pdf-page-wrapper:hover {
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Resizer visual feedback */
+.resizer {
+    transition: all 0.15s ease !important;
+}
+
+.resizer:hover {
+    background-color: var(--primary) !important;
+    width: 6px !important;
+}
+
+/* PDF Highlight Interaction Styles */
+.area-highlight-border {
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.area-highlight-border:hover {
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+    background-color: rgba(255, 107, 107, 0.2) !important;
+}
+
+.area-highlight-border.highlight-selected {
+    border-color: #3b82f6 !important;
+    border-width: 3px !important;
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3);
+    z-index: 100 !important;
+    animation: pulse-border 1.5s infinite;
+}
+
+@keyframes pulse-border {
+    0% {
+        box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+    }
+
+    70% {
+        box-shadow: 0 0 0 6px rgba(59, 130, 246, 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+    }
+}
+
+/* Floating Toolbar */
+.highlight-floating-toolbar {
+    position: absolute;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    padding: 4px;
+    display: flex;
+    gap: 4px;
+    z-index: 10000;
+    animation: fade-in-up 0.2s ease-out;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+@keyframes fade-in-up {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.toolbar-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #475569;
+    transition: all 0.2s;
+}
+
+.toolbar-btn:hover {
+    background-color: #f1f5f9;
+    color: #1e293b;
+}
+
+.toolbar-btn.delete:hover {
+    background-color: #fee2e2;
+    color: #ef4444;
+}
+
+.toolbar-divider {
+    width: 1px;
+    background-color: #e2e8f0;
+    margin: 4px 2px;
+}
+
+.color-picker-btn {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.color-picker-btn:hover {
+    transform: scale(1.2);
+}
+
+.color-picker-btn.active {
+    border-color: #475569;
+}
