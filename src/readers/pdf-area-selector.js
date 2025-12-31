@@ -135,8 +135,7 @@ export class PDFAreaSelector {
         const dragDistance = Math.sqrt(Math.pow(width, 2) + Math.pow(height, 2));
 
         // Ignore clicks or tiny drags (must be at least 20px in each dimension AND 30px euclidean distance)
-        if (width < 20 || height < 20 || dragDistance < 30) {
-
+        if (isNaN(width) || isNaN(height) || width < 20 || height < 20 || dragDistance < 30) {
             return;
         }
 

@@ -22,6 +22,10 @@
     "asar": false,
     "files": [
       "dist/**/*",
+      "!dist/win-unpacked",
+      "!dist/*.exe",
+      "!dist/*.yml",
+      "!dist/*.yaml",
       "electron/**/*",
       "package.json"
     ]
