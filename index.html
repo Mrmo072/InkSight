@@ -110,21 +110,22 @@
           <span class="material-icons-round">vertical_split</span>
         </button>
       </div>
-      
+
       <div id="reader-content-wrapper" class="reader-content-wrapper">
         <div id="outline-sidebar" class="outline-sidebar collapsed">
-           <div class="outline-header">
-               <span>Outline</span>
-           </div>
-           <div id="outline-content" class="outline-content">
-               <div class="outline-empty">No outline available</div>
-           </div>
+          <div class="outline-header">
+            <span>Outline</span>
+          </div>
+          <div id="outline-content" class="outline-content">
+            <div class="outline-empty">No outline available</div>
+          </div>
         </div>
         <div id="viewer" class="viewer">
-            <div class="empty-state">
-            <span class="material-icons-round" style="font-size: 48px; color: var(--text-secondary);">library_books</span>
+          <div class="empty-state">
+            <span class="material-icons-round"
+              style="font-size: 48px; color: var(--text-secondary);">library_books</span>
             <p>Select or import a document to start reading</p>
-            </div>
+          </div>
         </div>
       </div>
     </main>
@@ -134,23 +135,38 @@
 
     <!-- Right Panel: Mind Map & Notes -->
     <aside id="notes-panel" class="notes-panel">
-      <div class="notes-header">
-        <h3>Mind Map</h3>
-        <div class="actions">
-          <button id="layout-btn" class="icon-btn" title="Auto Layout">
-            <span class="material-icons-round">auto_graph</span>
+      <div class="panel-header">
+        <div class="panel-tabs">
+          <button id="tab-mindmap" class="tab-btn active" title="Mind Map">
+            <span class="material-icons-round">account_tree</span>
+          </button>
+          <button id="tab-annotations" class="tab-btn" title="Annotations">
+            <span class="material-icons-round">format_list_bulleted</span>
+          </button>
+        </div>
+        <div class="panel-actions">
+          <button id="layout-btn" class="icon-btn small" title="Auto Layout">
+            <span class="material-icons-round">auto_fix_high</span>
           </button>
         </div>
       </div>
-      <div id="mindmap-container" class="mindmap-container">
-        <!-- Canvas or SVG for mindmap will go here -->
-        <div class="mindmap-placeholder">
-          <p>Select text to create cards</p>
-          <p>Drag cards here to build map</p>
+
+      <div class="panel-content">
+        <div id="mindmap-container" class="mindmap-container">
+          <!-- Mind Map will be rendered here -->
+          <div class="mindmap-placeholder">
+            <span class="material-icons-round">psychology</span>
+            <p>Select text to create nodes</p>
+          </div>
+          <div id="mindmap-doc-info" class="doc-info-badge" style="display: none;"></div>
         </div>
-      </div>
-      <div id="mindmap-footer" class="mindmap-footer">
-        <div id="mindmap-doc-info" class="doc-source-badge" style="display: none;"></div>
+
+        <div id="annotation-list" class="annotation-list" style="display: none;">
+          <div class="empty-state">
+            <span class="material-icons-round">edit_note</span>
+            <p>No annotations yet</p>
+          </div>
+        </div>
       </div>
     </aside>
   </div>

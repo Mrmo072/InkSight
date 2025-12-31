@@ -706,6 +706,11 @@ export class PDFReader {
         // Focus the container to ensure keyboard events are captured here
         this.container.focus();
         this.toolbar.handleHighlightClick(e, highlightId, cardId);
+
+        // Dispatch global event for sync (Mindmap, Annotation List)
+        window.dispatchEvent(new CustomEvent('highlight-clicked', {
+            detail: { highlightId, cardId }
+        }));
     }
 
     hideToolbar() {

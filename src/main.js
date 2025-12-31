@@ -7,6 +7,7 @@ import { DrawnixView } from './mindmap/drawnix-view.js';
 import { highlightManager } from './core/highlight-manager.js';
 import { SplitView } from './ui/split-view.js';
 import { OutlineSidebar } from './ui/outline-sidebar.js';
+import { AnnotationList } from './ui/annotation-list.js'; // Import new module
 import { suppressResizeObserverLoop } from './drawnix/react-board/src/utils/resizeObserverFix.js';
 
 suppressResizeObserverLoop();
@@ -21,7 +22,8 @@ window.inksight = {
     cardSystem: null,
     highlightManager: null,
     pdfReader: null,
-    outlineSidebar: null
+    outlineSidebar: null,
+    annotationList: null
 };
 
 // Import cardSystem (it's already imported by other modules, but we need it here)
@@ -57,6 +59,7 @@ let mindmapView = null;
 let drawnixView = null;
 let splitView = null;
 let outlineSidebar = null;
+let annotationList = null;
 
 // Initialization
 function init() {
@@ -83,13 +86,50 @@ function init() {
         outlineSidebar = new OutlineSidebar('outline-sidebar', 'outline-content', 'toggle-outline');
         window.inksight.outlineSidebar = outlineSidebar;
 
+        // Init Annotation List
+        annotationList = new AnnotationList('annotation-list', window.inksight.cardSystem);
+        window.inksight.annotationList = annotationList;
+
         // Setup event listeners AFTER SplitView is initialized
         setupEventListeners();
+
+        // Setup Right Panel Tabs
+        setupRightPanelTabs();
 
     } catch (e) {
         console.error('Initialization error:', e);
     }
 }
+
+function setupRightPanelTabs() {
+    const tabMindmap = document.getElementById('tab-mindmap');
+    const tabAnnotations = document.getElementById('tab-annotations');
+    const containerMindmap = document.getElementById('mindmap-container');
+    const containerAnnotations = document.getElementById('annotation-list');
+
+    if (!tabMindmap || !tabAnnotations) return;
+
+    tabMindmap.addEventListener('click', () => {
+        tabMindmap.classList.add('active');
+        tabAnnotations.classList.remove('active');
+        containerMindmap.style.display = 'block';
+        containerAnnotations.style.display = 'none';
+        // splitView.toggleRight(true); // Ensure open
+    });
+
+    tabAnnotations.addEventListener('click', () => {
+        tabAnnotations.classList.add('active');
+        tabMindmap.classList.remove('active');
+        containerAnnotations.style.display = 'flex';
+        containerMindmap.style.display = 'none';
+
+        // Refresh list when switching to it
+        if (annotationList && state.currentFile) {
+            annotationList.load(state.currentFile.id);
+        }
+    });
+}
+
 
 function setupEventListeners() {
     // File Import
@@ -375,6 +415,11 @@ async function openFile(fileData) {
     }
     if (window.inksight.highlightManager) {
         window.inksight.highlightManager.updateSourceNames(fileData.id, fileData.name);
+    }
+
+    // Load Annotations List
+    if (window.inksight.annotationList) {
+        window.inksight.annotationList.load(fileData.id);
     }
 
     if (fileData.type === 'application/pdf') {

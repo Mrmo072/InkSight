@@ -143,6 +143,19 @@ export class CardSystem {
         }
     }
 
+    updateCard(id, updates) {
+        const card = this.cards.get(id);
+        if (card) {
+            Object.assign(card, updates);
+            // Dispatch event for UI update
+            const event = new CustomEvent('card-updated', {
+                detail: { id, updates }
+            });
+            window.dispatchEvent(event);
+            this.save();
+        }
+    }
+
     getPersistenceData() {
         // Clean up deleted cards before saving
         this.cleanupDeletedCards();
