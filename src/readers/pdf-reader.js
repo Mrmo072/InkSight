@@ -216,13 +216,34 @@ export class PDFReader {
         if (!selection.rangeCount || selection.isCollapsed) return;
 
         const range = selection.getRangeAt(0);
-        const text = selection.toString().trim();
+        // Normalize whitespace to avoid issues with PDF text extraction
+        const text = selection.toString().trim().replace(/\s+/g, ' ');
         if (!text) return;
 
-        const rects = range.getClientRects();
-        const pageInfo = this.pages[pageNum - 1];
+        // Determine the actual page where the selection starts
+        // This fixes issues where the mouse up event happens on a different page
+        // or when the provided pageNum is stale.
+        let startNode = range.startContainer;
+        if (startNode.nodeType === Node.TEXT_NODE) {
+            startNode = startNode.parentNode;
+        }
+
+        const wrapper = startNode.closest('.pdf-page-wrapper');
+        if (!wrapper) {
+            // console.warn('[PDFReader] Selection start not inside a page wrapper');
+            return;
+        }
+
+        const actualPageNum = parseInt(wrapper.dataset.pageNum);
+        const pageInfo = this.pages[actualPageNum - 1];
+
+        // console.log(`[PDFReader] Selection on Page ${actualPageNum} (Event Page: ${pageNum})`);
+
         if (!pageInfo || !pageInfo.wrapper) return;
 
+        const rects = range.getClientRects();
+
+        // Use the wrapper of the actual page where selection started
         const wrapperRect = pageInfo.wrapper.getBoundingClientRect();
         const highlightRects = [];
 
@@ -280,7 +301,7 @@ export class PDFReader {
 
         // Create highlight data
         const highlight = highlightManager.createHighlight(text, {
-            page: pageNum,
+            page: actualPageNum,
             rects: highlightRects
         }, this.fileId, 'text', PDFReader.defaultColors.text, this.fileName);
 
@@ -492,8 +513,12 @@ export class PDFReader {
         textLayerDiv.style.position = 'absolute';
         textLayerDiv.style.top = '0';
         textLayerDiv.style.left = '0';
-        textLayerDiv.style.right = '0';
-        textLayerDiv.style.bottom = '0';
+        // Explicitly set dimensions to match viewport - attempting to fix alignment
+        textLayerDiv.style.width = `${viewport.width}px`;
+        textLayerDiv.style.height = `${viewport.height}px`;
+        // Set scale factor for PDF.js text layer (Critical for correct text spacing/sizing)
+        textLayerDiv.style.setProperty('--scale-factor', viewport.scale);
+
         textLayerDiv.style.overflow = 'hidden';
         textLayerDiv.style.lineHeight = '1.0';
         textLayerDiv.style.color = 'transparent';
@@ -502,6 +527,7 @@ export class PDFReader {
         wrapper.appendChild(textLayerDiv);
 
         const textContent = await page.getTextContent();
+
         const textLayer = new pdfjsLib.TextLayer({
             textContentSource: textContent,
             container: textLayerDiv,
