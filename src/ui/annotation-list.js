@@ -131,7 +131,18 @@ export class AnnotationList {
         // Quote (Content)
         const quote = document.createElement('div');
         quote.className = 'annotation-quote';
-        quote.textContent = card.content || item.highlight?.text || '(Image)';
+        if (card.imageData) {
+            const img = document.createElement('img');
+            img.src = card.imageData;
+            img.className = 'annotation-image';
+            img.style.maxWidth = '100%';
+            img.style.borderRadius = '4px';
+            img.style.marginTop = '4px';
+            quote.appendChild(img);
+        } else {
+            quote.textContent = card.content || highlight?.text || '(Image)';
+        }
+
         if (highlight?.color) {
             quote.style.borderLeftColor = highlight.color;
         }

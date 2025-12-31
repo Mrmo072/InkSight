@@ -50,13 +50,30 @@ npm run dev
 - **多格式支持**: PDF, EPUB, TXT, Markdown。
 - **沉浸式阅读**: 专注于内容的阅读体验。
 - **可视化笔记**: 从文档直接拖拽内容生成思维导图节点。
+- **标注列表**: 专用的标注管理面板，支持查看、编辑标注并与文档双向同步。
+- **大纲导航**: 集成文档大纲侧边栏，支持点击跳转和阅读进度自动定位。
 - **智能排版**: 强大的自动布局算法，一键理清思维脉络。
 - **双向溯源**: 点击笔记节点瞬间跳转回原文出处。
 - **隐私安全**: 所有数据存储在本地，无需联网。
 
+## 📦 打包 (Windows 应用程序)
+
+你可以将 InkSight 打包为无需服务器即可运行的独立 Windows 可执行文件 (`.exe`)。
+
+### 构建可执行文件
+
+```bash
+# 构建应用程序
+npm run dist:win
+
+# 可执行文件将生成于：
+# dist/win-unpacked/InkSight.exe
+```
+
 ## 🛠️ 技术栈 (Tech Stack)
 
 - **Frontend**: React, Vanilla JS, Vite
+- **Desktop**: Electron
 - **Rendering**: PDF.js, Epub.js, Marked
 - **Canvas**: Plait (Drawnix), Rough.js
 

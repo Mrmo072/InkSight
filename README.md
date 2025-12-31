@@ -49,13 +49,30 @@ Visit `http://localhost:5173` to start using it.
 - **Multi-format Support**: PDF, EPUB, TXT, Markdown.
 - **Immersive Reading**: A reading experience focused on content.
 - **Visual Notes**: Generate mind map nodes directly by dragging content from documents.
+- **Annotation List**: Dedicated interaction panel for managing highlights and notes with bidirectional sync.
+- **Outline Navigation**: Integrated document outline sidebar for easy navigation.
 - **Smart Layout**: Powerful automatic layout algorithms to clarify your train of thought with one click.
 - **Bi-directional Tracing**: Click on a note node to instantly jump back to the original source in the text.
 - **Privacy & Security**: All data is stored locally, no internet connection required.
 
+## 📦 Packaging (Windows Application)
+
+You can package InkSight as a standalone Windows executable (`.exe`) that runs without a server.
+
+### Build Executable
+
+```bash
+# Build the application
+npm run dist:win
+
+# The executable will be generated at:
+# dist/win-unpacked/InkSight.exe
+```
+
 ## 🛠️ Tech Stack
 
 - **Frontend**: React, Vanilla JS, Vite
+- **Desktop**: Electron
 - **Rendering**: PDF.js, Epub.js, Marked
 - **Canvas**: Plait (Drawnix), Rough.js
 
