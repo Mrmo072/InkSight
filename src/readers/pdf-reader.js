@@ -160,6 +160,53 @@ export class PDFReader {
         this.setSelectionMode(this.selectionMode);
 
         this.setupZoomHandling();
+        this.setupPanHandling();
+    }
+
+    setupPanHandling() {
+        let isPanning = false;
+        let startX = 0;
+        let startY = 0;
+        let scrollLeft = 0;
+        let scrollTop = 0;
+
+        this.container.addEventListener('mousedown', (e) => {
+            // Check for Middle Mouse Button (button 1)
+            if (e.button === 1) {
+                e.preventDefault(); // Prevent default middle click scroll behavior
+                isPanning = true;
+                this.container.style.cursor = 'grabbing';
+                startX = e.pageX - this.container.offsetLeft;
+                startY = e.pageY - this.container.offsetTop;
+                scrollLeft = this.container.scrollLeft;
+                scrollTop = this.container.scrollTop;
+            }
+        });
+
+        this.container.addEventListener('mouseleave', () => {
+            if (isPanning) {
+                isPanning = false;
+                this.container.style.cursor = '';
+            }
+        });
+
+        this.container.addEventListener('mouseup', (e) => {
+            if (e.button === 1) { // Only stop if middle button released
+                isPanning = false;
+                this.container.style.cursor = '';
+            }
+        });
+
+        this.container.addEventListener('mousemove', (e) => {
+            if (!isPanning) return;
+            e.preventDefault();
+            const x = e.pageX - this.container.offsetLeft;
+            const y = e.pageY - this.container.offsetTop;
+            const walkX = (x - startX); // Scroll speed 1:1
+            const walkY = (y - startY);
+            this.container.scrollLeft = scrollLeft - walkX;
+            this.container.scrollTop = scrollTop - walkY;
+        });
     }
 
     setupZoomHandling() {
