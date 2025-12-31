@@ -57,8 +57,11 @@
     <!-- Main Content: Reader View -->
     <main id="reader-container" class="reader-container">
       <div id="reader-toolbar" class="toolbar">
-        <button id="toggle-sidebar" class="icon-btn" title="Toggle Sidebar">
+        <button id="toggle-sidebar" class="icon-btn" title="Toggle File List">
           <span class="material-icons-round">menu_open</span>
+        </button>
+        <button id="toggle-outline" class="icon-btn" title="Toggle Outline">
+          <span class="material-icons-round">toc</span>
         </button>
         <span id="doc-title">No document open</span>
         <div class="spacer"></div>
@@ -107,10 +110,21 @@
           <span class="material-icons-round">vertical_split</span>
         </button>
       </div>
-      <div id="viewer" class="viewer">
-        <div class="empty-state">
-          <span class="material-icons-round" style="font-size: 48px; color: var(--text-secondary);">library_books</span>
-          <p>Select or import a document to start reading</p>
+      
+      <div id="reader-content-wrapper" class="reader-content-wrapper">
+        <div id="outline-sidebar" class="outline-sidebar collapsed">
+           <div class="outline-header">
+               <span>Outline</span>
+           </div>
+           <div id="outline-content" class="outline-content">
+               <div class="outline-empty">No outline available</div>
+           </div>
+        </div>
+        <div id="viewer" class="viewer">
+            <div class="empty-state">
+            <span class="material-icons-round" style="font-size: 48px; color: var(--text-secondary);">library_books</span>
+            <p>Select or import a document to start reading</p>
+            </div>
         </div>
       </div>
     </main>

@@ -165,13 +165,24 @@ export class PDFReader {
             (entries) => this.handleIntersection(entries),
             {
                 root: this.container,
-                threshold: 0.1,
+                threshold: [0.01, 0.5], // Check small and large intersections
                 rootMargin: '200px' // Preload margin
             }
         );
         // Listen for highlight removal to sync with Mind Map deletion
-        // (Handler is bound in constructor now)
         window.addEventListener('highlight-removed', this.handleHighlightRemoved);
+
+        // Add scroll listener for smoother page updates
+        this.container.addEventListener('scroll', () => {
+            // Basic throttle
+            if (!this.scrollTicking) {
+                window.requestAnimationFrame(() => {
+                    this.detectCurrentPage();
+                    this.scrollTicking = false;
+                });
+                this.scrollTicking = true;
+            }
+        }, { passive: true });
     }
 
     setPageCountCallback(callback) {
@@ -418,6 +429,34 @@ export class PDFReader {
         }
     }
 
+    async getOutline() {
+        if (!this.pdfDoc) return null;
+        return await this.pdfDoc.getOutline();
+    }
+
+    async navigateToDest(dest) {
+        if (!this.pdfDoc) return;
+
+        try {
+            // Resolve destination if it's a string (named dest)
+            if (typeof dest === 'string') {
+                dest = await this.pdfDoc.getDestination(dest);
+            }
+
+            if (!dest) return;
+
+            // dest is [pageRef, {name: "XYZ"}, left, top, zoom]
+            const pageRef = dest[0];
+            const pageIndex = await this.pdfDoc.getPageIndex(pageRef);
+            const pageNum = pageIndex + 1;
+
+            this.scrollToPage(pageNum);
+
+        } catch (e) {
+            console.error('[PDFReader] Navigation error:', e);
+        }
+    }
+
     async initPages() {
         this.container.innerHTML = '';
         // Clear array instead of reassigning to maintain reference in highlightRenderer
@@ -431,6 +470,7 @@ export class PDFReader {
             wrapper.style.boxShadow = '0 2px 5px rgba(0,0,0,0.1)';
             wrapper.style.overflow = 'visible';
             wrapper.style.margin = '20px auto'; // Center the page
+            wrapper.style.flexShrink = '0'; // Prevent collapse in flex container
             wrapper.dataset.pageNum = num;
 
             const page = await this.pdfDoc.getPage(num);
@@ -450,25 +490,60 @@ export class PDFReader {
 
             this.observer.observe(wrapper);
         }
+        this.container.addEventListener('scroll', this.detectCurrentPage.bind(this));
     }
 
     handleIntersection(entries) {
+        let needsUpdate = false;
+
         entries.forEach(entry => {
             if (entry.isIntersecting) {
                 const wrapper = entry.target;
                 const pageNum = parseInt(wrapper.dataset.pageNum);
                 const pageInfo = this.pages[pageNum - 1];
 
-                if (!pageInfo.rendered) {
+                if (pageInfo && !pageInfo.rendered) {
                     this.renderPage(pageInfo);
                 }
 
-                this.onPageChange?.(pageNum);
-
                 // Optimization: Unload pages that are far away
                 this.cleanupPages(pageNum);
+
+                needsUpdate = true;
             }
         });
+
+        if (needsUpdate) {
+            this.detectCurrentPage();
+        }
+    }
+
+    detectCurrentPage() {
+        if (!this.pages.length) return;
+
+        const container = this.container;
+        const viewTop = container.scrollTop;
+        const viewHeight = container.clientHeight;
+        const viewMiddle = viewTop + (viewHeight / 3); // Bias towards top third for "current" page
+
+        let bestPage = this.currentPage || 1;
+
+        // Find page covering the "middle" (top third) line
+        for (const page of this.pages) {
+            if (!page.wrapper) continue;
+            const pageTop = page.wrapper.offsetTop;
+            const pageBottom = pageTop + page.wrapper.offsetHeight;
+
+            if (pageTop <= viewMiddle && pageBottom >= viewMiddle) {
+                bestPage = page.num;
+                break;
+            }
+        }
+
+        if (this._lastReportedPage !== bestPage) {
+            this._lastReportedPage = bestPage;
+            this.onPageChange?.(bestPage);
+        }
     }
 
     cleanupPages(currentPage) {
@@ -491,79 +566,85 @@ export class PDFReader {
         if (pageInfo.rendered) return;
         pageInfo.rendered = true;
 
-        const { wrapper, num, viewport } = pageInfo;
-        const page = await this.pdfDoc.getPage(num);
-
-        // Canvas
+        const viewport = pageInfo.viewport;
         const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
-        canvas.style.display = 'block';
-        wrapper.appendChild(canvas);
+        const context = canvas.getContext('2d');
 
-        await page.render({
-            canvasContext: ctx,
-            viewport: viewport
-        }).promise;
+        // Output scaling
+        const devicePixelRatio = window.devicePixelRatio || 1;
+        canvas.width = viewport.width * devicePixelRatio;
+        canvas.height = viewport.height * devicePixelRatio;
+        canvas.style.width = `${viewport.width}px`;
+        canvas.style.height = `${viewport.height}px`;
 
-        // Text Layer
-        const textLayerDiv = document.createElement('div');
-        textLayerDiv.className = 'textLayer';
-        textLayerDiv.style.position = 'absolute';
-        textLayerDiv.style.top = '0';
-        textLayerDiv.style.left = '0';
-        // Explicitly set dimensions to match viewport - attempting to fix alignment
-        textLayerDiv.style.width = `${viewport.width}px`;
-        textLayerDiv.style.height = `${viewport.height}px`;
-        // Set scale factor for PDF.js text layer (Critical for correct text spacing/sizing)
-        textLayerDiv.style.setProperty('--scale-factor', viewport.scale);
-
-        textLayerDiv.style.overflow = 'hidden';
-        textLayerDiv.style.lineHeight = '1.0';
-        textLayerDiv.style.color = 'transparent';
-        textLayerDiv.style.zIndex = '1';
-
-        wrapper.appendChild(textLayerDiv);
-
-        const textContent = await page.getTextContent();
-
-        const textLayer = new pdfjsLib.TextLayer({
-            textContentSource: textContent,
-            container: textLayerDiv,
+        const renderContext = {
+            canvasContext: context,
             viewport: viewport,
-            textDivs: []
+            transform: [devicePixelRatio, 0, 0, devicePixelRatio, 0, 0]
+        };
+
+        pageInfo.wrapper.appendChild(canvas);
+
+        // Setup tool listeners on wrapper
+        if (this.areaSelector) {
+            this.areaSelector.setupListeners(pageInfo.wrapper, pageInfo.num);
+        }
+        if (this.highlighterTool) {
+            this.highlighterTool.setupListeners(pageInfo.wrapper, pageInfo.num);
+        }
+
+        pageInfo.renderTask = this.pdfDoc.getPage(pageInfo.num).then(page => {
+            return page.render(renderContext).promise;
         });
 
-        await textLayer.render();
-
-        const textSpans = textLayerDiv.querySelectorAll('span');
-        textSpans.forEach(span => {
-            span.style.pointerEvents = 'auto';
-            span.style.cursor = 'text';
-            span.style.userSelect = 'text';
-        });
-
-        // Setup mouse event for text selection
-        textLayerDiv.addEventListener('mouseup', () => {
-            if (this.selectionMode === 'text') {
-                this.handleSelection(num);
+        pageInfo.renderTask.then(() => {
+            // Render Text Layer
+            this.renderTextLayer(pageInfo);
+            // Render highlights for this page
+            setTimeout(() => {
+                if (this.highlightRenderer && window.inksight && window.inksight.highlightManager) {
+                    const highlights = window.inksight.highlightManager.highlights;
+                    this.highlightRenderer.renderHighlightsForPage(pageInfo.num, highlights);
+                }
+            }, 0);
+        }).catch(err => {
+            if (err.name !== 'RenderingCancelledException') {
+                console.error('Render error:', err);
             }
         });
+    }
 
-        // Setup area selection listeners
-        this.areaSelector.setupListeners(wrapper, num);
+    renderTextLayer(pageInfo) {
+        this.pdfDoc.getPage(pageInfo.num).then(page => {
+            page.getTextContent().then(textContent => {
+                const textLayerDiv = document.createElement('div');
+                textLayerDiv.className = 'textLayer';
 
-        // Setup highlighter tool listeners
-        if (this.highlighterTool) {
-            this.highlighterTool.setupListeners(wrapper, num);
-        }
+                // Set explicit dimensions matching viewport
+                textLayerDiv.style.width = `${pageInfo.viewport.width}px`;
+                textLayerDiv.style.height = `${pageInfo.viewport.height}px`;
 
-        // Render existing highlights for this page
-        if (window.inksight && window.inksight.highlightManager) {
-            const highlights = window.inksight.highlightManager.highlights;
-            this.renderHighlightsForPage(num, highlights);
-        }
+                // IMPORTANT: Set scale factor for correct text sizing
+                textLayerDiv.style.setProperty('--scale-factor', pageInfo.viewport.scale);
+
+                pageInfo.wrapper.appendChild(textLayerDiv);
+
+                const textLayer = new pdfjsLib.TextLayer({
+                    textContentSource: textContent,
+                    container: textLayerDiv,
+                    viewport: pageInfo.viewport,
+                    textDivs: []
+                });
+
+                textLayer.render().then(() => {
+                    textLayerDiv.addEventListener('mouseup', () => {
+                        if (this.selectionMode === 'text') {
+                            this.handleSelection(pageInfo.num);
+                        }
+                    });
+                });
+            });
+        });
     }
 
     renderHighlightsForPage(pageNum, highlights) {
@@ -710,6 +791,108 @@ export class PDFReader {
                     detail: { id: highlightId, color }
                 }));
             }
+        }
+    }
+
+    async getOutline() {
+        if (!this.pdfDoc) return null;
+        return await this.pdfDoc.getOutline();
+    }
+
+    async navigateToDest(dest) {
+        if (!this.pdfDoc) return;
+
+        try {
+            console.log('[PDFReader] navigateToDest:', dest);
+
+            // Resolve destination if it's a string (named dest)
+            if (typeof dest === 'string') {
+                dest = await this.pdfDoc.getDestination(dest);
+                console.log('[PDFReader] Resolved string dest:', dest);
+            }
+
+            if (!dest) {
+                console.warn('[PDFReader] Destination is null');
+                return;
+            }
+
+            // dest is [pageRef, {name: "XYZ"}, left, top, zoom]
+            const pageRef = dest[0];
+            const pageIndex = await this.pdfDoc.getPageIndex(pageRef);
+            const pageNum = pageIndex + 1;
+
+            console.log(`[PDFReader] Page Ref:`, pageRef, `Index: ${pageIndex}, Num: ${pageNum}`);
+
+            this.scrollToPage(pageNum);
+
+        } catch (e) {
+            console.error('[PDFReader] Navigation error:', e);
+        }
+    }
+
+    scrollToPage(pageNum) {
+        console.log('[PDFReader] scrollToPage requested:', pageNum);
+
+        pageNum = Math.max(1, Math.min(pageNum, this.pdfDoc.numPages));
+        const pageInfo = this.pages[pageNum - 1];
+
+        if (pageInfo && pageInfo.wrapper) {
+            console.log('[PDFReader] Rolling to wrapper for page:', pageNum, 'Top:', pageInfo.wrapper.offsetTop);
+
+            // Use 'auto' instead of 'smooth' to prevent race conditions during heavy render
+            pageInfo.wrapper.scrollIntoView({ behavior: 'auto', block: 'start' });
+
+            // Force immediate update
+            // Verify if scroll actually happened before detecting?
+            // setTimeout to allow layout to settle
+            setTimeout(() => {
+                this.detectCurrentPage();
+            }, 50);
+        } else {
+            console.warn('[PDFReader] Page wrapper not found for:', pageNum);
+        }
+    }
+
+    onPrevPage() {
+        // Find first visible page or use current logic
+        // Simply scrolling up by one page height? No, page-based.
+        // We'll estimate current page from scroll position if needed, or track it.
+        // For now, let's look at the first page that intersects or close to top.
+        // A heuristic: find page closest to top of container.
+        const containerTop = this.container.scrollTop;
+        let bestPage = 1;
+        let minDiff = Infinity;
+
+        this.pages.forEach(p => {
+            const offset = p.wrapper.offsetTop;
+            const diff = Math.abs(offset - containerTop);
+            if (diff < minDiff) {
+                minDiff = diff;
+                bestPage = p.num;
+            }
+        });
+
+        if (bestPage > 1) {
+            this.scrollToPage(bestPage - 1);
+        }
+    }
+
+    onNextPage() {
+        const containerTop = this.container.scrollTop;
+        let bestPage = 1;
+        let minDiff = Infinity;
+
+        this.pages.forEach(p => {
+            const offset = p.wrapper.offsetTop;
+            const diff = Math.abs(offset - containerTop);
+            if (diff < minDiff) {
+                minDiff = diff;
+                bestPage = p.num;
+            }
+        });
+
+        if (bestPage < this.pdfDoc.numPages) {
+            this.scrollToPage(bestPage + 1);
         }
     }
 

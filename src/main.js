@@ -6,6 +6,7 @@ import { MindmapView } from './mindmap/mindmap-view.js';
 import { DrawnixView } from './mindmap/drawnix-view.js';
 import { highlightManager } from './core/highlight-manager.js';
 import { SplitView } from './ui/split-view.js';
+import { OutlineSidebar } from './ui/outline-sidebar.js';
 import { suppressResizeObserverLoop } from './drawnix/react-board/src/utils/resizeObserverFix.js';
 
 suppressResizeObserverLoop();
@@ -17,9 +18,10 @@ window.inksight = {
         name: null,
         id: null
     },
-    cardSystem: null, // Will be populated below
-    highlightManager: null, // Will be populated below
-    pdfReader: null // Will be populated when PDF is loaded
+    cardSystem: null,
+    highlightManager: null,
+    pdfReader: null,
+    outlineSidebar: null
 };
 
 // Import cardSystem (it's already imported by other modules, but we need it here)
@@ -54,6 +56,7 @@ let currentReader = null;
 let mindmapView = null;
 let drawnixView = null;
 let splitView = null;
+let outlineSidebar = null;
 
 // Initialization
 function init() {
@@ -64,11 +67,7 @@ function init() {
         // Init Mindmap or Drawnix
         const mindmapContainer = document.getElementById('mindmap-container');
         if (mindmapContainer) {
-            // mindmapView = new MindmapView(mindmapContainer);
-            // console.log('MindmapView initialized');
-
             drawnixView = new DrawnixView(mindmapContainer);
-
         }
 
         // Init SplitView BEFORE setupEventListeners
@@ -79,6 +78,10 @@ function init() {
             resizerLeftId: 'resizer-left',
             resizerRightId: 'resizer-right'
         });
+
+        // Init Outline Sidebar
+        outlineSidebar = new OutlineSidebar('outline-sidebar', 'outline-content', 'toggle-outline');
+        window.inksight.outlineSidebar = outlineSidebar;
 
         // Setup event listeners AFTER SplitView is initialized
         setupEventListeners();
@@ -103,32 +106,24 @@ function setupEventListeners() {
     });
 
     // Mind Map Selection Change (Show Document Name)
-    // Mind Map Selection Change (Show Document Name)
     const docInfoEl = document.getElementById('mindmap-doc-info');
 
     window.addEventListener('mindmap-selection-changed', (e) => {
         const { sourceId } = e.detail;
-        // console.log('[Main] mindmap-selection-changed received. sourceId:', sourceId);
-
         if (sourceId && docInfoEl) {
-            // console.log('[Main] Looking for file with ID:', sourceId);
             const file = state.files.find(f => f.id === sourceId);
             if (file) {
-                // console.log('[Main] File found:', file.name);
                 docInfoEl.textContent = file.name;
                 docInfoEl.style.display = 'inline-flex';
                 docInfoEl.title = file.name;
             } else if (e.detail.sourceName) {
-                // console.log('[Main] File not loaded, using persisted sourceName:', e.detail.sourceName);
                 docInfoEl.textContent = e.detail.sourceName;
                 docInfoEl.style.display = 'inline-flex';
                 docInfoEl.title = e.detail.sourceName;
             } else {
-                // console.warn('[Main] File not found for sourceId:', sourceId);
                 docInfoEl.style.display = 'none';
             }
         } else if (docInfoEl) {
-            // console.log('[Main] No sourceId or element missing');
             docInfoEl.style.display = 'none';
         }
     });
@@ -191,66 +186,43 @@ function setupEventListeners() {
         let startHeight = 16;
         let clickThreshold = 5;
 
-        // Show panel on hover (only if active)
         highlighterModeBtn.addEventListener('mouseenter', () => {
             if (highlighterModeBtn.classList.contains('active')) {
-                // First make the panel visible to ensure it's rendered
                 highlighterPanel.classList.add('visible');
-
-                // Force a reflow to ensure the panel is fully rendered before calculating position
                 void highlighterPanel.offsetHeight;
-
-                // Calculate position relative to the offset parent (likely reader-container or body)
                 const btnRect = highlighterModeBtn.getBoundingClientRect();
-                // Check if offsetParent exists, otherwise fallback to body
                 const offsetParent = highlighterPanel.offsetParent || document.body;
                 const containerRect = offsetParent.getBoundingClientRect();
-                const panelWidth = 220; // Width defined in CSS
-
-                // Calculate left position relative to container
+                const panelWidth = 220;
                 let left = (btnRect.left - containerRect.left) + (btnRect.width / 2) - (panelWidth / 2);
-
-                // Ensure it doesn't go off-screen (relative to container width)
                 const containerWidth = containerRect.width;
                 if (left < 10) left = 10;
                 if (left + panelWidth > containerWidth - 10) left = containerWidth - panelWidth - 10;
-
-                // Calculate top position relative to container
-                const top = (btnRect.bottom - containerRect.top) + 12; // 12px gap
-
+                const top = (btnRect.bottom - containerRect.top) + 12;
                 highlighterPanel.style.top = `${top}px`;
                 highlighterPanel.style.left = `${left}px`;
-                highlighterPanel.style.transform = 'translateX(0)'; // Reset any centering transform if present
+                highlighterPanel.style.transform = 'translateX(0)';
             }
         });
 
         highlighterModeBtn.addEventListener('mousedown', (e) => {
             isDragging = false;
             startY = e.clientY;
-
             if (currentReader && currentReader.highlighterTool) {
                 startHeight = currentReader.highlighterTool.height;
             } else if (heightSlider) {
                 startHeight = parseInt(heightSlider.value) || 16;
             }
-
             document.addEventListener('mousemove', onMouseMove);
             document.addEventListener('mouseup', onMouseUp);
         });
 
         const onMouseMove = (e) => {
             const deltaY = startY - e.clientY;
-            if (Math.abs(deltaY) > clickThreshold) {
-                isDragging = true;
-            }
-
+            if (Math.abs(deltaY) > clickThreshold) isDragging = true;
             if (isDragging) {
-                // Calculate new height
                 let newHeight = startHeight + deltaY;
-                // Clamp height between 8 and 48
                 newHeight = Math.max(8, Math.min(48, newHeight));
-
-                // Update slider and tool
                 if (heightSlider) heightSlider.value = newHeight;
                 if (currentReader && currentReader.highlighterTool) {
                     currentReader.highlighterTool.setHeight(newHeight);
@@ -263,7 +235,6 @@ function setupEventListeners() {
             document.removeEventListener('mouseup', onMouseUp);
         }
 
-        // Handle slider change directly
         if (heightSlider) {
             heightSlider.addEventListener('input', (e) => {
                 const newHeight = parseInt(e.target.value);
@@ -273,7 +244,6 @@ function setupEventListeners() {
             });
         }
 
-        // Hide panel when clicking outside
         document.addEventListener('click', (e) => {
             if (!highlighterPanel.contains(e.target) && e.target !== highlighterModeBtn) {
                 highlighterPanel.classList.remove('visible');
@@ -287,7 +257,6 @@ function setupEventListeners() {
         layoutBtn.addEventListener('click', () => {
             if (window.applyAutoLayout) {
                 window.applyAutoLayout();
-
             } else {
                 console.warn('Auto-layout function not available yet');
             }
@@ -297,13 +266,9 @@ function setupEventListeners() {
 
 // File Handling
 async function handleFileSelect(e) {
-
     const file = e.target.files[0];
     if (!file) return;
 
-    // Generate a deterministic ID based on file metadata
-    // This ensures that if the user reloads and re-opens the same file,
-    // the ID remains the same, matching the sourceId stored in persisted cards.
     const fileSignature = `${file.name}-${file.size}-${file.lastModified}`;
     const fileId = await generateHash(fileSignature);
 
@@ -315,10 +280,9 @@ async function handleFileSelect(e) {
         fileObj: file
     };
 
-    // Check if file already exists in state to avoid duplicates
     const existingIndex = state.files.findIndex(f => f.id === fileId);
     if (existingIndex >= 0) {
-        state.files[existingIndex] = fileData; // Update existing
+        state.files[existingIndex] = fileData;
     } else {
         state.files.push(fileData);
     }
@@ -333,7 +297,7 @@ async function generateHash(message) {
     const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    return hashHex.substring(0, 32); // Use first 32 chars as ID
+    return hashHex.substring(0, 32);
 }
 
 function renderFileList() {
@@ -353,51 +317,34 @@ window.openFileById = (id) => {
 };
 
 async function handleJumpToSource(sourceId, highlightId) {
-
-
-    // Try to find highlight first, as it might have the updated sourceId
     let highlight = null;
     if (window.inksight && window.inksight.highlightManager) {
         highlight = window.inksight.highlightManager.highlights.find(h => h.id === highlightId);
     }
 
-
-    // If highlight found, use its sourceId as it's likely more up-to-date (remapped on load)
     const effectiveSourceId = highlight ? highlight.sourceId : sourceId;
-    // console.log('[Main] Effective sourceId:', effectiveSourceId);
-
     const file = state.files.find(f => f.id === effectiveSourceId);
     if (!file) {
         console.warn('[Main] Source file not found:', effectiveSourceId, 'Original:', sourceId);
         return;
     }
-    // console.log('[Main] Found file:', file.name);
 
     if (!highlight) {
         console.warn('[Main] Highlight not found:', highlightId);
         return;
     }
 
-    // If file is not current, load it
     if (!state.currentFile || state.currentFile.id !== effectiveSourceId) {
-
         await openFile(file);
     }
 
-    // Scroll to highlight
     if (currentReader) {
         if (currentReader.scrollToHighlight) {
             await currentReader.scrollToHighlight(highlightId);
         } else {
-            // Fallback for other readers (Text/Epub) if they don't support scrollToHighlight yet
-
-            // ... (keep existing fallback logic if needed, or just rely on reader)
-            // For now, let's assume other readers might need similar implementation later
-            // But since we only modified PDFReader, we should check type or method existence
             const pageInfo = currentReader.pages ? currentReader.pages[highlight.location.page - 1] : null;
             if (pageInfo && pageInfo.wrapper) {
                 pageInfo.wrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                // Flash highlight after scroll
                 if (currentReader.flashHighlight) {
                     setTimeout(() => {
                         currentReader.flashHighlight(highlightId);
@@ -414,17 +361,15 @@ async function openFile(fileData) {
     renderFileList();
     elements.viewer.innerHTML = '';
 
-    // Register document with DocumentManager
     if (window.inksight.documentManager) {
         window.inksight.documentManager.registerDocument(
             fileData.id,
             fileData.name,
             fileData.type,
-            true // loaded
+            true
         );
     }
 
-    // Update source names in CardSystem and HighlightManager (Healing for existing files)
     if (window.inksight.cardSystem) {
         window.inksight.cardSystem.updateSourceNames(fileData.id, fileData.name);
     }
@@ -433,19 +378,18 @@ async function openFile(fileData) {
     }
 
     if (fileData.type === 'application/pdf') {
-        // Clean up existing reader if it exists
         if (currentReader) {
-
             if (currentReader.destroy) {
                 currentReader.destroy();
             }
             currentReader = null;
         }
 
+        // Reset outline
+        outlineSidebar.reset();
+
         elements.viewer.innerHTML = '<div class="loading">Loading PDF...</div>';
         currentReader = new PDFReader(elements.viewer);
-
-        // Expose PDF reader globally for import operations
         window.inksight.pdfReader = currentReader;
 
         currentReader.setPageCountCallback((count) => {
@@ -462,11 +406,17 @@ async function openFile(fileData) {
             await currentReader.load(fileData);
             elements.prevBtn.disabled = false;
             elements.nextBtn.disabled = false;
+
+            // Load Outline
+            const outline = currentReader.getOutline();
+            outlineSidebar.render(outline, currentReader.pdfDoc);
+
         } catch (e) {
             elements.viewer.innerHTML = `<div class="error">Error loading PDF: ${e.message}</div>`;
             console.error(e);
         }
     } else if (fileData.type === 'application/epub+zip' || fileData.type === 'application/epub' || fileData.name.toLowerCase().endsWith('.epub')) {
+        outlineSidebar.reset();
         elements.viewer.innerHTML = '<div class="loading">Loading EPUB...</div>';
         currentReader = new EpubReader(elements.viewer);
 
@@ -535,7 +485,6 @@ function updateToolAvailability(fileType) {
         }
     });
 
-    // Always switch to text mode if current mode is disabled
     const currentModeBtn = document.querySelector('.mode-btn.active');
     if (currentModeBtn && currentModeBtn.disabled) {
         const textModeBtn = document.getElementById('text-mode');

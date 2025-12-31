@@ -137,6 +137,14 @@ body {
   flex-shrink: 1;
 }
 
+/* Reader Layout */
+.reader-content-wrapper {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+}
+
 .viewer {
   flex: 1;
   overflow: auto;
@@ -144,6 +152,83 @@ body {
   background-color: #f3f4f6;
   display: flex;
   flex-direction: column;
+}
+
+/* Outline Sidebar */
+.outline-sidebar {
+  width: 260px;
+  background-color: var(--bg-main);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.outline-sidebar.collapsed {
+  width: 0;
+  border-right: none;
+}
+
+.outline-header {
+  height: 40px;
+  min-height: 40px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+  background-color: var(--bg-secondary);
+}
+
+.outline-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.outline-item {
+  padding: 6px 12px 6px 16px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-main);
+  /* white-space: nowrap; */
+  /* Allow wrapping for long titles */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-left: 2px solid transparent;
+  width: 100%;
+  display: block;
+}
+
+.outline-item:hover {
+  background-color: var(--bg-secondary);
+  color: var(--primary);
+}
+
+.outline-item.active {
+  background-color: #eff6ff;
+  color: var(--primary);
+  border-left-color: var(--primary);
+  font-weight: 500;
+}
+
+.outline-item.nested {
+  padding-left: 32px;
+}
+
+.outline-item.nested-2 {
+  padding-left: 48px;
+}
+
+.outline-empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 13px;
 }
 
 .empty-state {
