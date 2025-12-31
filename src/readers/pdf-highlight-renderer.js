@@ -83,13 +83,39 @@ export class PDFHighlightRenderer {
                 return;
             }
 
+            // Handle normalized coordinates (0-1) or absolute pixels (backward compatibility)
+            let finalTop, finalLeft, finalWidth, finalHeight;
+
+            // Check if coordinates are normalized (<= 1)
+            // Heuristic: if top/left are small but page is large, it's normalized.
+            // But we can just check if we switched to normalized in the creator.
+            // Let's assume if it looks like pixels (large values), we scale them relative to original viewport?
+            // No, we can't easily know original viewport.
+            // New logic: Creator stores normalized.
+
+            const isNormalized = rect.left <= 1 && rect.top <= 1 && rect.width <= 1 && rect.height <= 1;
+
+            if (isNormalized) {
+                finalTop = rect.top * pageInfo.viewport.height;
+                finalLeft = rect.left * pageInfo.viewport.width;
+                finalWidth = rect.width * pageInfo.viewport.width;
+                finalHeight = rect.height * pageInfo.viewport.height;
+            } else {
+                // Fallback for legacy pixel highlights (will be offset on zoom, but preserved)
+                // Or we could try to scale if we assume they were created at scale 1.5? risky.
+                finalTop = rect.top;
+                finalLeft = rect.left;
+                finalWidth = rect.width;
+                finalHeight = rect.height;
+            }
+
             const highlightDiv = document.createElement('div');
             highlightDiv.className = 'highlight-overlay';
             highlightDiv.style.position = 'absolute';
-            highlightDiv.style.top = `${rect.top}px`;
-            highlightDiv.style.left = `${rect.left}px`;
-            highlightDiv.style.width = `${rect.width}px`;
-            highlightDiv.style.height = `${rect.height}px`;
+            highlightDiv.style.top = `${finalTop}px`;
+            highlightDiv.style.left = `${finalLeft}px`;
+            highlightDiv.style.width = `${finalWidth}px`;
+            highlightDiv.style.height = `${finalHeight}px`;
 
             // Handle color
             let bgColor = 'rgba(255, 226, 52, 0.4)'; // Default

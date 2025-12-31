@@ -158,6 +158,40 @@ export class PDFReader {
 
         // Initialize selection mode and colors
         this.setSelectionMode(this.selectionMode);
+
+        this.setupZoomHandling();
+    }
+
+    setupZoomHandling() {
+        this.container.addEventListener('wheel', (e) => {
+            if (e.ctrlKey) {
+                e.preventDefault();
+                const zoomStep = 0.1;
+                const delta = -Math.sign(e.deltaY);
+                const newScale = Math.max(0.5, Math.min(this.scale + (delta * zoomStep), 3.0));
+
+                this.setScale(newScale);
+            }
+        }, { passive: false });
+    }
+
+    async setScale(newScale) {
+        if (Math.abs(this.scale - newScale) < 0.01) return;
+
+        // Calculate current center relative position to maintain scroll
+        const scrollTop = this.container.scrollTop;
+        const scrollHeight = this.container.scrollHeight;
+        const ratio = scrollHeight > 0 ? scrollTop / scrollHeight : 0;
+
+        this.scale = newScale;
+
+        // Reload pages with new scale
+        await this.initPages();
+
+        // Restore scroll position
+        if (ratio > 0) {
+            this.container.scrollTop = this.container.scrollHeight * ratio;
+        }
     }
 
     initObserver() {
@@ -281,20 +315,32 @@ export class PDFReader {
             const rect = rects[i];
             if (rect.width === 0 || rect.height === 0) continue;
 
-            // Convert to relative coordinates
-            const top = rect.top - wrapperRect.top;
-            const left = rect.left - wrapperRect.left;
+            // Convert to relative normalized coordinates (0-1)
+            // This ensures highlights scale correctly when zoom changes
+            const topPx = rect.top - wrapperRect.top;
+            const leftPx = rect.left - wrapperRect.left;
 
-            const currentRect = { top, left, width: rect.width, height: rect.height };
+            const normalizedTop = topPx / wrapperRect.height;
+            const normalizedLeft = leftPx / wrapperRect.width;
+            const normalizedWidth = rect.width / wrapperRect.width;
+            const normalizedHeight = rect.height / wrapperRect.height;
 
-            // Check overlap
+            const currentRect = {
+                top: normalizedTop,
+                left: normalizedLeft,
+                width: normalizedWidth,
+                height: normalizedHeight
+            };
+
+            // Check overlap (using normalized coords is fine for math)
             if (processedRects.some(pr => areRectsOverlapping(pr, currentRect))) continue;
 
             const highlightDiv = document.createElement('div');
             highlightDiv.className = 'highlight-overlay';
             highlightDiv.style.position = 'absolute';
-            highlightDiv.style.top = `${top}px`;
-            highlightDiv.style.left = `${left}px`;
+            // Render temporary overlay using pixels for immediate feedback
+            highlightDiv.style.top = `${topPx}px`;
+            highlightDiv.style.left = `${leftPx}px`;
             highlightDiv.style.width = `${rect.width}px`;
             highlightDiv.style.height = `${rect.height}px`;
             highlightDiv.style.backgroundColor = PDFReader.defaultColors.text;
@@ -306,7 +352,7 @@ export class PDFReader {
 
             pageInfo.wrapper.appendChild(highlightDiv);
             highlightOverlays.push(highlightDiv);
-            highlightRects.push(currentRect);
+            highlightRects.push(currentRect); // Push normalized rect
             processedRects.push(currentRect);
         }
 
