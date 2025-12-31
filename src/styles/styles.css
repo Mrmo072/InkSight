@@ -394,12 +394,17 @@ body {
   border: none;
   background: transparent;
   font-size: 12px;
+  font-family: inherit;
   color: var(--text-secondary);
   padding: 4px 0;
   border-top: 1px solid transparent;
   border-bottom: 1px solid transparent;
   outline: none;
   transition: all 0.2s;
+  resize: none;
+  /* Auto-resizing via JS */
+  overflow: hidden;
+  line-height: 1.4;
 }
 
 .annotation-note-input:focus,

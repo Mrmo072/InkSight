@@ -138,13 +138,24 @@ export class AnnotationList {
         div.appendChild(quote);
 
         // Note Input
-        const input = document.createElement('input');
+        const input = document.createElement('textarea');
         input.className = 'annotation-note-input';
         input.placeholder = 'Add a note...';
         input.value = card.note || '';
+        input.rows = 1;
+
+        // Auto-resize
+        const autoResize = () => {
+            input.style.height = 'auto';
+            input.style.height = input.scrollHeight + 'px';
+        };
+        // Initial resize
+        setTimeout(autoResize, 0);
 
         // Stop propagation of click to prevent jump when just editing note
         input.addEventListener('click', (e) => e.stopPropagation());
+
+        input.addEventListener('input', autoResize);
 
         input.addEventListener('change', (e) => {
             this.cardSystem.updateCard(card.id, { note: e.target.value });
