@@ -351,8 +351,11 @@ export class PDFReader {
             const intersectionArea = (x2 - x1) * (y2 - y1);
             const rect1Area = rect1.width * rect1.height;
             const rect2Area = rect2.width * rect2.height;
+            const minArea = Math.min(rect1Area, rect2Area);
 
-            return intersectionArea > 0.5 * Math.min(rect1Area, rect2Area);
+            // Only skip if one is almost completely inside another (90% overlap)
+            // This prevents skipping distinct text fragments like quotes that barely touch
+            return intersectionArea > 0.90 * minArea;
         };
 
         const processedRects = [];
