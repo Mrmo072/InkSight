@@ -367,6 +367,14 @@ export class PDFReader {
             const topPx = rect.top - wrapperRect.top;
             const leftPx = rect.left - wrapperRect.left;
 
+            // BUG FIX: Ignore rects that are likely the page vessel/container itself
+            // This happens when selection spans across pages or includes the wrapper div
+            if (rect.width > wrapperRect.width * 0.9 && rect.height > wrapperRect.height * 0.9) {
+                continue;
+            }
+
+            // Removed `if (topPx >= wrapperRect.height) continue;` to allow cross-page selections to show (via overflow)
+
             const normalizedTop = topPx / wrapperRect.height;
             const normalizedLeft = leftPx / wrapperRect.width;
             const normalizedWidth = rect.width / wrapperRect.width;
