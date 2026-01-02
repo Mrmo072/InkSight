@@ -826,6 +826,23 @@ export class PDFReader {
         }
     }
 
+    removeHighlightOverlays(highlightId) {
+        if (!highlightId) return;
+
+        // Remove standard overlays (text highlights) and area borders (image highlights)
+        const overlays = this.container.querySelectorAll(`[data-highlight-id="${highlightId}"]`);
+        overlays.forEach(el => el.remove());
+
+        // Also remove from SVG layer if present
+        const svgs = this.container.querySelectorAll(`[data-highlight-svg-id="${highlightId}"]`);
+        svgs.forEach(el => el.remove());
+
+        // Ensure HighlightRenderer also cleans up
+        if (this.highlightRenderer) {
+            this.highlightRenderer.removeHighlightOverlays(highlightId);
+        }
+    }
+
     updateHighlightColor(highlightId, color) {
         // Update visual
         const overlays = this.container.querySelectorAll(`[data-highlight-id="${highlightId}"]`);
