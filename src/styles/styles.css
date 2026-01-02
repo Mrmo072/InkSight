@@ -381,12 +381,17 @@ body {
   color: var(--text-main);
   padding-left: 8px;
   border-left: 3px solid var(--primary);
-  max-height: 100px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  -webkit-box-orient: vertical;
+  /* max-height: 100px; */
+  /* Remove clamping to show full text as requested */
+  /* overflow: hidden; */
+  /* text-overflow: ellipsis; */
+  /* display: -webkit-box; */
+  /* -webkit-line-clamp: 4; */
+  /* -webkit-box-orient: vertical; */
+  white-space: pre-wrap;
+  /* Preserve newlines */
+  overflow-wrap: break-word;
+  /* Ensure long words don't break layout */
 }
 
 .annotation-note-input {
