@@ -83,6 +83,7 @@ export interface Translations {
   'menu.exportImage.png': string;
   'menu.exportImage.jpg': string;
   'menu.cleanBoard': string;
+  'menu.exportSelectedText': string;
   'menu.github': string;
 
   // Dialog translations

@@ -78,6 +78,7 @@ const enTranslations: Translations = {
   'menu.exportImage.png': 'PNG',
   'menu.exportImage.jpg': 'JPG',
   'menu.cleanBoard': 'Clear Board',
+  'menu.exportSelectedText': 'Export Selected Text',
   'menu.github': 'GitHub',
 
   // Dialog translations

@@ -19,7 +19,7 @@ import {
 import { Island } from '../../island';
 import { Popover, PopoverContent, PopoverTrigger } from '../../popover/popover';
 import { useState } from 'react';
-import { CleanBoard, OpenFile, SaveAsImage, SaveToFile, Socials } from './app-menu-items';
+import { CleanBoard, ExportSelectedText, OpenFile, SaveAsImage, SaveToFile, Socials } from './app-menu-items';
 import { LanguageSwitcherMenu } from './language-switcher-menu';
 import Menu from '../../menu/menu';
 import MenuSeparator from '../../menu/menu-separator';
@@ -70,6 +70,7 @@ export const AppToolbar = () => {
               <OpenFile></OpenFile>
               <SaveToFile></SaveToFile>
               <SaveAsImage></SaveAsImage>
+              <ExportSelectedText></ExportSelectedText>
               <CleanBoard></CleanBoard>
               <MenuSeparator />
               <LanguageSwitcherMenu />
@@ -129,7 +130,7 @@ export const AppToolbar = () => {
             }}
           />
         )}
-        
+
       </Stack.Row>
     </Island>
   );

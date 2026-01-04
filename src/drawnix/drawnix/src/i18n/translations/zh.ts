@@ -71,7 +71,7 @@ const zhTranslations: Translations = {
   'language.english': 'English',
   'language.russian': 'Русский',
   'language.arabic': 'عربي',
-  
+
   // Menu items
   'menu.open': '打开',
   'menu.saveFile': '保存文件',
@@ -79,6 +79,7 @@ const zhTranslations: Translations = {
   'menu.exportImage.png': 'PNG',
   'menu.exportImage.jpg': 'JPG',
   'menu.cleanBoard': '清除画布',
+  'menu.exportSelectedText': '导出选中文字',
   'menu.github': 'GitHub',
 
   // Dialog translations
@@ -117,7 +118,7 @@ const zhTranslations: Translations = {
   'popupToolbar.fontColor': '字体颜色',
   'popupToolbar.link': '链接',
   'popupToolbar.stroke': '边框',
-  
+
   // Text placeholders
   'textPlaceholders.link': '链接',
   'textPlaceholders.text': '文本',
@@ -136,7 +137,7 @@ const zhTranslations: Translations = {
   // Draw elements text
   'draw.lineText': '文本',
   'draw.geometryText': '文本',
-  
+
   // Mind map elements text
   'mind.centralText': '中心主题',
   'mind.abstractNodeText': '摘要',

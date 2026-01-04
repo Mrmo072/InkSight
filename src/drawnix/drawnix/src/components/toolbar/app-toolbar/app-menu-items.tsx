@@ -4,6 +4,7 @@ import {
   OpenFileIcon,
   SaveFileIcon,
   TrashIcon,
+  TextIcon,
 } from '../../icons';
 import { useBoard, useListRender } from '@plait-board/react-board';
 import {
@@ -13,7 +14,9 @@ import {
   PlaitTheme,
   ThemeColorMode,
   Viewport,
+  getSelectedElements,
 } from '@plait/core';
+import { MindElement } from '@plait/mind';
 import { loadFromJSON, saveAsJSON } from '../../../data/json';
 import MenuItem from '../../menu/menu-item';
 import MenuItemLink from '../../menu/menu-item-link';
@@ -202,6 +205,60 @@ export const SaveAsImage = () => {
   );
 };
 SaveAsImage.displayName = 'SaveAsImage';
+
+export const ExportSelectedText = () => {
+  const board = useBoard();
+  const { t } = useI18n();
+
+  return (
+    <MenuItem
+      icon={TextIcon}
+      data-testid="export-text-button"
+      onSelect={() => {
+        const selectedElements = getSelectedElements(board);
+        if (selectedElements.length === 0) {
+          alert('No elements selected. Please select some nodes first.');
+          return;
+        }
+
+        const texts: string[] = [];
+        selectedElements.forEach(element => {
+          let text = '';
+          if (MindElement.isMindElement(board, element)) {
+            // Mind map node
+            text = (element.data?.topic?.children?.[0] as any)?.text || '';
+          } else if ((element as any).text && (element as any).text.children) {
+            // Geometry or other shape with text
+            text = (element as any).text.children[0]?.text || '';
+          }
+
+          if (text) {
+            texts.push(text);
+          }
+        });
+
+        if (texts.length === 0) {
+          alert('Selected elements contain no text.');
+          return;
+        }
+
+        const blob = new Blob([texts.join('\n')], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'exported_text.txt';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }}
+      aria-label={t('menu.exportSelectedText')}
+    >
+      {t('menu.exportSelectedText')}
+    </MenuItem>
+  );
+};
+ExportSelectedText.displayName = 'ExportSelectedText';
 
 export const CleanBoard = () => {
   const { appState, setAppState } = useDrawnix();
