@@ -52,7 +52,7 @@ body {
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid var(--border);
-  background-color: white;
+  background-color: var(--bg-main);
 }
 
 .file-list {
@@ -118,7 +118,7 @@ body {
   align-items: center;
   padding: 0 16px;
   gap: 12px;
-  background-color: white;
+  background-color: var(--bg-main);
   z-index: 10;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   min-width: 0;
@@ -149,7 +149,7 @@ body {
   flex: 1;
   overflow: auto;
   position: relative;
-  background-color: #f3f4f6;
+  background-color: var(--bg-tertiary);
   display: flex;
   flex-direction: column;
 }
@@ -263,11 +263,11 @@ body {
 }
 
 .panel-header {
-  height: 48px;
+  height: var(--header-height);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 8px;
+  padding: 0 16px;
   background-color: var(--bg-main);
   border-bottom: 1px solid var(--border);
 }
@@ -322,7 +322,7 @@ body {
   overflow: hidden;
   background-image: radial-gradient(var(--border) 1px, transparent 1px);
   background-size: 20px 20px;
-  background-color: #f8fafc;
+  background-color: var(--bg-secondary);
   user-select: none;
 }
 
@@ -354,7 +354,7 @@ body {
 }
 
 .annotation-item {
-  background: white;
+  background: var(--bg-main);
   border-radius: 8px;
   border: 1px solid var(--border);
   padding: 12px;
@@ -460,7 +460,7 @@ body {
   height: 24px;
   border-radius: 4px;
   border: none;
-  background: white;
+  background: var(--bg-main);
   color: var(--text-secondary);
   cursor: pointer;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);

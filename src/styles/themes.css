@@ -14,6 +14,14 @@
     --theme-shadow-md: rgba(0, 0, 0, 0.12);
     --theme-primary: #2563eb;
     --theme-primary-hover: #1d4ed8;
+
+    /* Map to standard variables */
+    --bg-main: var(--theme-bg-main);
+    --bg-secondary: var(--theme-bg-secondary);
+    --bg-tertiary: var(--theme-bg-tertiary);
+    --border: var(--theme-border);
+    --text-main: var(--theme-text-main);
+    --text-secondary: var(--theme-text-secondary);
 }
 
 /* Soft Theme (Gentle gray) */
@@ -29,6 +37,14 @@
     --theme-shadow-md: rgba(0, 0, 0, 0.1);
     --theme-primary: #4a90e2;
     --theme-primary-hover: #357abd;
+
+    /* Map to standard variables */
+    --bg-main: var(--theme-bg-main);
+    --bg-secondary: var(--theme-bg-secondary);
+    --bg-tertiary: var(--theme-bg-tertiary);
+    --border: var(--theme-border);
+    --text-main: var(--theme-text-main);
+    --text-secondary: var(--theme-text-secondary);
 }
 
 /* Retro Theme (Vintage warm) */
@@ -44,6 +60,14 @@
     --theme-shadow-md: rgba(61, 53, 32, 0.15);
     --theme-primary: #8b7355;
     --theme-primary-hover: #6d5940;
+
+    /* Map to standard variables */
+    --bg-main: var(--theme-bg-main);
+    --bg-secondary: var(--theme-bg-secondary);
+    --bg-tertiary: var(--theme-bg-tertiary);
+    --border: var(--theme-border);
+    --text-main: var(--theme-text-main);
+    --text-secondary: var(--theme-text-secondary);
 }
 
 /* Dark Theme (Dark mode) */
@@ -59,6 +83,14 @@
     --theme-shadow-md: rgba(0, 0, 0, 0.6);
     --theme-primary: #6698ff;
     --theme-primary-hover: #80acff;
+
+    /* Map to standard variables */
+    --bg-main: var(--theme-bg-main);
+    --bg-secondary: var(--theme-bg-secondary);
+    --bg-tertiary: var(--theme-bg-tertiary);
+    --border: var(--theme-border);
+    --text-main: var(--theme-text-main);
+    --text-secondary: var(--theme-text-secondary);
 }
 
 /* Starry Theme (Deep blue-black) */
@@ -74,6 +106,14 @@
     --theme-shadow-md: rgba(0, 0, 0, 0.8);
     --theme-primary: #4a9eff;
     --theme-primary-hover: #6bb0ff;
+
+    /* Map to standard variables */
+    --bg-main: var(--theme-bg-main);
+    --bg-secondary: var(--theme-bg-secondary);
+    --bg-tertiary: var(--theme-bg-tertiary);
+    --border: var(--theme-border);
+    --text-main: var(--theme-text-main);
+    --text-secondary: var(--theme-text-secondary);
 }
 
 /* Ensure smooth theme transitions */
@@ -99,6 +139,7 @@ body,
 :root[data-theme="starry"] .pdf-page-wrapper,
 :root[data-theme="starry"] #viewer .page {
     background-color: #ffffff !important;
+    filter: invert(0.9) hue-rotate(180deg);
 }
 
 /* Adjust viewer background in dark themes */

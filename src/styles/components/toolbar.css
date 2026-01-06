@@ -1,7 +1,7 @@
 /* Toolbar Upgrade */
 .toolbar {
     height: 64px !important;
-    background-color: rgba(255, 255, 255, 0.9) !important;
+    background-color: var(--bg-main) !important;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--theme-border) !important;
@@ -59,7 +59,7 @@
 }
 
 .mode-btn.active {
-    background-color: white !important;
+    background-color: var(--theme-bg-main) !important;
     color: var(--theme-primary) !important;
     box-shadow: var(--theme-shadow-sm) !important;
 }

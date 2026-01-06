@@ -75,3 +75,31 @@ body {
 #page-info {
     color: var(--theme-text-main, var(--text-main)) !important;
 }
+
+/* Update annotation items */
+.annotation-item {
+    background-color: var(--theme-bg-main, var(--bg-main)) !important;
+    border-color: var(--theme-border, var(--border)) !important;
+}
+
+.action-btn {
+    background-color: var(--theme-bg-main, var(--bg-main)) !important;
+    color: var(--theme-text-secondary, var(--text-secondary)) !important;
+}
+
+.action-btn:hover {
+    background-color: var(--theme-bg-tertiary, var(--bg-tertiary)) !important;
+    color: var(--theme-text-main, var(--text-main)) !important;
+}
+
+/* Update annotation list container and empty state */
+#annotation-list,
+.annotation-list {
+    background-color: var(--theme-bg-secondary, var(--bg-secondary)) !important;
+    border-right-color: var(--theme-border, var(--border)) !important;
+}
+
+.empty-state {
+    color: var(--theme-text-secondary, var(--text-secondary)) !important;
+    background-color: transparent !important;
+}
