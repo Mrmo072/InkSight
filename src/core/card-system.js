@@ -7,6 +7,7 @@ export class CardSystem {
         this.connections = []; // Added connections array
 
         // Listen for highlights
+        // Listen for highlights
         window.addEventListener('highlight-created', (e) => {
             // Ignore highlights created for image selections to avoid duplicate cards
             if (e.detail.text === '[Image Selection]') return;
@@ -33,7 +34,8 @@ export class CardSystem {
             sourceName: highlight.sourceName, // Copy sourceName from highlight
             position: { x: 100, y: 100 },
             createdAt: new Date().toISOString(),
-            color: highlight.color // Store color from highlight
+            color: highlight.color, // Store color from highlight
+            isOnBoard: false // Default to false for new highlights
         };
 
         this.addCard(card);

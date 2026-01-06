@@ -93,41 +93,41 @@ function init() {
         // Setup event listeners AFTER SplitView is initialized
         setupEventListeners();
 
-        // Setup Right Panel Tabs
-        setupRightPanelTabs();
+        // Setup Layout Toggles (incl. Annotations)
+        setupLayoutToggles();
 
     } catch (e) {
         console.error('Initialization error:', e);
     }
 }
 
-function setupRightPanelTabs() {
-    const tabMindmap = document.getElementById('tab-mindmap');
-    const tabAnnotations = document.getElementById('tab-annotations');
-    const containerMindmap = document.getElementById('mindmap-container');
-    const containerAnnotations = document.getElementById('annotation-list');
+function setupLayoutToggles() {
+    // Annotation List Toggle
+    const toggleAnnotationsBtn = document.getElementById('toggle-annotations');
+    const annotationListContainer = document.getElementById('annotation-list');
 
-    if (!tabMindmap || !tabAnnotations) return;
+    if (toggleAnnotationsBtn && annotationListContainer) {
+        toggleAnnotationsBtn.addEventListener('click', () => {
+            const isCollapsed = annotationListContainer.classList.toggle('collapsed');
+            toggleAnnotationsBtn.classList.toggle('active', !isCollapsed);
+        });
+    }
 
-    tabMindmap.addEventListener('click', () => {
-        tabMindmap.classList.add('active');
-        tabAnnotations.classList.remove('active');
-        containerMindmap.style.display = 'block';
-        containerAnnotations.style.display = 'none';
-        // splitView.toggleRight(true); // Ensure open
-    });
+    // Sidebar Toggles (Existing)
+    const toggleSidebarBtn = document.getElementById('toggle-sidebar');
+    const toggleNotesBtn = document.getElementById('toggle-notes');
 
-    tabAnnotations.addEventListener('click', () => {
-        tabAnnotations.classList.add('active');
-        tabMindmap.classList.remove('active');
-        containerAnnotations.style.display = 'flex';
-        containerMindmap.style.display = 'none';
+    if (toggleSidebarBtn) {
+        toggleSidebarBtn.addEventListener('click', () => {
+            if (splitView) splitView.toggleLeft();
+        });
+    }
 
-        // Refresh list when switching to it
-        if (annotationList && state.currentFile) {
-            annotationList.load(state.currentFile.id);
-        }
-    });
+    if (toggleNotesBtn) {
+        toggleNotesBtn.addEventListener('click', () => {
+            if (splitView) splitView.toggleRight();
+        });
+    }
 }
 
 
@@ -148,41 +148,126 @@ function setupEventListeners() {
     // Mind Map Selection Change (Show Document Name)
     const docInfoEl = document.getElementById('mindmap-doc-info');
 
-    window.addEventListener('mindmap-selection-changed', (e) => {
-        const { sourceId } = e.detail;
-        if (sourceId && docInfoEl) {
-            const file = state.files.find(f => f.id === sourceId);
-            if (file) {
-                docInfoEl.textContent = file.name;
-                docInfoEl.style.display = 'inline-flex';
-                docInfoEl.title = file.name;
-            } else if (e.detail.sourceName) {
-                docInfoEl.textContent = e.detail.sourceName;
-                docInfoEl.style.display = 'inline-flex';
-                docInfoEl.title = e.detail.sourceName;
+    // Unified Sync Handler
+    const handleSelectionSync = (sourceId, itemId, origin) => {
+        // origin: 'mindmap', 'annotation', 'highlight'
+        console.log('[Sync] Selection sync:', { sourceId, itemId, origin });
+
+        // 1. Sync to Reader (Scroll to Highlight)
+        if (origin !== 'highlight' && window.inksight.pdfReader) {
+            // Check if this item maps to a highlight
+            // If origin is mindmap, itemId is cardId or HighlightId? 
+            // We need to resolve HighlightId.
+            let highlightId = null;
+            if (origin === 'mindmap') {
+                const card = window.inksight.cardSystem.cards.get(itemId);
+                highlightId = card?.highlightId;
+            } else if (origin === 'annotation') {
+                const card = window.inksight.cardSystem.cards.get(itemId);
+                highlightId = card?.highlightId;
             } else {
-                docInfoEl.style.display = 'none';
+                highlightId = itemId;
             }
-        } else if (docInfoEl) {
-            docInfoEl.style.display = 'none';
+
+            if (highlightId) {
+                window.inksight.pdfReader.scrollToHighlight(highlightId);
+            }
         }
+
+        // 2. Sync to MindMap (Select Node)
+        if (origin !== 'mindmap') {
+            let cardId = null;
+            if (origin === 'highlight') {
+                // Find card for highlight
+                const cards = Array.from(window.inksight.cardSystem.cards.values());
+                const card = cards.find(c => c.highlightId === itemId);
+                cardId = card?.id;
+            } else {
+                cardId = itemId;
+            }
+
+            if (cardId) {
+                // Dispatch event for DrawnixBoard to consume
+                window.dispatchEvent(new CustomEvent('highlight-selected', {
+                    detail: { cardId }
+                }));
+            }
+        }
+
+        // 3. Sync to Annotation List (Highlight Item)
+        if (origin !== 'annotation') {
+            let cardId = null;
+            if (origin === 'highlight') {
+                // Find card for highlight
+                const cards = Array.from(window.inksight.cardSystem.cards.values());
+                const card = cards.find(c => c.highlightId === itemId);
+                cardId = card?.id;
+            } else if (origin === 'mindmap') {
+                cardId = itemId;
+            }
+
+            if (cardId) {
+                window.dispatchEvent(new CustomEvent('card-selected', {
+                    detail: cardId
+                }));
+            }
+        }
+    };
+
+    // Listeners invoking the unified handler
+    window.addEventListener('mindmap-selection-changed', (e) => {
+        // e.detail.sourceId is file ID. e.detail.cardId? 
+        // We updated DrawnixBoard to send cardId? NO, currently it sends sourceId.
+        // We need to update DrawnixBoard to send cardId in selection change if we want Sync.
+        // Wait, DrawnixBoard implementation currently:
+        /*
+          window.dispatchEvent(new CustomEvent('mindmap-selection-changed', {
+                detail: {
+                    sourceId: card.sourceId,
+                    sourceName: ...
+                }
+            }));
+        */
+        // This event seems used for "Document Title" update, NOT specific item selection.
+        // We need a NEW event 'mindmap-node-selected' from DrawnixBoard or update this one.
+        // Let's rely on jump-to-source logic which is 'click'.
     });
 
-    // Layout Toggles
-    const toggleSidebarBtn = document.getElementById('toggle-sidebar');
-    const toggleNotesBtn = document.getElementById('toggle-notes');
+    // Re-use existing jumps but route to sync
+    window.addEventListener('jump-to-source', (e) => {
+        // Triggered by MindMap Click
+        const { highlightId, cardId } = e.detail;
+        handleSelectionSync(null, cardId || highlightId, 'mindmap');
+    });
 
-    if (toggleSidebarBtn) {
-        toggleSidebarBtn.addEventListener('click', () => {
-            if (splitView) splitView.toggleLeft();
-        });
-    }
+    // Annotation Click
+    // AnnotationList dispatches ???
+    // It calls handleItemClick -> pdfReader.scrollToHighlight direct.
+    // It should dispatch an event instead if we want main.js to orchestrate.
+    // Or we just add listener for 'annotation-clicked' if we create it.
+    // AnnotationList currently has:
+    /*
+        handleItemClick(cardId, highlightId) {
+            this.activeCardId = cardId;
+            this.highlightItem(cardId);
+            if (window.inksight.pdfReader && highlightId) {
+                window.inksight.pdfReader.scrollToHighlight(highlightId);
+            }
+        }
+    */
+    // It does direct call. To sync MindMap, we should add:
+    // window.dispatchEvent(new CustomEvent('annotation-selected', { detail: { cardId, highlightId } }));
 
-    if (toggleNotesBtn) {
-        toggleNotesBtn.addEventListener('click', () => {
-            if (splitView) splitView.toggleRight();
-        });
-    }
+    window.addEventListener('annotation-selected', (e) => {
+        handleSelectionSync(null, e.detail.cardId, 'annotation');
+    });
+
+    // Highlight Click (from Reader)
+    window.addEventListener('highlight-clicked', (e) => {
+        handleSelectionSync(null, e.detail.highlightId, 'highlight');
+    });
+
+    // Layout Toggles moved to setupLayoutToggles()
 
     // Selection mode toggle buttons
     const textModeBtn = document.getElementById('text-mode');

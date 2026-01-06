@@ -136,13 +136,11 @@
     <!-- Right Panel: Mind Map & Notes -->
     <aside id="notes-panel" class="notes-panel">
       <div class="panel-header">
-        <div class="panel-tabs">
-          <button id="tab-mindmap" class="tab-btn active" title="Mind Map">
-            <span class="material-icons-round">account_tree</span>
+        <div class="panel-title-group" style="display: flex; align-items: center; gap: 8px;">
+          <button id="toggle-annotations" class="icon-btn active" title="Toggle Annotations List" style="padding: 4px;">
+            <span class="material-icons-round">view_sidebar</span>
           </button>
-          <button id="tab-annotations" class="tab-btn" title="Annotations">
-            <span class="material-icons-round">format_list_bulleted</span>
-          </button>
+          <span style="font-weight: 500; font-size: 14px; color: var(--text-main);">Mind Map & Notes</span>
         </div>
         <div class="panel-actions">
           <button id="layout-btn" class="icon-btn small" title="Auto Layout">
@@ -152,6 +150,13 @@
       </div>
 
       <div class="panel-content">
+        <div id="annotation-list" class="annotation-list">
+          <div class="empty-state">
+            <span class="material-icons-round">edit_note</span>
+            <p>No annotations yet</p>
+          </div>
+        </div>
+
         <div id="mindmap-container" class="mindmap-container">
           <!-- Mind Map will be rendered here -->
           <div class="mindmap-placeholder">
@@ -159,13 +164,6 @@
             <p>Select text to create nodes</p>
           </div>
           <div id="mindmap-doc-info" class="doc-info-badge" style="display: none;"></div>
-        </div>
-
-        <div id="annotation-list" class="annotation-list" style="display: none;">
-          <div class="empty-state">
-            <span class="material-icons-round">edit_note</span>
-            <p>No annotations yet</p>
-          </div>
         </div>
       </div>
     </aside>

@@ -105,6 +105,35 @@ export class AnnotationList {
         div.className = 'annotation-item';
         div.dataset.cardId = card.id;
         div.dataset.highlightId = card.highlightId;
+        div.draggable = true; // Enable Drag
+
+        // Drag Start Handler
+        div.addEventListener('dragstart', (e) => {
+            // Transfer JSON data for MindMap to consume
+            const dragData = {
+                id: card.id,
+                highlightId: card.highlightId,
+                text: card.content || highlight?.text || '',
+                type: 'text', // Assuming text for now, could be image if card has imageData
+                color: highlight?.color || card.color,
+                sourceId: card.sourceId,
+                sourceName: card.sourceName
+            };
+
+            if (card.imageData) {
+                dragData.type = 'image';
+                dragData.imageData = card.imageData;
+            }
+
+            e.dataTransfer.setData('application/json', JSON.stringify(dragData));
+            e.dataTransfer.setData('text/plain', dragData.text);
+            e.dataTransfer.effectAllowed = 'copy';
+            div.classList.add('dragging');
+        });
+
+        div.addEventListener('dragend', () => {
+            div.classList.remove('dragging');
+        });
 
         // Header
         const header = document.createElement('div');
@@ -202,10 +231,10 @@ export class AnnotationList {
         this.activeCardId = cardId;
         this.highlightItem(cardId);
 
-        // Sync to Reader
-        if (window.inksight.pdfReader && highlightId) {
-            window.inksight.pdfReader.scrollToHighlight(highlightId);
-        }
+        // Dispatch event for sync (handled in main.js)
+        window.dispatchEvent(new CustomEvent('annotation-selected', {
+            detail: { cardId, highlightId }
+        }));
     }
 
     handleHighlightSelection(highlightId) {
@@ -228,6 +257,11 @@ export class AnnotationList {
         const target = this.container.querySelector(`[data-card-id="${cardId}"]`);
         if (target) {
             target.classList.add('active');
+            target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+            // Add temporary flash
+            target.classList.add('flash-highlight');
+            setTimeout(() => target.classList.remove('flash-highlight'), 1500);
         }
     }
 

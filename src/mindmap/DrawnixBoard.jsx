@@ -36,11 +36,87 @@ export const DrawnixBoardComponent = () => {
                 const card = cards[i];
                 // Check if already exists to avoid duplicates on re-render
                 const exists = board.children.some(c => c.data?.cardId === card.id);
-                if (!exists) {
+                if (!exists && card.isOnBoard !== false) {
                     addCardNode(board, card, i);
                     addedCount++;
                 }
             }
+            // ... (omitted lines)
+            const handleBoardDrop = (e) => {
+                e.preventDefault();
+                const dataStr = e.dataTransfer.getData('application/json');
+                if (!dataStr) return;
+
+                try {
+                    const data = JSON.parse(dataStr);
+                    console.log('[DrawnixBoard] Dropped data:', data);
+
+                    // Calculate drop position relative to board
+                    const container = containerRef.current;
+                    const rect = container.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+
+                    const currentZoom = board ? (board.viewport?.zoom || 1) : 1;
+                    const viewX = board?.viewport?.x || 0;
+                    const viewY = board?.viewport?.y || 0;
+                    const boardX = x / currentZoom + viewX;
+                    const boardY = y / currentZoom + viewY;
+
+                    const existingNode = board.children.find(c => c.data?.cardId === data.id);
+
+                    if (existingNode) {
+                        const path = [board.children.indexOf(existingNode)];
+                        Transforms.setNode(board, {
+                            points: [[boardX, boardY], [boardX + (existingNode.width || 200), boardY + (existingNode.height || 100)]]
+                        }, path);
+                    } else {
+                        const card = cardSystem.cards.get(data.id);
+                        if (card) {
+                            // Mark as on board
+                            cardSystem.updateCard(card.id, { isOnBoard: true });
+
+                            // Add node manually (since we want specific position, and init loop might skip if we rely on it)
+                            let node;
+                            if (data.type === 'image' && data.imageData) {
+                                const width = 200;
+                                const height = 150;
+                                const imageNode = {
+                                    id: data.id,
+                                    type: 'image',
+                                    url: data.imageData,
+                                    points: [[boardX, boardY], [boardX + width, boardY + height]],
+                                    data: { cardId: data.id, cardType: data.type, sourceName: data.sourceName },
+                                    strokeColor: data.color || '#4f46e5',
+                                    strokeWidth: 2
+                                };
+                                Transforms.insertNode(board, imageNode, [board.children.length]);
+                            } else {
+                                const { width, height } = calculateNodeSize(data.text);
+                                node = {
+                                    id: data.id,
+                                    type: 'geometry',
+                                    shape: 'rectangle',
+                                    points: [[boardX, boardY], [boardX + width, boardY + height]],
+                                    text: { children: [{ text: data.text }] },
+                                    data: { cardId: data.id, cardType: data.type, sourceName: data.sourceName },
+                                    strokeColor: data.color || '#4f46e5',
+                                    strokeWidth: 2
+                                };
+                                Transforms.insertNode(board, node, [board.children.length]);
+                            }
+                        }
+                    }
+
+                } catch (err) {
+                    console.error('[DrawnixBoard] Error processing drop:', err);
+                }
+            };
+
+            // ... (omitted lines)
+
+            // Handle node removal to sync with PDF
+
 
             currentIndex = end;
 
@@ -72,7 +148,7 @@ export const DrawnixBoardComponent = () => {
 
             // Check if node already exists to avoid duplicates
             const exists = board.children.some(c => c.data?.cardId === card.id);
-            if (!exists) {
+            if (!exists && card.isOnBoard !== false) {
                 addCardNode(board, card, board.children.length);
             } else {
 
@@ -348,7 +424,8 @@ export const DrawnixBoardComponent = () => {
                             const event = new CustomEvent('jump-to-source', {
                                 detail: {
                                     sourceId: card.sourceId,
-                                    highlightId: card.highlightId
+                                    highlightId: card.highlightId,
+                                    cardId: card.id
                                 }
                             });
                             window.dispatchEvent(event);
@@ -357,6 +434,7 @@ export const DrawnixBoardComponent = () => {
                 }
             }
         });
+
 
         // Expose auto-layout function globally
         window.applyAutoLayout = () => applyAutoLayout(b);
@@ -532,8 +610,132 @@ export const DrawnixBoardComponent = () => {
         }
     };
 
+    const handleBoardDrop = (e) => {
+        e.preventDefault();
+        const dataStr = e.dataTransfer.getData('application/json');
+        if (!dataStr) return;
+
+        try {
+            const data = JSON.parse(dataStr);
+
+            // Check manual vs auto flow
+            const cardInSystem = cardSystem.cards.get(data.id);
+
+            // Calculate drop position relative to board
+            const container = containerRef.current;
+            const rect = container.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            // Adjust for zoom and scroll
+            const currentZoom = board ? (board.viewport?.zoom || 1) : 1;
+            const viewX = board?.viewport?.x || 0;
+            const viewY = board?.viewport?.y || 0;
+
+            const boardX = x / currentZoom + viewX;
+            const boardY = y / currentZoom + viewY;
+
+            // Create card/node manual entry
+            // We reuse the existing card ID if it exists? 
+            // The requirement says "drag annotation to generate corresponding node".
+            // Since the annotation implies a card already exists (in CardSystem), we just need to ensure it's ON THE BOARD.
+            // Check if node exists for this card
+            const existingNode = board.children.find(c => c.data?.cardId === data.id);
+
+            if (existingNode) {
+                // Move existing node to new position? 
+                // Or just flash it?
+                // Let's move it to drop location for convenience
+                const path = [board.children.indexOf(existingNode)];
+                Transforms.setNode(board, {
+                    points: [[boardX, boardY], [boardX + (existingNode.width || 200), boardY + (existingNode.height || 100)]]
+                }, path);
+            } else {
+                // Create new node for this existing card
+                // The card data is in 'data' from drag event
+                // We should ensure cardSystem has it (it should if it came from annotation list)
+                const card = cardSystem.cards.get(data.id);
+                if (card) {
+                    // Mark as on board so it persists
+                    cardSystem.updateCard(card.id, { isOnBoard: true });
+
+                    // We do NOT call addCardNode here because updateCard will trigger a refresh or we rely on processBatch? 
+                    // Wait, processBatch only runs on re-render. 
+                    // DrawnixBoard useEffect [board] -> if Transforms changes board, it runs.
+                    // BUT Transforms methods usually mutate board structure.
+                    // If we want to guarantee single insertion:
+                    // Option 1: rely on cardSystem update -> main.js -> card-updated -> AnnotationList refresh.
+                    // Does NOT trigger board add.
+                    // Option 2: DrawnixBoard useEffect runs.
+                    // If we add manually via Transforms (below), useEffect sees it exists -> skips.
+                    // If we do NOT add manually, does useEffect see it? 
+                    // Logic: useEffect iterates ALL cards. If (!exists && isOnBoard), adds it.
+                    // So if we set isOnBoard=true, AND trigger a re-run of useEffect, it will add it.
+                    // Does cardSystem.updateCard trigger re-run? No.
+                    // So manual insertion IS needed (the code below 'if (data.type === 'image') ... else { Transforms.insertNode }').
+                    // The DUPLICATE was caused by calling `addCardNode(board, card, 0)` WHICH ADDS A NODE
+                    // AND THEN calling `Transforms.insertNode` (in the code below) WHICH ADDS ANOTHER NODE.
+                    // So I just remove `addCardNode(board, card, 0)`.
+
+                    // addCardNode(board, card, 0); // REMOVE THIS LINE
+
+                    // Since addCardNode uses grid layout index, we might need a custom adder or update it immediately
+                    // Actually addCardNode is simple. Let's just manually insert here or modify addCardNode to accept pos?
+                    // Refactoring addCardNode to accept optional position is better but let's just do manual insertion for now to be safe
+                    // Wait, `addCardNode` is locally defined. Let's modify it or just copy logic.
+                    // Copying logic for simplicity of this patch:
+
+                    let node;
+                    if (data.type === 'image' && data.imageData) {
+                        // ... Image logic ...
+                        // For simplicity, let's just re-use addCardNode logic but forcing position update after?
+                        // Or better: update card position in system FIRST?
+                        card.position = { x: boardX, y: boardY };
+                        // But addCardNode ignores card.position currently and uses grid. 
+                        // Let's just create node here directly.
+
+                        const width = 200;
+                        const height = 150; // Approximations or need image load
+
+                        const imageNode = {
+                            id: data.id,
+                            type: 'image',
+                            url: data.imageData,
+                            points: [[boardX, boardY], [boardX + width, boardY + height]],
+                            data: { cardId: data.id, cardType: data.type, sourceName: data.sourceName },
+                            strokeColor: data.color || '#4f46e5',
+                            strokeWidth: 2
+                        };
+                        Transforms.insertNode(board, imageNode, [board.children.length]);
+                    } else {
+                        // Text
+                        const { width, height } = calculateNodeSize(data.text);
+                        node = {
+                            id: data.id,
+                            type: 'geometry',
+                            shape: 'rectangle',
+                            points: [[boardX, boardY], [boardX + width, boardY + height]],
+                            text: { children: [{ text: data.text }] },
+                            data: { cardId: data.id, cardType: data.type, sourceName: data.sourceName },
+                            strokeColor: data.color || '#4f46e5',
+                            strokeWidth: 2
+                        };
+                        Transforms.insertNode(board, node, [board.children.length]);
+                    }
+                }
+            }
+
+        } catch (err) {
+            console.error('[DrawnixBoard] Error processing drop:', err);
+        }
+    };
+
     return (
-        <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden', touchAction: 'none', overscrollBehavior: 'none', userSelect: 'none' }}>
+        <div
+            ref={containerRef}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={handleBoardDrop}
+            style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden', touchAction: 'none', overscrollBehavior: 'none', userSelect: 'none' }}>
             <Drawnix
                 value={value}
                 viewport={viewport}
@@ -650,9 +852,9 @@ export const DrawnixBoardComponent = () => {
                                 const node = op.node;
 
                                 if (node.data && node.data.cardId) {
-
-                                    // Mark card as deleted (soft delete)
-                                    cardSystem.markCardAsDeleted(node.data.cardId, true);
+                                    // Only remove from board view, do NOT delete card/highlight
+                                    cardSystem.updateCard(node.data.cardId, { isOnBoard: false });
+                                    // cardSystem.markCardAsDeleted(node.data.cardId, true);
                                 } else {
                                     console.warn('[DrawnixBoard] Removed node missing cardId:', node);
                                 }
