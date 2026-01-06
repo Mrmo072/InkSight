@@ -9,9 +9,14 @@ export class CardSystem {
         // Listen for highlights
         // Listen for highlights
         window.addEventListener('highlight-created', (e) => {
+            const highlight = e.detail;
+
             // Ignore highlights created for image selections to avoid duplicate cards
-            if (e.detail.text === '[Image Selection]') return;
-            this.createCardFromHighlight(e.detail);
+            if (highlight.text === '[Image Selection]') return;
+
+
+
+            this.createCardFromHighlight(highlight);
         });
 
         // Listen for card removal to sync deletions
