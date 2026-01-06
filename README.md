@@ -74,7 +74,11 @@ npm run dist:win
 - **Frontend**: React, Vanilla JS, Vite
 - **Desktop**: Electron
 - **Rendering**: PDF.js, Epub.js, Marked
-- **Canvas**: Plait (Drawnix), Rough.js
+- **Canvas**: [Plait (Drawnix)](https://github.com/plait-board/drawnix), Rough.js
+
+## 🤝 Acknowledgements
+
+- **[Drawnix](https://github.com/plait-board/drawnix)**: The core whiteboard engine of InkSight is built upon Drawnix. Special thanks to the Plait Board team for their excellent work.
 
 ## ☕ Support
 

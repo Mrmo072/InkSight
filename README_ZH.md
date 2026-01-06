@@ -75,7 +75,11 @@ npm run dist:win
 - **Frontend**: React, Vanilla JS, Vite
 - **Desktop**: Electron
 - **Rendering**: PDF.js, Epub.js, Marked
-- **Canvas**: Plait (Drawnix), Rough.js
+- **Canvas**: [Plait (Drawnix)](https://github.com/plait-board/drawnix), Rough.js
+
+## 🤝 致谢 (Acknowledgements)
+
+- **[Drawnix](https://github.com/plait-board/drawnix)**: InkSight 的核心白板引擎基于 Drawnix 构建。特别感谢 Plait Board 团队的杰出工作。
 
 ## ☕ 请我喝杯咖啡 (Buy me a coffee)
 
