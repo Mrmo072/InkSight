@@ -17,6 +17,7 @@ const zhTranslations: Translations = {
   'toolbar.arrow.straight': '直线',
   'toolbar.arrow.elbow': '肘线',
   'toolbar.arrow.curve': '曲线',
+  'toolbar.lineShape': '线型',
 
   'toolbar.shape.rectangle': '长方形 — R',
   'toolbar.shape.ellipse': '圆 — O',

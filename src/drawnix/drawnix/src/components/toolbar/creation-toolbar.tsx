@@ -29,10 +29,10 @@ import {
   DrawPointerType,
   FlowchartSymbols,
 } from '@plait/draw';
-import { FreehandPanel , FREEHANDS } from './freehand-panel/freehand-panel';
+import { FreehandPanel, FREEHANDS } from './freehand-panel/freehand-panel';
 import { ShapePicker } from '../shape-picker';
 import { ArrowPicker } from '../arrow-picker';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '../popover/popover';
 import { FreehandShape } from '../../plugins/freehand/type';
 import {
@@ -42,7 +42,7 @@ import {
 } from '../../hooks/use-drawnix';
 import { ExtraToolsButton } from './extra-tools/extra-tools-button';
 import { addImage } from '../../utils/image';
-import { useI18n } from '../../i18n';
+import { useI18n, Translations } from '../../i18n';
 import { SHAPES } from '../shape-picker';
 import { ARROWS } from '../arrow-picker';
 
@@ -144,7 +144,29 @@ export const CreationToolbar = () => {
       BUTTONS.find((button) => button.key === PopupKey.freehand)!
     );
   const [lastShapePointer, setLastShapePointer] = useState<string | undefined>(SHAPES[0].pointer);
-  const [lastArrowPointer, setLastArrowPointer] = useState<string | undefined>(ARROWS[0].pointer);
+  const [lastArrowPointer, setLastArrowPointer] = useState<string | undefined>(() => {
+    // Initialize from localStorage
+    const saved = localStorage.getItem('drawnix-arrow-shape');
+    if (saved && ARROWS.some(a => a.pointer === saved)) {
+      return saved;
+    }
+    return ARROWS[0].pointer;
+  });
+
+  // Sync with global event or custom dispatch if needed? 
+  // For now, local state in Toolbar. Popup toolbar updates will need to dispatch an event or use a shared context.
+  // We'll use a custom event 'drawnix-arrow-shape-change' to sync between popup and creation toolbar.
+  useEffect(() => {
+    const handleShapeChange = (e: CustomEvent) => {
+      const newPointer = e.detail;
+      setLastArrowPointer(newPointer);
+      localStorage.setItem('drawnix-arrow-shape', newPointer);
+      // Also update current pointer if arrow tool is active?
+      // Not necessarily, but if user clicks Arrow tool later, it should use this.
+    };
+    window.addEventListener('drawnix-arrow-shape-changed', handleShapeChange as EventListener);
+    return () => window.removeEventListener('drawnix-arrow-shape-changed', handleShapeChange as EventListener);
+  }, []);
 
   const onPointerDown = (pointer: DrawnixPointerType) => {
     setCreationMode(board, BoardCreationMode.dnd);
@@ -164,7 +186,7 @@ export const CreationToolbar = () => {
 
   const checkCurrentPointerIsFreehand = (board: PlaitBoard) => {
     return PlaitBoard.isInPointer(board, [
-      FreehandShape.feltTipPen, 
+      FreehandShape.feltTipPen,
       FreehandShape.eraser,
     ]);
   };
@@ -253,7 +275,7 @@ export const CreationToolbar = () => {
                         setPointer(lastShapePointer || SHAPES[0].pointer)
                         setCreationMode(board, BoardCreationMode.drawing);
                         BoardTransforms.updatePointerType(board, lastShapePointer || SHAPES[0].pointer);
-                      } 
+                      }
                     }}
                   />
                 </PopoverTrigger>

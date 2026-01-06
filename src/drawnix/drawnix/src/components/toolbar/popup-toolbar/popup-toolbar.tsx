@@ -43,6 +43,7 @@ import { NO_COLOR } from '../../../constants/color';
 import { Freehand } from '../../../plugins/freehand/type';
 import { PopupLinkButton } from './link-button';
 import { ArrowMarkButton } from './arrow-mark-button';
+import { PopupArrowShapeButton } from './popup-arrow-shape-button';
 
 export const PopupToolbar = () => {
   const board = useBoard();
@@ -74,6 +75,7 @@ export const PopupToolbar = () => {
     isLine?: boolean;
     source?: ArrowLineHandle;
     target?: ArrowLineHandle;
+    shape?: string;
   } = {
     fill: 'red',
   };
@@ -232,6 +234,14 @@ export const PopupToolbar = () => {
             )}
             {state.isLine && (
               <>
+                <PopupArrowShapeButton
+                  board={board}
+                  key={6}
+                  currentPointer={state.shape}
+                // Current pointer? We can infer from selection or passed prop if we track it.
+                // For now let's just use first selected element's shape as 'current' visual?
+                // Or let component determine it from selection
+                />
                 <ArrowMarkButton
                   board={board}
                   key={4}
@@ -261,7 +271,7 @@ export const getMindElementState = (
   return {
     fill: element.fill,
     strokeColor: getStrokeColorByMindElement(board, element),
-    strokeStyle:getStrokeStyleByElement(board, element),
+    strokeStyle: getStrokeStyleByElement(board, element),
     marks,
   };
 };
@@ -278,6 +288,7 @@ export const getDrawElementState = (
     marks,
     source: element?.source || {},
     target: element?.target || {},
+    shape: element?.shape,
   };
 };
 

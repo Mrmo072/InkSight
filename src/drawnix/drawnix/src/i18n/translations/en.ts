@@ -17,6 +17,7 @@ const enTranslations: Translations = {
   'toolbar.arrow.straight': 'Straight Arrow Line',
   'toolbar.arrow.elbow': 'Elbow Arrow Line',
   'toolbar.arrow.curve': 'Curve Arrow Line',
+  'toolbar.lineShape': 'Line Shape',
 
   'toolbar.shape.rectangle': 'Rectangle — R',
   'toolbar.shape.ellipse': 'Ellipse — O',

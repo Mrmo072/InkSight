@@ -40,6 +40,7 @@ import { LinkPopup } from './components/popup/link-popup/link-popup';
 import { I18nProvider } from './i18n';
 import { Tutorial } from './components/tutorial';
 import { LASER_POINTER_CLASS_NAME } from './utils/laser-pointer';
+import { withArrowShapeSync } from './plugins/with-arrow-shape-sync';
 
 export type DrawnixProps = {
   value: PlaitElement[];
@@ -108,6 +109,7 @@ export const Drawnix: React.FC<DrawnixProps> = ({
     withFreehand,
     buildPencilPlugin(updateAppState),
     buildTextLinkPlugin(updateAppState),
+    withArrowShapeSync,
   ];
 
   const containerRef = useRef<HTMLDivElement>(null);
