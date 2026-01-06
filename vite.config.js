@@ -33,5 +33,11 @@ export default defineConfig({
         includePaths: [resolve(__dirname, 'node_modules')]
       }
     }
+  },
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './test/setup.ts',
+    exclude: ['node_modules', 'dist', 'drawnix-repo', 'src/drawnix'],
   }
 });
