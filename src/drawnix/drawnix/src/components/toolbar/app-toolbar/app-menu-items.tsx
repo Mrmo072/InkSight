@@ -55,7 +55,10 @@ export const SaveToFile = () => {
             extraData.highlights = highlightData.highlights;
           }
         }
-        saveAsJSON(board, undefined, extraData);
+        // Strip extension from book name
+        const fileName = extraData.bookName ? extraData.bookName.replace(/\.[^/.]+$/, "") : undefined;
+        console.log('[SaveToFile] Exporting with filename:', { original: extraData.bookName, stripped: fileName });
+        saveAsJSON(board, fileName, extraData);
       }}
       icon={SaveFileIcon}
       aria-label={t('menu.saveFile')}

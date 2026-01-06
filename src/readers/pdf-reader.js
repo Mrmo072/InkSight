@@ -312,71 +312,66 @@ export class PDFReader {
         const text = selection.toString().trim().replace(/\s+/g, ' ');
         if (!text) return;
 
-        // Determine the actual page where the selection starts
-        // This fixes issues where the mouse up event happens on a different page
-        // or when the provided pageNum is stale.
-        let startNode = range.startContainer;
-        if (startNode.nodeType === Node.TEXT_NODE) {
-            startNode = startNode.parentNode;
-        }
-
-        const wrapper = startNode.closest('.pdf-page-wrapper');
-        if (!wrapper) {
-            // console.warn('[PDFReader] Selection start not inside a page wrapper');
-            return;
-        }
-
-        const actualPageNum = parseInt(wrapper.dataset.pageNum);
-        const pageInfo = this.pages[actualPageNum - 1];
-
-        // console.log(`[PDFReader] Selection on Page ${actualPageNum} (Event Page: ${pageNum})`);
-
-        if (!pageInfo || !pageInfo.wrapper) return;
+        // NEW LOGIC: Support cross-page selection
+        // Instead of assuming everything is on `pageNum`, we check which page each rect belongs to.
 
         const rects = range.getClientRects();
-
-        // Use the wrapper of the actual page where selection started
-        const wrapperRect = pageInfo.wrapper.getBoundingClientRect();
         const highlightRects = [];
+        const highlightOverlays = [];
 
-        // Helper function to check if two rects overlap significantly
-        const areRectsOverlapping = (rect1, rect2) => {
+        // We need to group rects by page to render temporary overlays correctly
+        // and to store correct page info in the highlight data.
+
+        // Helper to check intersection
+        const getIntersection = (rect1, rect2) => {
             const x1 = Math.max(rect1.left, rect2.left);
             const y1 = Math.max(rect1.top, rect2.top);
             const x2 = Math.min(rect1.left + rect1.width, rect2.left + rect2.width);
             const y2 = Math.min(rect1.top + rect1.height, rect2.top + rect2.height);
 
-            if (x2 <= x1 || y2 <= y1) return false;
-
-            const intersectionArea = (x2 - x1) * (y2 - y1);
-            const rect1Area = rect1.width * rect1.height;
-            const rect2Area = rect2.width * rect2.height;
-            const minArea = Math.min(rect1Area, rect2Area);
-
-            // Only skip if one is almost completely inside another (90% overlap)
-            // This prevents skipping distinct text fragments like quotes that barely touch
-            return intersectionArea > 0.90 * minArea;
+            if (x2 <= x1 || y2 <= y1) return 0;
+            return (x2 - x1) * (y2 - y1);
         };
 
         const processedRects = [];
-        const highlightOverlays = [];
 
         for (let i = 0; i < rects.length; i++) {
             const rect = rects[i];
             if (rect.width === 0 || rect.height === 0) continue;
 
-            // Convert to relative normalized coordinates (0-1)
-            // This ensures highlights scale correctly when zoom changes
-            const topPx = rect.top - wrapperRect.top;
-            const leftPx = rect.left - wrapperRect.left;
+            // Find which page this rect belongs to
+            // We iterate through all rendered pages to find the one containing this rect
+            let bestPage = null;
+            let maxIntersection = 0;
+
+            for (const page of this.pages) {
+                if (!page.wrapper) continue;
+
+                const wrapperRect = page.wrapper.getBoundingClientRect();
+                const intersection = getIntersection(rect, wrapperRect);
+
+                if (intersection > maxIntersection && intersection > (rect.width * rect.height * 0.5)) {
+                    // Must overlap at least 50% of the rect (avoids tiny fragments on wrong pages)
+                    maxIntersection = intersection;
+                    bestPage = page;
+                }
+            }
+
+            if (!bestPage) {
+                // console.warn('Rect does not belong to any known page', rect);
+                continue;
+            }
+
+            const wrapperRect = bestPage.wrapper.getBoundingClientRect();
 
             // BUG FIX: Ignore rects that are likely the page vessel/container itself
-            // This happens when selection spans across pages or includes the wrapper div
             if (rect.width > wrapperRect.width * 0.9 && rect.height > wrapperRect.height * 0.9) {
                 continue;
             }
 
-            // Removed `if (topPx >= wrapperRect.height) continue;` to allow cross-page selections to show (via overflow)
+            // Convert to relative normalized coordinates for THAT page
+            const topPx = rect.top - wrapperRect.top;
+            const leftPx = rect.left - wrapperRect.left;
 
             const normalizedTop = topPx / wrapperRect.height;
             const normalizedLeft = leftPx / wrapperRect.width;
@@ -384,19 +379,29 @@ export class PDFReader {
             const normalizedHeight = rect.height / wrapperRect.height;
 
             const currentRect = {
+                page: bestPage.num, // IMPORTANT: Associate rect with its specific page
                 top: normalizedTop,
                 left: normalizedLeft,
                 width: normalizedWidth,
                 height: normalizedHeight
             };
 
-            // Check overlap (using normalized coords is fine for math)
-            if (processedRects.some(pr => areRectsOverlapping(pr, currentRect))) continue;
+            // Deduplication (per page)
+            const isDuplicate = processedRects.some(pr =>
+                pr.page === currentRect.page &&
+                Math.abs(pr.top - currentRect.top) < 0.01 &&
+                Math.abs(pr.left - currentRect.left) < 0.01 &&
+                Math.abs(pr.width - currentRect.width) < 0.01
+            );
 
+            if (isDuplicate) continue;
+            processedRects.push(currentRect);
+            highlightRects.push(currentRect);
+
+            // Create temporary overlay
             const highlightDiv = document.createElement('div');
             highlightDiv.className = 'highlight-overlay';
             highlightDiv.style.position = 'absolute';
-            // Render temporary overlay using pixels for immediate feedback
             highlightDiv.style.top = `${topPx}px`;
             highlightDiv.style.left = `${leftPx}px`;
             highlightDiv.style.width = `${rect.width}px`;
@@ -405,44 +410,45 @@ export class PDFReader {
             if (PDFReader.defaultColors.text.startsWith('#')) {
                 highlightDiv.style.opacity = '0.4';
             }
-            highlightDiv.style.pointerEvents = 'none'; // Will be enabled after highlight is created
-            highlightDiv.style.zIndex = '100'; // Match z-index of permanent highlights
+            highlightDiv.style.pointerEvents = 'none';
+            highlightDiv.style.zIndex = '100';
 
-            pageInfo.wrapper.appendChild(highlightDiv);
+            bestPage.wrapper.appendChild(highlightDiv);
             highlightOverlays.push(highlightDiv);
-            highlightRects.push(currentRect); // Push normalized rect
-            processedRects.push(currentRect);
         }
+
+        if (highlightRects.length === 0) return;
+
+        // Use the page of the first rect as the primary "location" page, 
+        // but individual rects now carry their own page info.
+        const primaryPage = highlightRects[0].page;
 
         // Create highlight data
         const highlight = highlightManager.createHighlight(text, {
-            page: actualPageNum,
-            rects: highlightRects
+            page: primaryPage, // Primary anchor page (for sorting/jumping)
+            rects: highlightRects // Contains { page, top, ... }
         }, this.fileId, 'text', PDFReader.defaultColors.text, this.fileName);
 
         // Convert temporary overlays to clickable highlights
         highlightOverlays.forEach(div => {
             div.dataset.highlightId = highlight.id;
-            div.style.pointerEvents = 'auto'; // Enable clicking
+            div.style.pointerEvents = 'auto';
             div.style.cursor = 'pointer';
 
-            // Find associated card ID
-            let cardId = null;
-            if (window.inksight && window.inksight.cardSystem) {
-                // Card will be created by CardSystem listening to 'highlight-created' event
-                // We need to wait a bit for the card to be created
-                setTimeout(() => {
+            // Wait for card creation
+            setTimeout(() => {
+                let cardId = null;
+                if (window.inksight && window.inksight.cardSystem) {
                     const card = Array.from(window.inksight.cardSystem.cards.values()).find(c => c.highlightId === highlight.id);
                     if (card) {
                         cardId = card.id;
-                        // Now bind the click handler
                         div.addEventListener('click', (e) => {
                             e.stopPropagation();
                             this.handleHighlightClick(e, highlight.id, cardId);
                         });
                     }
-                }, 100);
-            }
+                }
+            }, 100);
         });
 
         selection.removeAllRanges();

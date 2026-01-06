@@ -21,18 +21,16 @@ export const saveAsJSON = async (
 
   const fileHandle = await fileSave(blob, {
     name,
-    extension: 'drawnix',
-    description: 'Drawnix file',
+    extension: 'inksight',
+    description: 'InkSight file',
   });
   return { fileHandle };
 };
 
 export const loadFromJSON = async (board: PlaitBoard) => {
   const file = await fileOpen({
-    description: 'Drawnix files',
-    // ToDo: Be over-permissive until https://bugs.webkit.org/show_bug.cgi?id=34442
-    // gets resolved. Else, iOS users cannot open `.drawnix` files.
-    // extensions: ["json", "drawnix", "png", "svg"],
+    description: 'InkSight files',
+    extensions: ['inksight', 'drawnix', 'json'],
   });
   const data = await normalizeFile(file);
   const loadedData = await loadFromBlob(board, data);

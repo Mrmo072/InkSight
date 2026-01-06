@@ -29,19 +29,34 @@ export class PDFHighlightRenderer {
         // Filter highlights for this page and current file
         const pageHighlights = highlights.filter(h => {
             const matchFile = h.sourceId === this.fileId;
-            const matchPage = h.location && h.location.page === pageNum;
+            let matchPage = false;
+
+            // Core check: Does this highlight belong to this page?
+            // 1. Legacy/Simple: location.page matches
+            if (h.location && h.location.page === pageNum) {
+                matchPage = true;
+            }
+            // 2. Cross-page/Advanced: One of the rects belongs to this page
+            else if (h.location && h.location.rects) {
+                matchPage = h.location.rects.some(r => r.page === pageNum);
+            }
+
             // console.log(`[PDFHighlightRenderer] Checking highlight ${h.id}: Page ${h.location?.page} vs ${pageNum}, Source ${h.sourceId} vs ${this.fileId}`);
             return matchFile && matchPage;
         });
 
         if (pageHighlights.length > 0) {
-
+            // console.log(`[PDFHighlightRenderer] Found ${pageHighlights.length} highlights for page ${pageNum}`);
         }
 
         pageHighlights.forEach(highlight => {
             // Check if already rendered
+            // Note: For multi-page highlights, we might have already rendered the *parts* on other pages,
+            // but we need to check if we rendered the parts for *this* page.
+            // Simplified check: if any querySelector finds it, we might be safe? 
+            // NO. The DOM query is scoped to pageInfo.wrapper. So it only checks THIS page. Correct.
             if (pageInfo.wrapper.querySelector(`[data-highlight-id="${highlight.id}"]`)) {
-                // console.log(`[PDFHighlightRenderer] Highlight ${highlight.id} already rendered`);
+                // console.log(`[PDFHighlightRenderer] Highlight ${highlight.id} already rendered on page ${pageNum}`);
                 return;
             }
 
@@ -58,11 +73,9 @@ export class PDFHighlightRenderer {
 
             // Skip rendering if card is marked as deleted
             if (isCardDeleted) {
-
+                // console.log(`[PDFHighlightRenderer] Skipping deleted highlight ${highlight.id}`);
                 return;
             }
-
-
 
             if (highlight.type === 'text' && highlight.location.rects) {
                 this.renderTextHighlight(pageInfo, highlight, cardId);
@@ -76,7 +89,13 @@ export class PDFHighlightRenderer {
 
     renderTextHighlight(pageInfo, highlight, cardId) {
         highlight.location.rects.forEach((rect, index) => {
-
+            // MULTI-PAGE SUPPORT:
+            // Only render rects that belong to this page.
+            // If rect.page is missing (legacy data), check against highlight.location.page
+            const rectPage = rect.page || highlight.location.page;
+            if (rectPage !== pageInfo.num) {
+                return;
+            }
 
             if (rect.width === 0 || rect.height === 0) {
                 console.warn('[PDFHighlightRenderer] Skipping zero-size rect:', rect);
