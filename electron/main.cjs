@@ -24,7 +24,7 @@ function createWindow() {
 
     if (isDev) {
         win.loadURL('http://localhost:5173');
-        win.webContents.openDevTools();
+        // win.webContents.openDevTools();
     } else {
         win.loadFile(path.join(__dirname, '../dist/index.html'));
         // win.webContents.openDevTools(); // Disabled for production
