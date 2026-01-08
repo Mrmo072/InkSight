@@ -20,6 +20,11 @@ export const PlaitBoardComponent = () => {
         newBoard.children = [];
         setBoard(newBoard);
 
+        // Expose board for global access (Auto-Save)
+        if (window.inksight) {
+            window.inksight.board = newBoard;
+        }
+
         // Load existing cards
         const cards = Array.from(cardSystem.cards.values());
         cards.forEach((card, index) => {

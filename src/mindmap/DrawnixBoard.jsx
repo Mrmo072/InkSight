@@ -473,6 +473,13 @@ export const DrawnixBoardComponent = () => {
     const handleBoardInit = (b) => {
         setBoard(b);
         boardRef.current = b; // Store ref for callbacks
+        if (window.inksight) {
+            window.inksight.board = b;
+        }
+
+        // Signal that board is ready for restoring data
+        console.log('[DrawnixBoard] Board initialized and ready');
+        window.dispatchEvent(new CustomEvent('board-ready'));
 
         // Add click listener for jump-to-source
         const container = PlaitBoard.getBoardContainer(b);
@@ -793,6 +800,22 @@ export const DrawnixBoardComponent = () => {
             console.error('[DrawnixBoard] Error processing drop:', err);
         }
     };
+
+    // Auto-Restore Listener
+    useEffect(() => {
+        const handleRestore = (e) => {
+            const data = e.detail;
+            if (data.elements) {
+                console.log('[DrawnixBoard] Restoring board state from event');
+                setValue(data.elements);
+                if (data.viewport) {
+                    setViewport(data.viewport);
+                }
+            }
+        };
+        window.addEventListener('restore-board-state', handleRestore);
+        return () => window.removeEventListener('restore-board-state', handleRestore);
+    }, []);
 
     return (
         <div

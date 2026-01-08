@@ -454,7 +454,7 @@ export class PDFReader {
         selection.removeAllRanges();
     }
 
-    async load(fileData) {
+    async load(fileData, initialPage = 1) {
         try {
             // Clear highlights from previous document (visual only, preserve data)
             if (this.highlightRenderer && this.fileId) {
@@ -523,14 +523,22 @@ export class PDFReader {
 
             // Reset scroll position to show first page
             // Store timeout so it can be cancelled if a jump occurs immediately
-            this.initialScrollTimeout = setTimeout(() => {
-                requestAnimationFrame(() => {
-                    this.container.scrollTop = 0;
-                    this.container.scrollLeft = 0;
-                    this.onPageChange?.(1);
-                    this.initialScrollTimeout = null;
-                });
-            }, 500);
+            if (initialPage > 1) { // Removed numPages check as this.pdfDoc might not be fully populated? No, it is awaited above.
+                console.log('[PDFReader] Jumping to initial page:', initialPage);
+                // Use a short delay to ensure layout
+                setTimeout(() => {
+                    this.scrollToPage(initialPage);
+                }, 100);
+            } else {
+                this.initialScrollTimeout = setTimeout(() => {
+                    requestAnimationFrame(() => {
+                        this.container.scrollTop = 0;
+                        this.container.scrollLeft = 0;
+                        this.onPageChange?.(1);
+                        this.initialScrollTimeout = null;
+                    });
+                }, 500);
+            }
 
             return this.pdfDoc;
         } catch (error) {
@@ -964,6 +972,12 @@ export class PDFReader {
 
     scrollToPage(pageNum) {
         console.log('[PDFReader] scrollToPage requested:', pageNum);
+
+        // Cancel initial scroll reset if it's pending (Fix for auto-restore race condition)
+        if (this.initialScrollTimeout) {
+            clearTimeout(this.initialScrollTimeout);
+            this.initialScrollTimeout = null;
+        }
 
         pageNum = Math.max(1, Math.min(pageNum, this.pdfDoc.numPages));
         const pageInfo = this.pages[pageNum - 1];

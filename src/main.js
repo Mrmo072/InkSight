@@ -7,8 +7,9 @@ import { DrawnixView } from './mindmap/drawnix-view.js';
 import { highlightManager } from './core/highlight-manager.js';
 import { SplitView } from './ui/split-view.js';
 import { OutlineSidebar } from './ui/outline-sidebar.js';
-import { AnnotationList } from './ui/annotation-list.js'; // Import new module
+import { AnnotationList } from './ui/annotation-list.js';
 import { suppressResizeObserverLoop } from './drawnix/react-board/src/utils/resizeObserverFix.js';
+import { documentHistoryManager } from './core/document-history-manager.js'; // Import History Manager
 
 suppressResizeObserverLoop();
 
@@ -96,8 +97,18 @@ function init() {
         // Setup Layout Toggles (incl. Annotations)
         setupLayoutToggles();
 
+        // Listen for live page restore events (from History Manager recovery)
+        window.addEventListener('restore-page-position', (e) => {
+            const page = e.detail.page;
+            if (page && currentReader && page > 1) {
+                console.log('[Main] Received restore-page-position event. Jumping to:', page);
+                currentReader.scrollToPage(page);
+            }
+        });
+
     } catch (e) {
-        console.error('Initialization error:', e);
+        console.error('Error opening file:', e);
+        // showToast('无法打开文件: ' + e.message);
     }
 }
 
@@ -483,6 +494,12 @@ async function handleJumpToSource(sourceId, highlightId) {
 async function openFile(fileData) {
     state.currentFile = fileData;
     elements.docTitle.textContent = fileData.name;
+
+    // Update Global State for Persistence
+    window.inksight.currentBook.md5 = fileData.id;
+    window.inksight.currentBook.id = fileData.id;
+    window.inksight.currentBook.name = fileData.name;
+
     renderFileList();
     elements.viewer.innerHTML = '';
 
@@ -530,16 +547,45 @@ async function openFile(fileData) {
         currentReader.setPageChangeCallback((num) => {
             state.currentPage = num;
             updatePageInfo();
+
+            // Save Reading Progress
+            if (window.inksight.currentBook && window.inksight.currentBook.md5) {
+                documentHistoryManager.updatePage(window.inksight.currentBook.md5, num);
+            }
         });
 
         try {
-            await currentReader.load(fileData);
+            // Get history early for initial scroll
+            const md5 = window.inksight.currentBook.md5;
+            let startPage = 1;
+            let history = null;
+            if (md5) {
+                history = documentHistoryManager.getHistory(md5);
+                if (history && history.lastPage) {
+                    startPage = history.lastPage;
+                }
+            }
+
+            await currentReader.load(fileData, startPage);
             elements.prevBtn.disabled = false;
             elements.nextBtn.disabled = false;
 
             // Load Outline
             const outline = currentReader.getOutline();
             outlineSidebar.render(outline, currentReader.pdfDoc);
+
+            // --- Auto-Restore Logic ---
+            if (md5) {
+                // 1. Restore Page Position - Handled by load() now
+
+                // 2. Restore MindMap/Highlights State
+                documentHistoryManager.restoreState(md5);
+
+                // 3. Start Auto-Save
+                // Strip extension for book name if needed, or pass full name (Manager handles .inksight extension)
+                const bookName = fileData.name.replace(/\.[^/.]+$/, "");
+                documentHistoryManager.startAutoSave(md5, bookName);
+            }
 
         } catch (e) {
             elements.viewer.innerHTML = `<div class="error">Error loading PDF: ${e.message}</div>`;

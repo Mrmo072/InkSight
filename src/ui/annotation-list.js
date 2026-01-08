@@ -18,6 +18,7 @@ export class AnnotationList {
         window.addEventListener('card-updated', () => this.refresh()); // Or granular update
         window.addEventListener('card-removed', () => this.refresh());
         window.addEventListener('card-soft-deleted', () => this.refresh()); // Sync with Mindmap deletions
+        window.addEventListener('cards-restored', () => this.refresh()); // Auto-Restore Sync
 
         // Listen for internal active card changes (from CardSystem or Drawnix)
         window.addEventListener('card-selected', (e) => {
