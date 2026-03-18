@@ -27,26 +27,48 @@ export class SplitView {
 
     setupResizers() {
         // Left Resizer
-        this.resizerLeft.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            this.leftPanel.classList.add('resizing'); // Disable transitions
-            document.addEventListener('mousemove', this.resizeLeft);
-            document.addEventListener('mouseup', this.stopResizeLeft);
-            document.body.style.cursor = 'col-resize';
-        });
+        const addResizeListeners = (element, isLeft) => {
+            const startResize = (e) => {
+                e.preventDefault();
+                const panel = isLeft ? this.leftPanel : this.rightPanel;
+                panel.classList.add('resizing');
 
-        // Right Resizer
-        this.resizerRight.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            this.rightPanel.classList.add('resizing'); // Disable transitions
-            document.addEventListener('mousemove', this.resizeRight);
-            document.addEventListener('mouseup', this.stopResizeRight);
-            document.body.style.cursor = 'col-resize';
-        });
+                if (isLeft) {
+                    document.addEventListener('mousemove', this.resizeLeft);
+                    document.addEventListener('mouseup', this.stopResizeLeft);
+                    document.addEventListener('touchmove', this.resizeLeftTouch, { passive: false });
+                    document.addEventListener('touchend', this.stopResizeLeftTouch);
+                } else {
+                    document.addEventListener('mousemove', this.resizeRight);
+                    document.addEventListener('mouseup', this.stopResizeRight);
+                    document.addEventListener('touchmove', this.resizeRightTouch, { passive: false });
+                    document.addEventListener('touchend', this.stopResizeRightTouch);
+                }
+                document.body.style.cursor = 'col-resize';
+            };
+
+            element.addEventListener('mousedown', startResize);
+            element.addEventListener('touchstart', (e) => {
+                // Use the first touch point
+                startResize(e);
+            }, { passive: false });
+        };
+
+        addResizeListeners(this.resizerLeft, true);
+        addResizeListeners(this.resizerRight, false);
     }
 
     resizeLeft = (e) => {
-        const newWidth = e.clientX;
+        this.performResizeLeft(e.clientX);
+    }
+
+    resizeLeftTouch = (e) => {
+        if (e.cancelable) e.preventDefault();
+        this.performResizeLeft(e.touches[0].clientX);
+    }
+
+    performResizeLeft(clientX) {
+        const newWidth = clientX;
         // Calculate max width allowing for right panel and min center width
         const rightPanelWidth = this.rightPanel.getBoundingClientRect().width;
         const maxLeftWidth = window.innerWidth - rightPanelWidth - 300; // Reserve 300px for center
@@ -58,14 +80,33 @@ export class SplitView {
     }
 
     stopResizeLeft = () => {
+        this.cleanupResizeLeft();
+    }
+
+    stopResizeLeftTouch = () => {
+        this.cleanupResizeLeft();
+    }
+
+    cleanupResizeLeft() {
         this.leftPanel.classList.remove('resizing'); // Re-enable transitions
         document.removeEventListener('mousemove', this.resizeLeft);
         document.removeEventListener('mouseup', this.stopResizeLeft);
+        document.removeEventListener('touchmove', this.resizeLeftTouch);
+        document.removeEventListener('touchend', this.stopResizeLeftTouch);
         document.body.style.cursor = 'default';
     }
 
     resizeRight = (e) => {
-        const newWidth = window.innerWidth - e.clientX;
+        this.performResizeRight(e.clientX);
+    }
+
+    resizeRightTouch = (e) => {
+        if (e.cancelable) e.preventDefault();
+        this.performResizeRight(e.touches[0].clientX);
+    }
+
+    performResizeRight(clientX) {
+        const newWidth = window.innerWidth - clientX;
         // Calculate max width allowing for left panel and min center width
         const leftPanelWidth = this.leftPanel.getBoundingClientRect().width;
         const maxRightWidth = window.innerWidth - leftPanelWidth - 300; // Reserve 300px for center
@@ -77,9 +118,19 @@ export class SplitView {
     }
 
     stopResizeRight = () => {
+        this.cleanupResizeRight();
+    }
+
+    stopResizeRightTouch = () => {
+        this.cleanupResizeRight();
+    }
+
+    cleanupResizeRight() {
         this.rightPanel.classList.remove('resizing'); // Re-enable transitions
         document.removeEventListener('mousemove', this.resizeRight);
         document.removeEventListener('mouseup', this.stopResizeRight);
+        document.removeEventListener('touchmove', this.resizeRightTouch);
+        document.removeEventListener('touchend', this.stopResizeRightTouch);
         document.body.style.cursor = 'default';
     }
 

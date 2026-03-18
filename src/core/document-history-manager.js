@@ -7,8 +7,33 @@ export class DocumentHistoryManager {
         this.currentMd5 = null;
         this.currentBookName = null;
         this.HISTORY_KEY = 'inksight_document_history';
+        this.hasPendingRestore = false;
+        this.isStatsRestored = true;
+        this.initialElementCount = 0;
 
         this.init();
+    }
+
+    sanitizeSaveFilename(filename) {
+        return filename.replace(/[<>:"/\\|?*]/g, '_');
+    }
+
+    getBaseBookName(bookName) {
+        if (!bookName) return '';
+        return bookName.replace(/\.[^/.]+$/, '');
+    }
+
+    getSaveFilename(bookName) {
+        return this.sanitizeSaveFilename(`${this.getBaseBookName(bookName)}.inksight`);
+    }
+
+    getRestoreCandidates(bookName) {
+        if (!bookName) return [];
+
+        const rawCandidate = this.sanitizeSaveFilename(`${bookName}.inksight`);
+        const baseCandidate = this.getSaveFilename(bookName);
+
+        return Array.from(new Set([baseCandidate, rawCandidate].filter(Boolean)));
     }
 
     init() {
@@ -172,8 +197,7 @@ export class DocumentHistoryManager {
             const jsonStr = JSON.stringify(data, null, 2);
 
             // Construct filename
-            const fileName = `${this.currentBookName}.inksight`;
-            const safeFileName = fileName.replace(/[<>:"/\\|?*]/g, '_'); // Windows unsafe chars
+            const safeFileName = this.getSaveFilename(this.currentBookName);
 
             // Use IPC to save
             const result = await this.ipcRenderer.saveFile(safeFileName, jsonStr);
@@ -216,50 +240,10 @@ export class DocumentHistoryManager {
             // Case B: No history, try fallback to book name
             if (window.inksight && window.inksight.currentBook && window.inksight.currentBook.name) {
                 const bookName = window.inksight.currentBook.name;
-                const candidates = [];
-
-                // 1. Exact name + .inksight (e.g., Book.pdf.inksight)
-                candidates.push(`${bookName}.inksight`);
-
-                // 2. Name without extension + .inksight (e.g., Book.inksight)
-                const nameWithoutExt = bookName.replace(/\.pdf$/i, '');
-                if (nameWithoutExt !== bookName) {
-                    candidates.push(`${nameWithoutExt}.inksight`);
-                }
+                const candidates = this.getRestoreCandidates(bookName);
 
                 console.log('[DocumentHistoryManager] No history found, trying fallback candidates:', candidates);
-
-                // Try candidates sequentially
-                for (const candidate of candidates) {
-                    const safeName = candidate.replace(/[<>:"/\\|?*]/g, '_');
-                    // Check if file exists (via lightweight check if possible, or just look for md5 in all?)
-                    // Since we don't have a "checkExists" IPC, we can just let the load logic below handle the first valid one?
-                    // But we need the loop here.
-                    // Actually, let's just pick one? No, we don't know which one exists.
-                    // We'll set 'filename' to the first one for now, but maybe we should try loop loading right here?
-                    // Let's refactor to try loading candidates here.
-                    filename = safeName; // Default to first
-
-                    // But we can't easily check existence without trying to load or adding an IPC.
-                    // Let's assume the one without .pdf is more likely if the user says so, OR just expose an "exists" check?
-                    // For now, let's look at the MD5 logic again. 
-                    // Actually, we can use findSaveByMd5 as the ULTIMATE check, which we already have.
-                    // But to respect the filename logic:
-                }
-
-                // Better strategy: Just set specific priority. 
-                // Given the user log, the file on disk is ONLY .inksight (no .pdf).
-                // So likely we should prioritize the stripped version.
-                const safeRaw = `${bookName}.inksight`.replace(/[<>:"/\\|?*]/g, '_');
-                const safeStripped = `${nameWithoutExt}.inksight`.replace(/[<>:"/\\|?*]/g, '_');
-
-                // We'll try safeStripped FIRST because that matches the user's current state.
-                filename = safeStripped;
-                // We'll store the other as a secondary fallback if needed? 
-                // Our current flow only supports one 'filename' variable. 
-                // Let's rely on MD5 fallback if this wrong guess fails?
-                // The user specifically wants us to find "why it's not found". 
-                // So fixing the guess to match reality is the answer.
+                filename = candidates[0] || null;
                 console.log('[DocumentHistoryManager] Selected fallback filename:', filename);
             }
         }

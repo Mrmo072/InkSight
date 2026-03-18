@@ -52,6 +52,20 @@ export class PDFAreaSelector {
         if (this.attachedWrappers.has(wrapper)) return; // Prevent duplicate listeners
 
         wrapper.addEventListener('mousedown', (e) => this.onSelectionStart(e, wrapper, pageNum));
+
+        // Touch Support
+        wrapper.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                const touch = e.touches[0];
+                const mouseEvent = {
+                    preventDefault: () => e.preventDefault(),
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                };
+                this.onSelectionStart(mouseEvent, wrapper, pageNum);
+            }
+        }, { passive: false });
+
         this.attachedWrappers.add(wrapper);
     }
 
@@ -81,6 +95,23 @@ export class PDFAreaSelector {
 
         document.addEventListener('mousemove', this.boundMouseMove);
         document.addEventListener('mouseup', this.boundMouseUp);
+
+        // Bind touch global listeners
+        this.boundTouchMove = (e) => {
+            if (e.touches.length === 1) {
+                // e.preventDefault(); // Prevent scroll
+                const touch = e.touches[0];
+                const mouseEvent = {
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                };
+                this.onSelectionMove(mouseEvent);
+            }
+        };
+        this.boundTouchEnd = (e) => this.onSelectionEnd(e);
+
+        document.addEventListener('touchmove', this.boundTouchMove, { passive: false });
+        document.addEventListener('touchend', this.boundTouchEnd);
     }
 
     onSelectionMove(e) {
@@ -114,6 +145,8 @@ export class PDFAreaSelector {
         // Remove global listeners
         document.removeEventListener('mousemove', this.boundMouseMove);
         document.removeEventListener('mouseup', this.boundMouseUp);
+        document.removeEventListener('touchmove', this.boundTouchMove);
+        document.removeEventListener('touchend', this.boundTouchEnd);
 
         this.isDrawing = false;
 

@@ -67,6 +67,40 @@ export class PDFHighlighterTool {
                 this.handleMouseUp(e, pageWrapper, pageNum);
             }
         });
+
+        // Touch Support
+        pageWrapper.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                // Mimic mouse event
+                const touch = e.touches[0];
+                const mouseEvent = {
+                    preventDefault: () => e.preventDefault(),
+                    clientX: touch.clientX,
+                    clientY: touch.clientY,
+                    target: e.target
+                };
+                this.handleMouseDown(mouseEvent, pageWrapper, pageNum);
+            }
+        }, { passive: false });
+
+        pageWrapper.addEventListener('touchmove', (e) => {
+            if (this.isDrawing && e.touches.length === 1) {
+                e.preventDefault(); // Critical to prevent scrolling
+                const touch = e.touches[0];
+                const mouseEvent = {
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                };
+                this.handleMouseMove(mouseEvent, pageWrapper);
+            }
+        }, { passive: false });
+
+        pageWrapper.addEventListener('touchend', (e) => {
+            if (this.isDrawing) {
+                const mouseEvent = {}; // handleMouseUp doesn't strictly need client coords if drawing finished
+                this.handleMouseUp(mouseEvent, pageWrapper, pageNum);
+            }
+        });
     }
 
     /**

@@ -1,19 +1,12 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { themeManager } from '../theme-manager';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { themeManager } from '../theme-manager.js';
 
 describe('ThemeManager', () => {
     beforeEach(() => {
-        // Reset theme to default before each test
-        // Accessing private internal state for testing purposes, or just using public API if possible
-        // Ideally we should have a reset method, but for now we can rely on public API
-
-        // Since themeManager is a singleton, its state persists across tests.
-        // We need to ensure a clean state.
+        vi.spyOn(console, 'log').mockImplementation(() => {});
         if (themeManager.getTheme() !== 'default') {
             themeManager.setTheme('default');
         }
-
-        // Clear mocks if any
         vi.clearAllMocks();
     });
 
@@ -26,6 +19,7 @@ describe('ThemeManager', () => {
         themeManager.setTheme('dark');
         expect(themeManager.getTheme()).toBe('dark');
         expect(document.documentElement.dataset.theme).toBe('dark');
+        expect(console.log).toHaveBeenCalledWith('Theme changed to: dark');
     });
 
     it('should notify listeners on theme change', () => {
@@ -59,5 +53,18 @@ describe('ThemeManager', () => {
         unsubscribe();
         themeManager.setTheme('starry');
         expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('supports multiple listeners and only removes the unsubscribed one', () => {
+        const first = vi.fn();
+        const second = vi.fn();
+        const unsubscribeFirst = themeManager.subscribe(first);
+        themeManager.subscribe(second);
+
+        unsubscribeFirst();
+        themeManager.setTheme('colorful');
+
+        expect(first).not.toHaveBeenCalled();
+        expect(second).toHaveBeenCalledWith('colorful');
     });
 });

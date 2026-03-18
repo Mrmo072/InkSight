@@ -53,6 +53,9 @@ body {
   justify-content: space-between;
   border-bottom: 1px solid var(--border);
   background-color: var(--bg-main);
+  position: relative;
+  z-index: 101;
+  /* Ensure above resizers */
 }
 
 .file-list {
@@ -91,6 +94,19 @@ body {
   cursor: col-resize;
   transition: background-color 0.2s;
   z-index: 100;
+  position: relative;
+  /* Ensure pseudo-element positioning works */
+}
+
+/* Increase hit area for touch */
+.resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -12px;
+  right: -12px;
+  z-index: 100;
 }
 
 .resizer:hover,
@@ -119,7 +135,8 @@ body {
   padding: 0 16px;
   gap: 12px;
   background-color: var(--bg-main);
-  z-index: 10;
+  z-index: 101;
+  /* Ensure above resizers */
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   min-width: 0;
   /* Allow shrinking */
@@ -182,6 +199,8 @@ body {
   color: var(--text-secondary);
   border-bottom: 1px solid var(--border);
   background-color: var(--bg-secondary);
+  position: relative;
+  z-index: 101;
 }
 
 .outline-content {
@@ -270,6 +289,8 @@ body {
   padding: 0 16px;
   background-color: var(--bg-main);
   border-bottom: 1px solid var(--border);
+  position: relative;
+  z-index: 101;
 }
 
 .panel-tabs {

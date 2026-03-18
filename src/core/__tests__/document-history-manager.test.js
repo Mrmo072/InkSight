@@ -1,155 +1,242 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { DocumentHistoryManager } from '../document-history-manager.js';
+function createInksightState(overrides = {}) {
+    return {
+        board: { children: [{ id: 'el-1' }], viewport: { x: 1, y: 2, zoom: 1 } },
+        currentBook: { md5: 'book-md5', id: 'book-md5', name: 'Book.pdf' },
+        highlightManager: {
+            getPersistenceData: vi.fn(() => ({ highlights: [{ id: 'h-1' }] })),
+            restorePersistenceData: vi.fn()
+        },
+        cardSystem: {
+            getPersistenceData: vi.fn(() => ({ cards: [['c-1', { id: 'c-1' }]], connections: [{ id: 'link-1' }] })),
+            restorePersistenceData: vi.fn()
+        },
+        ...overrides
+    };
+}
 
-describe('DocumentHistoryManager Regression Tests', () => {
+describe('DocumentHistoryManager', () => {
+    let DocumentHistoryManager;
     let manager;
     let mockIpc;
-    let mockBoard;
+    let originalRequire;
 
-    beforeEach(() => {
-        // Mock Window Globals
-        mockBoard = { children: [], viewport: {} };
-        window.inksight = {
-            board: mockBoard,
-            currentBook: { md5: 'test-md5', name: 'TestBook' },
-            highlightManager: { getPersistenceData: () => ({ highlights: [] }), restorePersistenceData: vi.fn() },
-            cardSystem: { getPersistenceData: () => ({ cards: [], connections: [] }), restorePersistenceData: vi.fn() },
-        };
+    beforeEach(async () => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        vi.spyOn(console, 'log').mockImplementation(() => {});
+        localStorage.clear();
 
-        // Mock IPC
+        originalRequire = globalThis.require;
+        globalThis.require = undefined;
+        window.require = undefined;
+        window.ipcRenderer = undefined;
+        window.electronAPI = undefined;
+
+        window.inksight = createInksightState();
+
         mockIpc = {
-            saveFile: vi.fn().mockResolvedValue({ success: true, path: '/tmp/test.inksight' }),
+            saveFile: vi.fn().mockResolvedValue({ success: true, path: '/tmp/Book.inksight' }),
             loadFile: vi.fn(),
             findSaveByMd5: vi.fn()
         };
 
-        // Instantiate Manager
+        vi.resetModules();
+        ({ DocumentHistoryManager } = await import('../document-history-manager.js'));
         manager = new DocumentHistoryManager();
-        manager.ipcRenderer = mockIpc; // Inject mock IPC
-        manager.currentMd5 = 'test-md5';
-        manager.currentBookName = 'TestBook';
-
-        // Mock Console to keep output clean
-        // vi.spyOn(console, 'log').mockImplementation(() => {});
-        // vi.spyOn(console, 'warn').mockImplementation(() => {});
-        // vi.spyOn(console, 'error').mockImplementation(() => {});
+        manager.ipcRenderer = mockIpc;
+        manager.currentMd5 = 'book-md5';
+        manager.currentBookName = 'Book.pdf';
     });
 
     afterEach(() => {
-        vi.clearAllMocks();
-        // vi.restoreAllMocks(); // Restore console
+        manager?.stopAutoSave();
+        globalThis.require = originalRequire;
+        delete window.require;
+        delete window.ipcRenderer;
+        delete window.electronAPI;
+        vi.useRealTimers();
+        vi.restoreAllMocks();
+        localStorage.clear();
     });
 
-    // --- 1. Safety Valve Tests ---
-    describe('Safety Valve (Empty Overwrite Protection)', () => {
-        it('should ABORT save if expected elements > 0 but board is empty', async () => {
-            // Setup: Restore expected 5 elements
-            manager.initialElementCount = 5;
-            manager.isStatsRestored = true; // Assume restore "finished" but failed to populate board
+    describe('filename helpers', () => {
+        it('normalizes save filenames from source book names', () => {
+            expect(manager.getBaseBookName('Book.pdf')).toBe('Book');
+            expect(manager.getSaveFilename('Book.pdf')).toBe('Book.inksight');
+            expect(manager.getSaveFilename('Research:Draft?.epub')).toBe('Research_Draft_.inksight');
+        });
 
-            // Act: Board is empty (mockBoard.children = [])
+        it('returns restore candidates in preferred order', () => {
+            expect(manager.getRestoreCandidates('Novel.epub')).toEqual([
+                'Novel.inksight',
+                'Novel.epub.inksight'
+            ]);
+            expect(manager.getRestoreCandidates('Notes')).toEqual(['Notes.inksight']);
+        });
+    });
+
+    describe('auto-save lifecycle', () => {
+        it('schedules periodic auto-save and clears it on stop', () => {
+            vi.useFakeTimers();
+            const performAutoSaveSpy = vi.spyOn(manager, 'performAutoSave').mockResolvedValue();
+
+            manager.startAutoSave('md5-1', 'Timed Book.pdf');
+            vi.advanceTimersByTime(3 * 60 * 1000);
+
+            expect(performAutoSaveSpy).toHaveBeenCalledTimes(1);
+            expect(manager.currentMd5).toBe('md5-1');
+            expect(manager.currentBookName).toBe('Timed Book.pdf');
+
+            manager.stopAutoSave();
+            vi.advanceTimersByTime(3 * 60 * 1000);
+
+            expect(performAutoSaveSpy).toHaveBeenCalledTimes(1);
+            expect(manager.currentMd5).toBeNull();
+            expect(manager.currentBookName).toBeNull();
+        });
+
+        it('skips saving while restore is still pending', async () => {
+            manager.hasPendingRestore = true;
+            manager.isStatsRestored = false;
+
             await manager.performAutoSave();
 
-            // Assert: Save should NOT be called
             expect(mockIpc.saveFile).not.toHaveBeenCalled();
-            expect(console.error).toHaveBeenCalledWith(expect.stringContaining('SAFETY VALVE TRIGGERED'));
+            expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('Restore pending'));
         });
 
-        it('should ALLOW save if expected elements = 0 (New File)', async () => {
-            manager.initialElementCount = 0;
+        it('prevents overwriting existing content with an empty board', async () => {
+            manager.initialElementCount = 3;
+            manager.isStatsRestored = true;
+            window.inksight.board.children = [];
+
+            await manager.performAutoSave();
+
+            expect(mockIpc.saveFile).not.toHaveBeenCalled();
+            expect(console.error).toHaveBeenCalledWith(expect.stringContaining('EMPTY board'));
+        });
+
+        it('serializes board state, metadata, and updates save history', async () => {
+            manager.updatePage('book-md5', 42);
             manager.isStatsRestored = true;
 
             await manager.performAutoSave();
 
-            expect(mockIpc.saveFile).toHaveBeenCalled();
-        });
+            expect(mockIpc.saveFile).toHaveBeenCalledWith('Book.inksight', expect.any(String));
 
-        it('should ALLOW save if board has content', async () => {
-            manager.initialElementCount = 5;
-            manager.isStatsRestored = true;
-            mockBoard.children = [1, 2, 3]; // Mock content
-
-            await manager.performAutoSave();
-
-            expect(mockIpc.saveFile).toHaveBeenCalled();
+            const [, payload] = mockIpc.saveFile.mock.calls[0];
+            const parsed = JSON.parse(payload);
+            expect(parsed.bookMd5).toBe('book-md5');
+            expect(parsed.bookName).toBe('Book.pdf');
+            expect(parsed.cards).toEqual([['c-1', { id: 'c-1' }]]);
+            expect(parsed.highlights).toEqual([{ id: 'h-1' }]);
+            expect(parsed.lastPage).toBe(42);
+            expect(manager.history['book-md5'].saveFilename).toBe('Book.inksight');
+            expect(manager.history['book-md5'].autoSavePath).toBe('/tmp/Book.inksight');
         });
     });
 
-    // --- 2. Smart Reconnect Tests ---
-    describe('Smart Reconnect (MD5 Recovery)', () => {
-        it('should try MD5 search if primary load fails', async () => {
-            // Setup: Primary load fails
-            mockIpc.loadFile.mockResolvedValueOnce({ success: false, error: 'File not found' });
+    describe('restore flow', () => {
+        it('loads from persisted autoSavePath basename when saveFilename is missing', async () => {
+            manager.history['book-md5'] = { autoSavePath: 'C:\\saves\\Recovered.inksight' };
+            mockIpc.loadFile.mockResolvedValue({ success: true, content: JSON.stringify({ elements: [] }) });
 
-            // Setup: MD5 search succeeds
-            mockIpc.findSaveByMd5.mockResolvedValueOnce({ success: true, filename: 'FoundFile.inksight' });
-            mockIpc.loadFile.mockResolvedValueOnce({ success: true, content: JSON.stringify({ elements: [] }) }); // Second load succeeds
+            await manager.restoreState('book-md5');
 
-            // Act
-            await manager.restoreState('test-md5');
-
-            // Assert
-            expect(mockIpc.loadFile).toHaveBeenCalledTimes(2); // First fail, second success
-            expect(mockIpc.findSaveByMd5).toHaveBeenCalledWith('test-md5');
-            expect(mockIpc.loadFile).toHaveBeenLastCalledWith('FoundFile.inksight');
+            expect(mockIpc.loadFile).toHaveBeenCalledWith('Recovered.inksight');
         });
 
-        it('should try filename fallback without extension if primary fails', async () => {
-            // Mock book name with .pdf
-            window.inksight.currentBook.name = 'TestBook.pdf';
+        it('falls back to normalized filename candidates when there is no history', async () => {
+            window.inksight.currentBook.name = 'Novel.epub';
+            mockIpc.loadFile.mockResolvedValue({ success: false, error: 'missing' });
+            mockIpc.findSaveByMd5.mockResolvedValue({ success: false });
 
-            // Setup: Explicit loads fail to trigger looking at logic flow (actually logic does strict sequence)
-            // But we can check if it attempts the stripped name.
-            // Manager logic:
-            // 1. Try history (none)
-            // 2. Try candidates (Loop check? No, logic picks one and tries load)
-            // Current logic picks 'TestBook.inksight' (stripped) as primary fallback
+            await manager.restoreState('book-md5');
 
-            mockIpc.loadFile.mockResolvedValue({ success: false }); // All fail
-
-            await manager.restoreState('test-md5');
-
-            // Verify it requested the STRIPPED name first/early
-            // 'TestBook.inksight' not 'TestBook.pdf.inksight'
-            expect(mockIpc.loadFile).toHaveBeenCalledWith(expect.stringContaining('TestBook.inksight'));
-        });
-    });
-
-    // --- 3. Page Persistence Tests ---
-    describe('Page Persistence', () => {
-        it('should include lastPage in auto-save data', async () => {
-            // Setup: Mock history with page info
-            manager.history['test-md5'] = { lastPage: 42 };
-            manager.isStatsRestored = true;
-
-            await manager.performAutoSave();
-
-            // Assert: saveFile content includes lastPage
-            const saveCall = mockIpc.saveFile.mock.calls[0];
-            const content = JSON.parse(saveCall[1]);
-            expect(content.lastPage).toBe(42);
+            expect(mockIpc.loadFile).toHaveBeenCalledWith('Novel.inksight');
         });
 
-        it('should dispatch restore-page-position event on restore', async () => {
-            // Setup: Mock file content with lastPage
-            const mockContent = {
-                lastPage: 99,
-                elements: []
-            };
-            mockIpc.loadFile.mockResolvedValue({ success: true, content: JSON.stringify(mockContent) });
+        it('uses MD5 lookup when the primary restore file is missing', async () => {
+            manager.history['book-md5'] = { saveFilename: 'Missing.inksight' };
+            mockIpc.loadFile
+                .mockResolvedValueOnce({ success: false, error: 'missing' })
+                .mockResolvedValueOnce({ success: true, content: JSON.stringify({ elements: [] }) });
+            mockIpc.findSaveByMd5.mockResolvedValue({ success: true, filename: 'Recovered.inksight' });
 
-            // Listen for event
-            const listener = vi.fn();
-            window.addEventListener('restore-page-position', listener);
+            await manager.restoreState('book-md5');
 
-            // Act
-            await manager.restoreState('test-md5');
+            expect(mockIpc.findSaveByMd5).toHaveBeenCalledWith('book-md5');
+            expect(mockIpc.loadFile).toHaveBeenNthCalledWith(1, 'Missing.inksight');
+            expect(mockIpc.loadFile).toHaveBeenNthCalledWith(2, 'Recovered.inksight');
+            expect(manager.history['book-md5'].saveFilename).toBe('Recovered.inksight');
+        });
 
-            // Assert
-            expect(listener).toHaveBeenCalled();
-            expect(listener.mock.calls[0][0].detail.page).toBe(99);
-            window.removeEventListener('restore-page-position', listener);
+        it('restores page position, cards, highlights, and board state when board is ready', async () => {
+            const restorePageListener = vi.fn();
+            const restoreBoardListener = vi.fn();
+            window.addEventListener('restore-page-position', restorePageListener);
+            window.addEventListener('restore-board-state', restoreBoardListener);
+
+            mockIpc.loadFile.mockResolvedValue({
+                success: true,
+                content: JSON.stringify({
+                    lastPage: 9,
+                    elements: [{ id: 'restored-node' }],
+                    viewport: { x: 10, y: 20, zoom: 2 },
+                    highlights: [{ id: 'h-9' }],
+                    cards: [['c-9', { id: 'c-9' }]],
+                    connections: [{ id: 'link-9' }]
+                })
+            });
+
+            await manager.restoreState('book-md5');
+
+            expect(restorePageListener).toHaveBeenCalled();
+            expect(restoreBoardListener).toHaveBeenCalled();
+            expect(window.inksight.highlightManager.restorePersistenceData).toHaveBeenCalledWith(
+                { highlights: [{ id: 'h-9' }] },
+                'book-md5'
+            );
+            expect(window.inksight.cardSystem.restorePersistenceData).toHaveBeenCalledWith(
+                { cards: [['c-9', { id: 'c-9' }]], connections: [{ id: 'link-9' }] },
+                'book-md5'
+            );
+            expect(manager.initialElementCount).toBe(1);
+            expect(manager.isStatsRestored).toBe(true);
+            expect(manager.hasPendingRestore).toBe(false);
+
+            window.removeEventListener('restore-page-position', restorePageListener);
+            window.removeEventListener('restore-board-state', restoreBoardListener);
+        });
+
+        it('waits for board-ready before dispatching board restore when board is unavailable', async () => {
+            vi.useFakeTimers();
+            window.inksight.board = null;
+
+            const restoreBoardListener = vi.fn();
+            window.addEventListener('restore-board-state', restoreBoardListener);
+
+            mockIpc.loadFile.mockResolvedValue({
+                success: true,
+                content: JSON.stringify({
+                    elements: [{ id: 'delayed-node' }],
+                    viewport: { x: 0, y: 0, zoom: 1 }
+                })
+            });
+
+            await manager.restoreState('book-md5');
+            expect(restoreBoardListener).not.toHaveBeenCalled();
+
+            window.dispatchEvent(new CustomEvent('board-ready'));
+            await Promise.resolve();
+
+            expect(restoreBoardListener).toHaveBeenCalled();
+            expect(manager.isStatsRestored).toBe(true);
+            expect(manager.hasPendingRestore).toBe(false);
+
+            window.removeEventListener('restore-board-state', restoreBoardListener);
         });
     });
 });

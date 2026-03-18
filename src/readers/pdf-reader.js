@@ -170,43 +170,72 @@ export class PDFReader {
         let scrollLeft = 0;
         let scrollTop = 0;
 
-        this.container.addEventListener('mousedown', (e) => {
-            // Check for Middle Mouse Button (button 1)
-            if (e.button === 1) {
-                e.preventDefault(); // Prevent default middle click scroll behavior
-                isPanning = true;
-                this.container.style.cursor = 'grabbing';
-                startX = e.pageX - this.container.offsetLeft;
-                startY = e.pageY - this.container.offsetTop;
-                scrollLeft = this.container.scrollLeft;
-                scrollTop = this.container.scrollTop;
-            }
-        });
+        const startPan = (pageX, pageY) => {
+            isPanning = true;
+            this.container.style.cursor = 'grabbing';
+            startX = pageX - this.container.offsetLeft;
+            startY = pageY - this.container.offsetTop;
+            scrollLeft = this.container.scrollLeft;
+            scrollTop = this.container.scrollTop;
+        };
 
-        this.container.addEventListener('mouseleave', () => {
-            if (isPanning) {
-                isPanning = false;
-                this.container.style.cursor = '';
-            }
-        });
-
-        this.container.addEventListener('mouseup', (e) => {
-            if (e.button === 1) { // Only stop if middle button released
-                isPanning = false;
-                this.container.style.cursor = '';
-            }
-        });
-
-        this.container.addEventListener('mousemove', (e) => {
+        const movePan = (pageX, pageY) => {
             if (!isPanning) return;
-            e.preventDefault();
-            const x = e.pageX - this.container.offsetLeft;
-            const y = e.pageY - this.container.offsetTop;
-            const walkX = (x - startX); // Scroll speed 1:1
+            const x = pageX - this.container.offsetLeft;
+            const y = pageY - this.container.offsetTop;
+            const walkX = (x - startX);
             const walkY = (y - startY);
             this.container.scrollLeft = scrollLeft - walkX;
             this.container.scrollTop = scrollTop - walkY;
+        };
+
+        const endPan = () => {
+            isPanning = false;
+            // Restore cursor based on mode
+            if (this.selectionMode === 'pan') {
+                this.container.style.cursor = 'grab';
+            } else {
+                this.container.style.cursor = '';
+            }
+        };
+
+        // Mouse Events
+        this.container.addEventListener('mousedown', (e) => {
+            // Middle Click OR (Left Click AND Pan Mode)
+            if (e.button === 1 || (e.button === 0 && this.selectionMode === 'pan')) {
+                e.preventDefault();
+                startPan(e.pageX, e.pageY);
+            }
         });
+
+        this.container.addEventListener('mouseleave', endPan);
+        this.container.addEventListener('mouseup', endPan);
+
+        this.container.addEventListener('mousemove', (e) => {
+            if (isPanning) {
+                e.preventDefault();
+                movePan(e.pageX, e.pageY);
+            }
+        });
+
+        // Touch Events
+        this.container.addEventListener('touchstart', (e) => {
+            if (this.selectionMode === 'pan' && e.touches.length === 1) {
+                // e.preventDefault(); // Do not prevent default here, might interfere with pinch zoom? 
+                // Actually for panning we usually want to prevent default scroll
+                if (e.cancelable) e.preventDefault();
+                startPan(e.touches[0].pageX, e.touches[0].pageY);
+            }
+        }, { passive: false });
+
+        this.container.addEventListener('touchmove', (e) => {
+            if (isPanning && e.touches.length === 1) {
+                if (e.cancelable) e.preventDefault();
+                movePan(e.touches[0].pageX, e.touches[0].pageY);
+            }
+        }, { passive: false });
+
+        this.container.addEventListener('touchend', endPan);
     }
 
     setupZoomHandling() {
@@ -294,8 +323,13 @@ export class PDFReader {
         // Toggle disable-selection class on container
         if (mode === 'text') {
             this.container.classList.remove('disable-selection');
+            this.container.style.cursor = 'text';
+        } else if (mode === 'pan') {
+            this.container.classList.add('disable-selection');
+            this.container.style.cursor = 'grab';
         } else {
             this.container.classList.add('disable-selection');
+            this.container.style.cursor = 'default';
         }
     }
 

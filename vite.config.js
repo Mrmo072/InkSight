@@ -8,6 +8,9 @@ const __dirname = dirname(__filename);
 
 export default defineConfig({
   base: './',
+  server: {
+    host: '0.0.0.0'
+  },
   plugins: [react()],
   resolve: {
     alias: {

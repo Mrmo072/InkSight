@@ -62,6 +62,20 @@ let splitView = null;
 let outlineSidebar = null;
 let annotationList = null;
 
+function destroyCurrentReader() {
+    if (currentReader?.destroy) {
+        currentReader.destroy();
+    }
+    currentReader = null;
+    window.inksight.pdfReader = null;
+}
+
+function resetReadingState() {
+    state.currentPage = 1;
+    state.totalPages = 0;
+    updatePageInfo();
+}
+
 // Initialization
 function init() {
 
@@ -281,12 +295,13 @@ function setupEventListeners() {
     // Layout Toggles moved to setupLayoutToggles()
 
     // Selection mode toggle buttons
+    const panModeBtn = document.getElementById('pan-mode');
     const textModeBtn = document.getElementById('text-mode');
     const rectModeBtn = document.getElementById('rect-mode');
     const ellipseModeBtn = document.getElementById('ellipse-mode');
     const highlighterModeBtn = document.getElementById('highlighter-mode');
 
-    const modeButtons = [textModeBtn, rectModeBtn, ellipseModeBtn, highlighterModeBtn].filter(Boolean);
+    const modeButtons = [panModeBtn, textModeBtn, rectModeBtn, ellipseModeBtn, highlighterModeBtn].filter(Boolean);
 
     const setActiveMode = (mode, activeBtn) => {
         if (currentReader && currentReader.setSelectionMode) {
@@ -295,6 +310,10 @@ function setupEventListeners() {
             if (activeBtn) activeBtn.classList.add('active');
         }
     };
+
+    if (panModeBtn) {
+        panModeBtn.addEventListener('click', () => setActiveMode('pan', panModeBtn));
+    }
 
     if (textModeBtn) {
         textModeBtn.addEventListener('click', () => setActiveMode('text', textModeBtn));
@@ -309,7 +328,33 @@ function setupEventListeners() {
     }
 
     if (highlighterModeBtn) {
-        highlighterModeBtn.addEventListener('click', () => setActiveMode('highlighter', highlighterModeBtn));
+        highlighterModeBtn.addEventListener('click', (e) => {
+            // Toggle panel if already active (for mobile/tablet where no hover)
+            if (highlighterModeBtn.classList.contains('active')) {
+                const isVisible = highlighterPanel.classList.contains('visible');
+                if (isVisible) {
+                    highlighterPanel.classList.remove('visible');
+                } else {
+                    highlighterPanel.classList.add('visible');
+                    // Position logic (copied from mouseenter)
+                    void highlighterPanel.offsetHeight;
+                    const btnRect = highlighterModeBtn.getBoundingClientRect();
+                    const offsetParent = highlighterPanel.offsetParent || document.body;
+                    const containerRect = offsetParent.getBoundingClientRect();
+                    const panelWidth = 220;
+                    let left = (btnRect.left - containerRect.left) + (btnRect.width / 2) - (panelWidth / 2);
+                    const containerWidth = containerRect.width;
+                    if (left < 10) left = 10;
+                    if (left + panelWidth > containerWidth - 10) left = containerWidth - panelWidth - 10;
+                    const top = (btnRect.bottom - containerRect.top) + 12;
+                    highlighterPanel.style.top = `${top}px`;
+                    highlighterPanel.style.left = `${left}px`;
+                    highlighterPanel.style.transform = 'translateX(0)';
+                }
+            } else {
+                setActiveMode('highlighter', highlighterModeBtn);
+            }
+        });
     }
 
     // Highlighter Height Control Panel
@@ -341,20 +386,18 @@ function setupEventListeners() {
             }
         });
 
-        highlighterModeBtn.addEventListener('mousedown', (e) => {
+        const startDrag = (y) => {
             isDragging = false;
-            startY = e.clientY;
+            startY = y;
             if (currentReader && currentReader.highlighterTool) {
                 startHeight = currentReader.highlighterTool.height;
             } else if (heightSlider) {
                 startHeight = parseInt(heightSlider.value) || 16;
             }
-            document.addEventListener('mousemove', onMouseMove);
-            document.addEventListener('mouseup', onMouseUp);
-        });
+        };
 
-        const onMouseMove = (e) => {
-            const deltaY = startY - e.clientY;
+        const onMove = (y) => {
+            const deltaY = startY - y;
             if (Math.abs(deltaY) > clickThreshold) isDragging = true;
             if (isDragging) {
                 let newHeight = startHeight + deltaY;
@@ -366,10 +409,38 @@ function setupEventListeners() {
             }
         };
 
+        highlighterModeBtn.addEventListener('mousedown', (e) => {
+            startDrag(e.clientY);
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
+
+        highlighterModeBtn.addEventListener('touchstart', (e) => {
+            // Prevent default to avoid scrolling while dragging slider
+            if (e.cancelable) e.preventDefault();
+            startDrag(e.touches[0].clientY);
+            document.addEventListener('touchmove', onTouchMove, { passive: false });
+            document.addEventListener('touchend', onTouchEnd);
+        }, { passive: false });
+
+        const onMouseMove = (e) => {
+            onMove(e.clientY);
+        };
+
+        const onTouchMove = (e) => {
+            if (e.cancelable) e.preventDefault();
+            onMove(e.touches[0].clientY);
+        };
+
         const onMouseUp = () => {
             document.removeEventListener('mousemove', onMouseMove);
             document.removeEventListener('mouseup', onMouseUp);
-        }
+        };
+
+        const onTouchEnd = () => {
+            document.removeEventListener('touchmove', onTouchMove);
+            document.removeEventListener('touchend', onTouchEnd);
+        };
 
         if (heightSlider) {
             heightSlider.addEventListener('input', (e) => {
@@ -429,11 +500,30 @@ async function handleFileSelect(e) {
 
 // Simple hash function for deterministic IDs
 async function generateHash(message) {
-    const msgBuffer = new TextEncoder().encode(message);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    return hashHex.substring(0, 32);
+    if (window.crypto && window.crypto.subtle) {
+        try {
+            const msgBuffer = new TextEncoder().encode(message);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            return hashHex.substring(0, 32);
+        } catch (e) {
+            console.warn('[Hash] Crypto API failed, falling back:', e);
+        }
+    }
+
+    // Fallback for insecure contexts (e.g. HTTP IP access)
+    // Simple non-cryptographic hash (DJB2 variant)
+    let hash = 5381;
+    for (let i = 0; i < message.length; i++) {
+        hash = ((hash << 5) + hash) + message.charCodeAt(i); /* hash * 33 + c */
+    }
+    // Convert to hex and pad/trim to look similar to SHA-256 frag
+    const hashHex = (hash >>> 0).toString(16).padStart(8, '0');
+    // Extend a bit to mimic ID length if needed, or just return short unique ID
+    // Since we need consistent IDs, we'll just append length + first/last chars code
+    const suffix = message.length.toString(16) + (message.charCodeAt(0) || 0).toString(16);
+    return (hashHex + suffix).padEnd(32, '0').substring(0, 32);
 }
 
 function renderFileList() {
@@ -492,6 +582,10 @@ async function handleJumpToSource(sourceId, highlightId) {
 }
 
 async function openFile(fileData) {
+    destroyCurrentReader();
+    resetReadingState();
+    documentHistoryManager.stopAutoSave();
+
     state.currentFile = fileData;
     elements.docTitle.textContent = fileData.name;
 
@@ -525,13 +619,6 @@ async function openFile(fileData) {
     }
 
     if (fileData.type === 'application/pdf') {
-        if (currentReader) {
-            if (currentReader.destroy) {
-                currentReader.destroy();
-            }
-            currentReader = null;
-        }
-
         // Reset outline
         outlineSidebar.reset();
 
@@ -595,6 +682,7 @@ async function openFile(fileData) {
         outlineSidebar.reset();
         elements.viewer.innerHTML = '<div class="loading">Loading EPUB...</div>';
         currentReader = new EpubReader(elements.viewer);
+        window.inksight.pdfReader = null;
 
         currentReader.setPageCountCallback((count) => {
             state.totalPages = count;
@@ -615,8 +703,10 @@ async function openFile(fileData) {
             console.error(e);
         }
     } else if (fileData.type === 'text/plain' || fileData.type === 'text/markdown' || fileData.name.toLowerCase().endsWith('.md') || fileData.name.toLowerCase().endsWith('.txt')) {
+        outlineSidebar.reset();
         elements.viewer.innerHTML = '<div class="loading">Loading Text...</div>';
         currentReader = new TextReader(elements.viewer);
+        window.inksight.pdfReader = null;
 
         currentReader.setPageCountCallback((count) => {
             state.totalPages = count;
@@ -637,6 +727,7 @@ async function openFile(fileData) {
             console.error(e);
         }
     } else {
+        outlineSidebar.reset();
         elements.viewer.innerHTML = '<div class="error">Unsupported file type: ' + fileData.type + '</div>';
     }
 
