@@ -1,4 +1,47 @@
 .popup-toolbar {
+    .popup-font-size {
+        display: inline-flex;
+        align-items: stretch;
+        height: var(--lg-button-size);
+        border: 1px solid var(--island-border-color);
+        border-radius: var(--border-radius-lg);
+        background: var(--island-bg-color);
+        overflow: hidden;
+    }
+    .popup-font-size__input {
+        width: 3rem;
+        border: none;
+        background: transparent;
+        color: var(--color-text-primary);
+        padding: 0 0.4rem;
+        font-size: 0.875rem;
+        text-align: center;
+        outline: none;
+    }
+    .popup-font-size__input::-webkit-outer-spin-button,
+    .popup-font-size__input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+    .popup-font-size__stepper {
+        display: flex;
+        flex-direction: column;
+        border-left: 1px solid var(--island-border-color);
+    }
+    .popup-font-size__button {
+        border: none;
+        background: transparent;
+        color: var(--color-text-secondary);
+        width: 1.4rem;
+        flex: 1;
+        cursor: pointer;
+        line-height: 1;
+        font-size: 0.75rem;
+    }
+    .popup-font-size__button:hover {
+        background: var(--color-gray-10);
+        color: var(--color-text-primary);
+    }
     .property-button {
         height: var(--lg-button-size);
         width: var(--lg-button-size);

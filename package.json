@@ -11,7 +11,12 @@
     "electron": "electron .",
     "electron:dev": "concurrently -k \"cross-env BROWSER=none npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
     "dist:win": "npm run build && electron-builder --win --x64",
-    "test": "vitest"
+    "test": "vitest",
+    "drawnix:sync:status": "powershell -ExecutionPolicy Bypass -File .\\scripts\\drawnix-sync.ps1 -Action status",
+    "drawnix:sync:fetch": "powershell -ExecutionPolicy Bypass -File .\\scripts\\drawnix-sync.ps1 -Action fetch",
+    "drawnix:sync:log": "powershell -ExecutionPolicy Bypass -File .\\scripts\\drawnix-sync.ps1 -Action log",
+    "drawnix:sync:diff": "powershell -ExecutionPolicy Bypass -File .\\scripts\\drawnix-sync.ps1 -Action diff",
+    "drawnix:sync:all": "powershell -ExecutionPolicy Bypass -File .\\scripts\\drawnix-sync.ps1 -Action all"
   },
   "build": {
     "appId": "com.inksight.app",

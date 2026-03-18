@@ -63,6 +63,7 @@ export const serializeAsJSON = (board: PlaitBoard, extraData: Record<string, any
     source: 'web',
     elements: board.children,
     viewport: board.viewport,
+    theme: board.theme,
     ...extraData
   };
 

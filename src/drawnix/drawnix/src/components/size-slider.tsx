@@ -10,6 +10,7 @@ interface SliderProps {
   step?: number;
   defaultValue?: number;
   disabled?: boolean;
+  title?: string;
   onChange?: (value: number) => void;
   beforeStart?: () => void;
   afterEnd?: () => void;
@@ -21,6 +22,7 @@ export const SizeSlider: React.FC<SliderProps> = ({
   step = 1,
   defaultValue = 100,
   disabled = false,
+  title,
   onChange,
   beforeStart,
   afterEnd,
@@ -96,7 +98,11 @@ export const SizeSlider: React.FC<SliderProps> = ({
   }
 
   return (
-    <div className={classNames('slider-container', { disabled: disabled })}>
+    <div
+      data-tooltip
+      title={title}
+      className={classNames('slider-container', { disabled: disabled })}
+    >
       <div
         ref={sliderRef}
         className="slider-track"
