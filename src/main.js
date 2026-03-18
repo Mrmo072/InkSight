@@ -1,6 +1,4 @@
 import './styles/styles.css';
-import { MindmapView } from './mindmap/mindmap-view.js';
-import { DrawnixView } from './mindmap/drawnix-view.js';
 import { highlightManager } from './core/highlight-manager.js';
 import { SplitView } from './ui/split-view.js';
 import { OutlineSidebar } from './ui/outline-sidebar.js';
@@ -50,19 +48,18 @@ const elements = {
 };
 
 let currentReader = null;
-let mindmapView = null;
-let drawnixView = null;
 let splitView = null;
 let outlineSidebar = null;
 let annotationList = null;
 let currentToolMode = 'pan';
 let readerLoader = null;
-const appCleanupCallbacks = [];
+
+async function createDrawnixView(container) {
+    const { DrawnixView } = await import('./mindmap/drawnix-view.js');
+    return new DrawnixView(container);
+}
 
 function registerCleanup(cleanup) {
-    if (typeof cleanup === 'function') {
-        appCleanupCallbacks.push(cleanup);
-    }
     return cleanup;
 }
 
@@ -158,7 +155,7 @@ function setupResponsiveLayout() {
 }
 
 // Initialization
-function init() {
+async function init() {
 
     try {
         loadFilesFromStorage();
@@ -166,7 +163,7 @@ function init() {
         // Init Mindmap or Drawnix
         const mindmapContainer = document.getElementById('mindmap-container');
         if (mindmapContainer) {
-            drawnixView = new DrawnixView(mindmapContainer);
+            await createDrawnixView(mindmapContainer);
         }
 
         // Init SplitView BEFORE setupEventListeners
@@ -689,7 +686,7 @@ function updatePageInfo() {
 }
 
 function loadFilesFromStorage() {
-    // TODO: Implement IndexedDB loading
+    return [];
 }
 
 // Start app
@@ -703,4 +700,4 @@ readerLoader = createReaderLoader({
     updatePageInfo
 });
 
-init();
+void init();

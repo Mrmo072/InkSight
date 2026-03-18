@@ -10,7 +10,7 @@ import {
   ThemeColorMode,
   Viewport,
 } from '@plait/core';
-import React, { useState, useRef, useEffect } from 'react';
+import React, { Suspense, lazy, useState, useRef, useEffect } from 'react';
 import { withGroup } from '@plait/common';
 import { withDraw } from '@plait/draw';
 import { MindThemeColors, withMind } from '@plait/mind';
@@ -30,10 +30,10 @@ import { buildPencilPlugin } from './plugins/with-pencil';
 import {
   DrawnixBoard,
   DrawnixContext,
+  DialogType,
   DrawnixState,
 } from './hooks/use-drawnix';
 import { ClosePencilToolbar } from './components/toolbar/pencil-mode-toolbar';
-import { TTDDialog } from './components/ttd-dialog/ttd-dialog';
 import { CleanConfirm } from './components/clean-confirm/clean-confirm';
 import { buildTextLinkPlugin } from './plugins/with-text-link';
 import { LinkPopup } from './components/popup/link-popup/link-popup';
@@ -41,6 +41,10 @@ import { I18nProvider } from './i18n';
 import { Tutorial } from './components/tutorial';
 import { LASER_POINTER_CLASS_NAME } from './utils/laser-pointer';
 import { withArrowShapeSync } from './plugins/with-arrow-shape-sync';
+
+const TTDDialog = lazy(() => import('./components/ttd-dialog/ttd-dialog').then((module) => ({
+  default: module.TTDDialog,
+})));
 
 export type DrawnixProps = {
   value: PlaitElement[];
@@ -75,7 +79,6 @@ export const Drawnix: React.FC<DrawnixProps> = ({
   };
 
   const [appState, setAppState] = useState<DrawnixState>(() => {
-    // TODO: need to consider how to maintenance the pointer state in future
     const md = new MobileDetect(window.navigator.userAgent);
     return {
       pointer: PlaitPointerType.hand,
@@ -156,7 +159,13 @@ export const Drawnix: React.FC<DrawnixProps> = ({
             <PopupToolbar></PopupToolbar>
             <LinkPopup></LinkPopup>
             <ClosePencilToolbar></ClosePencilToolbar>
-            <TTDDialog container={containerRef.current}></TTDDialog>
+            {appState.openDialogType &&
+              (appState.openDialogType === DialogType.mermaidToDrawnix ||
+                appState.openDialogType === DialogType.markdownToDrawnix) && (
+                <Suspense fallback={null}>
+                  <TTDDialog container={containerRef.current}></TTDDialog>
+                </Suspense>
+              )}
             <CleanConfirm container={containerRef.current}></CleanConfirm>
           </Wrapper>
           <canvas className={`${LASER_POINTER_CLASS_NAME} mouse-course-hidden`}></canvas>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useDeferredValue } from 'react';
+import { useState, useEffect, useDeferredValue, useRef } from 'react';
 import './mermaid-to-drawnix.scss';
 import './ttd-dialog.scss';
 import { TTDDialogPanels } from './ttd-dialog-panels';
@@ -30,6 +30,7 @@ export interface MarkdownToDrawnixLibProps {
 const MarkdownToDrawnix = () => {
   const { appState, setAppState } = useDrawnix();
   const { t, language } = useI18n();
+  const markdownLibPromiseRef = useRef<MarkdownToDrawnixLibProps['api'] | null>(null);
   const [markdownToDrawnixLib, setMarkdownToDrawnixLib] =
     useState<MarkdownToDrawnixLibProps>({
       loaded: false,
@@ -38,27 +39,32 @@ const MarkdownToDrawnix = () => {
           null as any as MindElement,
       }),
     });
-
-  useEffect(() => {
-    const loadLib = async () => {
-      try {
-        const module = await import('@plait-board/markdown-to-drawnix');
-        setMarkdownToDrawnixLib({
-          loaded: true,
-          api: Promise.resolve(module),
-        });
-      } catch (err) {
-        console.error('Failed to load mermaid library:', err);
-        setError(new Error(t('dialog.error.loadMermaid')));
-      }
-    };
-    loadLib();
-  }, []);
   const [text, setText] = useState(() => t('markdown.example'));
   const [value, setValue] = useState<PlaitElement[]>(() => []);
   const deferredText = useDeferredValue(text.trim());
   const [error, setError] = useState<Error | null>(null);
+  const [previewRequested, setPreviewRequested] = useState(false);
   const board = useBoard();
+
+  const ensureMarkdownLibLoaded = async () => {
+    if (!markdownLibPromiseRef.current) {
+      markdownLibPromiseRef.current = import('@plait-board/markdown-to-drawnix');
+      setMarkdownToDrawnixLib((current) => ({ ...current, api: markdownLibPromiseRef.current }));
+    }
+
+    try {
+      const module = await markdownLibPromiseRef.current;
+      setMarkdownToDrawnixLib({
+        loaded: true,
+        api: Promise.resolve(module),
+      });
+      return module;
+    } catch (err) {
+      console.error('Failed to load mermaid library:', err);
+      setError(new Error(t('dialog.error.loadMermaid')));
+      throw err;
+    }
+  };
    
   // Update markdown example when language changes
   useEffect(() => {
@@ -67,8 +73,16 @@ const MarkdownToDrawnix = () => {
 
   useEffect(() => {
     const convertMarkdown = async () => {
+      if (!previewRequested || !deferredText) {
+        if (!deferredText) {
+          setValue([]);
+          setError(null);
+        }
+        return;
+      }
+
       try {
-        const api = await markdownToDrawnixLib.api;
+        const api = await ensureMarkdownLibLoaded();
         let ret;
         try {
           ret = await api.parseMarkdownToDrawnix(deferredText);
@@ -87,8 +101,16 @@ const MarkdownToDrawnix = () => {
         setError(err);
       }
     };
-    convertMarkdown();
-  }, [deferredText, markdownToDrawnixLib]);
+    void convertMarkdown();
+  }, [deferredText, previewRequested]);
+
+  const requestPreview = () => {
+    if (!previewRequested) {
+      setPreviewRequested(true);
+      return false;
+    }
+    return true;
+  };
 
   const insertToBoard = () => {
     if (!value.length) {
@@ -127,6 +149,9 @@ const MarkdownToDrawnix = () => {
             placeholder={t('dialog.markdown.placeholder')}
             onChange={(event) => setText(event.target.value)}
             onKeyboardSubmit={() => {
+              if (!requestPreview()) {
+                return;
+              }
               insertToBoard();
             }}
           />
@@ -135,6 +160,9 @@ const MarkdownToDrawnix = () => {
           label={t('dialog.markdown.preview')}
           panelAction={{
             action: () => {
+              if (!requestPreview()) {
+                return;
+              }
               insertToBoard();
             },
             label: t('dialog.markdown.insert'),

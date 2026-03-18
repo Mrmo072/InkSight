@@ -1,4 +1,4 @@
-import { useState, useEffect, useDeferredValue } from 'react';
+import { useState, useEffect, useDeferredValue, useRef } from 'react';
 import './mermaid-to-drawnix.scss';
 import './ttd-dialog.scss';
 import { TTDDialogPanels } from './ttd-dialog-panels';
@@ -37,6 +37,7 @@ const MERMAID_EXAMPLE =
 const MermaidToDrawnix = () => {
   const { appState, setAppState } = useDrawnix();
   const { t, language } = useI18n();
+  const mermaidLibPromiseRef = useRef<MermaidToDrawnixLibProps['api'] | null>(null);
   const [mermaidToDrawnixLib, setMermaidToDrawnixLib] =
     useState<MermaidToDrawnixLibProps>({
       loaded: false,
@@ -44,32 +45,45 @@ const MermaidToDrawnix = () => {
         parseMermaidToDrawnix: async () => ({ elements: [] }),
       }),
     });
-
-  useEffect(() => {
-    const loadLib = async () => {
-      try {
-        const module = await import('@plait-board/mermaid-to-drawnix');
-        setMermaidToDrawnixLib({
-          loaded: true,
-          api: Promise.resolve(module),
-        });
-      } catch (err) {
-        console.error('Failed to load mermaid library:', err);
-        setError(new Error(t('dialog.error.loadMermaid')));
-      }
-    };
-    loadLib();
-  }, []);
   const [text, setText] = useState(() => MERMAID_EXAMPLE);
   const [value, setValue] = useState<PlaitElement[]>(() => []);
   const deferredText = useDeferredValue(text.trim());
   const [error, setError] = useState<Error | null>(null);
+  const [previewRequested, setPreviewRequested] = useState(false);
   const board = useBoard();
+
+  const ensureMermaidLibLoaded = async () => {
+    if (!mermaidLibPromiseRef.current) {
+      mermaidLibPromiseRef.current = import('@plait-board/mermaid-to-drawnix');
+      setMermaidToDrawnixLib((current) => ({ ...current, api: mermaidLibPromiseRef.current }));
+    }
+
+    try {
+      const module = await mermaidLibPromiseRef.current;
+      setMermaidToDrawnixLib({
+        loaded: true,
+        api: Promise.resolve(module),
+      });
+      return module;
+    } catch (err) {
+      console.error('Failed to load mermaid library:', err);
+      setError(new Error(t('dialog.error.loadMermaid')));
+      throw err;
+    }
+  };
 
   useEffect(() => {
     const convertMermaid = async () => {
+      if (!previewRequested || !deferredText) {
+        if (!deferredText) {
+          setValue([]);
+          setError(null);
+        }
+        return;
+      }
+
       try {
-        const api = await mermaidToDrawnixLib.api;
+        const api = await ensureMermaidLibLoaded();
         let ret;
         try {
           ret = await api.parseMermaidToDrawnix(deferredText);
@@ -85,8 +99,16 @@ const MermaidToDrawnix = () => {
         setError(err);
       }
     };
-    convertMermaid();
-  }, [deferredText, mermaidToDrawnixLib]);
+    void convertMermaid();
+  }, [deferredText, previewRequested]);
+
+  const requestPreview = () => {
+    if (!previewRequested) {
+      setPreviewRequested(true);
+      return false;
+    }
+    return true;
+  };
 
   const insertToBoard = () => {
     if (!value.length) {
@@ -196,6 +218,9 @@ const MermaidToDrawnix = () => {
             placeholder={t('dialog.mermaid.placeholder')}
             onChange={(event) => setText(event.target.value)}
             onKeyboardSubmit={() => {
+              if (!requestPreview()) {
+                return;
+              }
               insertToBoard();
             }}
           />
@@ -204,6 +229,9 @@ const MermaidToDrawnix = () => {
           label={t('dialog.mermaid.preview')}
           panelAction={{
             action: () => {
+              if (!requestPreview()) {
+                return;
+              }
               insertToBoard();
             },
             label: t('dialog.mermaid.insert'),

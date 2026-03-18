@@ -1,6 +1,3 @@
-import { PDFReader } from '../readers/pdf-reader.js';
-import { EpubReader } from '../readers/epub-reader.js';
-import { TextReader } from '../readers/text-reader.js';
 import { getAppContext, setAppService } from './app-context.js';
 
 export function createReaderLoader({
@@ -30,7 +27,10 @@ export function createReaderLoader({
             matches: (fileData) => fileData.type === 'application/pdf',
             loadingText: 'Loading PDF...',
             errorLabel: 'PDF',
-            createReader: () => new PDFReader(elements.viewer),
+            loadReaderModule: async () => {
+                const { PDFReader } = await import('../readers/pdf-reader.js');
+                return PDFReader;
+            },
             defaultMode: 'pan',
             beforeLoad: () => {
                 resolveOutlineSidebar()?.reset();
@@ -69,7 +69,10 @@ export function createReaderLoader({
                 || fileData.name.toLowerCase().endsWith('.epub'),
             loadingText: 'Loading EPUB...',
             errorLabel: 'EPUB',
-            createReader: () => new EpubReader(elements.viewer),
+            loadReaderModule: async () => {
+                const { EpubReader } = await import('../readers/epub-reader.js');
+                return EpubReader;
+            },
             defaultMode: 'text',
             beforeLoad: () => {
                 resolveOutlineSidebar()?.reset();
@@ -95,7 +98,10 @@ export function createReaderLoader({
                 || fileData.name.toLowerCase().endsWith('.txt'),
             loadingText: 'Loading Text...',
             errorLabel: 'Text',
-            createReader: () => new TextReader(elements.viewer),
+            loadReaderModule: async () => {
+                const { TextReader } = await import('../readers/text-reader.js');
+                return TextReader;
+            },
             defaultMode: 'text',
             beforeLoad: () => {
                 resolveOutlineSidebar()?.reset();
@@ -132,7 +138,8 @@ export function createReaderLoader({
         resetAuxiliaryPanels();
         elements.viewer.innerHTML = `<div class="loading">${config.loadingText}</div>`;
 
-        const reader = config.createReader();
+        const ReaderClass = await config.loadReaderModule();
+        const reader = new ReaderClass(elements.viewer);
         config.configureReader?.(reader);
 
         try {

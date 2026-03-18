@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { Drawnix } from '@drawnix/drawnix';
-import ELK from 'elkjs/lib/elk.bundled.js';
 import { Transforms, PlaitBoard, getSelectedElements, BoardTransforms, toViewBoxPoint, toHostPoint } from '@plait/core';
 import { setAppService } from '../app/app-context.js';
 import { registerEventListeners } from '../app/event-listeners.js';
@@ -23,7 +22,17 @@ export const DrawnixBoardComponent = () => {
     const [flashOverlay, setFlashOverlay] = useState(null);
     const containerRef = useRef(null);
     const processingCardIds = useRef(new Set()); // Track cards being processed to avoid loops
-    const elkRef = useRef(new ELK()); // Reuse ELK instance
+    const elkRef = useRef(null);
+
+    const getElkInstance = async () => {
+        if (elkRef.current) {
+            return elkRef.current;
+        }
+
+        const { default: ELK } = await import('elkjs/lib/elk.bundled.js');
+        elkRef.current = new ELK();
+        return elkRef.current;
+    };
 
     // Initialize with existing cards once board is ready
     useEffect(() => {
@@ -469,7 +478,7 @@ export const DrawnixBoardComponent = () => {
     const applyAutoLayout = async (boardInstance) => {
         if (!boardInstance || !boardInstance.children) return;
 
-        const elk = elkRef.current;
+        const elk = await getElkInstance();
         const { graph, nodeMap } = createLayoutGraph(boardInstance.children);
 
         if (graph.children.length === 0) return;

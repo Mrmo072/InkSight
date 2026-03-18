@@ -6,6 +6,72 @@ import { dirname, resolve } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+function manualChunks(id) {
+  if (!id.includes('node_modules') && !id.includes(`${resolve(__dirname, 'src')}\\drawnix`) && !id.includes(`${resolve(__dirname, 'src')}/drawnix`)) {
+    return undefined;
+  }
+
+  const normalizedId = id.replaceAll('\\', '/');
+
+  if (normalizedId.includes('/node_modules/react/') || normalizedId.includes('/node_modules/react-dom/')) {
+    return 'react-vendor';
+  }
+
+  if (normalizedId.includes('/node_modules/pdfjs-dist/')) {
+    return 'pdf-vendor';
+  }
+
+  if (normalizedId.includes('/node_modules/epubjs/')) {
+    return 'epub-vendor';
+  }
+
+  if (normalizedId.includes('/node_modules/marked/') || normalizedId.includes('/node_modules/katex/')) {
+    return 'text-vendor';
+  }
+
+  if (
+    normalizedId.includes('/node_modules/@plait/') ||
+    normalizedId.includes('/src/drawnix/react-board/') ||
+    normalizedId.includes('/src/drawnix/react-text/')
+  ) {
+    return 'plait-vendor';
+  }
+
+  if (
+    normalizedId.includes('/src/drawnix/drawnix/') ||
+    normalizedId.includes('/node_modules/@plait-board/')
+  ) {
+    return 'drawnix-vendor';
+  }
+
+  if (normalizedId.includes('/node_modules/elkjs/')) {
+    return 'elk-vendor';
+  }
+
+  if (
+    normalizedId.includes('/node_modules/mermaid/') ||
+    normalizedId.includes('/node_modules/d3-') ||
+    normalizedId.includes('/node_modules/dagre-') ||
+    normalizedId.includes('/node_modules/cytoscape') ||
+    normalizedId.includes('/node_modules/khroma/') ||
+    normalizedId.includes('/node_modules/layout-base/') ||
+    normalizedId.includes('/node_modules/graphlib/') ||
+    normalizedId.includes('/node_modules/lodash-es/') ||
+    normalizedId.includes('/node_modules/dayjs/')
+  ) {
+    return 'mermaid-vendor';
+  }
+
+  if (
+    normalizedId.includes('mindmap-definition') ||
+    normalizedId.includes('mermaid')
+  ) {
+    return 'diagram-vendor';
+  }
+
+  return undefined;
+}
+
 export default defineConfig({
   base: './',
   server: {
@@ -20,7 +86,12 @@ export default defineConfig({
     }
   },
   build: {
-    target: 'es2022'
+    target: 'es2022',
+    rollupOptions: {
+      output: {
+        manualChunks
+      }
+    }
   },
   esbuild: {
     target: 'es2022'

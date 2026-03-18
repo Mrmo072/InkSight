@@ -1,10 +1,19 @@
+import { Suspense, lazy } from 'react';
 import { Dialog, DialogContent } from '../dialog/dialog';
-import MermaidToDrawnix from './mermaid-to-drawnix';
 import { DialogType, useDrawnix } from '../../hooks/use-drawnix';
-import MarkdownToDrawnix from './markdown-to-drawnix';
+
+const MermaidToDrawnix = lazy(() => import('./mermaid-to-drawnix'));
+const MarkdownToDrawnix = lazy(() => import('./markdown-to-drawnix'));
 
 export const TTDDialog = ({ container }: { container: HTMLElement | null }) => {
   const { appState, setAppState } = useDrawnix();
+
+  const renderLazyDialog = (content: React.ReactNode) => (
+    <Suspense fallback={null}>
+      {content}
+    </Suspense>
+  );
+
   return (
     <>
       <Dialog
@@ -17,7 +26,7 @@ export const TTDDialog = ({ container }: { container: HTMLElement | null }) => {
         }}
       >
         <DialogContent className="Dialog ttd-dialog" container={container}>
-          <MermaidToDrawnix></MermaidToDrawnix>
+          {renderLazyDialog(<MermaidToDrawnix></MermaidToDrawnix>)}
         </DialogContent>
       </Dialog>
       <Dialog
@@ -30,7 +39,7 @@ export const TTDDialog = ({ container }: { container: HTMLElement | null }) => {
         }}
       >
         <DialogContent className="Dialog ttd-dialog" container={container}>
-          <MarkdownToDrawnix></MarkdownToDrawnix>
+          {renderLazyDialog(<MarkdownToDrawnix></MarkdownToDrawnix>)}
         </DialogContent>
       </Dialog>
     </>
