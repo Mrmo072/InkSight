@@ -68,13 +68,13 @@ describe('buildAutoLayoutPlan', () => {
         expect(childBRect.x).toBeGreaterThan(rootRect.x + rootRect.width);
         expect(grandchildRect.x).toBeGreaterThan(childBRect.x + childBRect.width);
 
-        expect(rootEdge).toHaveLength(4);
+        expect(rootEdge).toHaveLength(3);
         expect(rootEdge[0][0]).toBeGreaterThan(rootRect.x + rootRect.width);
         expect(rootEdge[1][0]).toBeGreaterThan(rootEdge[0][0]);
         expect(rootEdge[rootEdge.length - 1][0]).toBeLessThan(childARect.x);
     });
 
-    it('pushes non-tree edges to outer lanes so they avoid the node cluster', () => {
+    it('routes same-level extra edges through a sibling corridor instead of across the node stack', () => {
         const children = [
             createNode('root', 400, 220),
             createNode('child-a', 180, 120),
@@ -88,14 +88,16 @@ describe('buildAutoLayoutPlan', () => {
 
         const { nodeRects, edgeRoutes } = buildAutoLayoutPlan(children);
         const extraEdge = edgeRoutes.get('edge-extra').points;
-        const bounds = Array.from(nodeRects.values()).reduce((acc, rect) => ({
-            top: Math.min(acc.top, rect.y),
-            bottom: Math.max(acc.bottom, rect.y + rect.height)
-        }), { top: Number.POSITIVE_INFINITY, bottom: Number.NEGATIVE_INFINITY });
+        const rootSubtreeRight = Math.max(
+            nodeRects.get('root').x + nodeRects.get('root').width,
+            nodeRects.get('child-a').x + nodeRects.get('child-a').width,
+            nodeRects.get('child-b').x + nodeRects.get('child-b').width,
+            nodeRects.get('child-c').x + nodeRects.get('child-c').width
+        );
 
-        expect(extraEdge).toHaveLength(6);
-        const laneY = extraEdge[2][1];
-        expect(laneY < bounds.top || laneY > bounds.bottom).toBe(true);
+        expect(extraEdge).toHaveLength(4);
+        expect(extraEdge[1][0]).toBeGreaterThan(rootSubtreeRight);
+        expect(extraEdge[2][0]).toBeGreaterThan(rootSubtreeRight);
     });
 
     it('sorts sibling branches by provided document order instead of current canvas position', () => {
@@ -166,5 +168,33 @@ describe('buildAutoLayoutPlan', () => {
 
         expect(startYs[0]).toBeLessThan(startYs[1]);
         expect(startYs[1]).toBeLessThan(startYs[2]);
+    });
+
+    it('routes sibling-to-sibling edges outside their parent subtree when a same-level link exists', () => {
+        const children = [
+            createNode('root', 420, 260),
+            createNode('node-b', 160, 120),
+            createNode('node-c', 160, 260),
+            createNode('node-d', 160, 400),
+            createEdge('edge-root-b', 'root', 'node-b'),
+            createEdge('edge-root-c', 'root', 'node-c'),
+            createEdge('edge-root-d', 'root', 'node-d'),
+            createEdge('edge-b-c', 'node-b', 'node-c')
+        ];
+
+        const { nodeRects, edgeRoutes } = buildAutoLayoutPlan(children);
+        const route = edgeRoutes.get('edge-b-c');
+        const subtreeRight = Math.max(
+            nodeRects.get('root').x + nodeRects.get('root').width,
+            nodeRects.get('node-b').x + nodeRects.get('node-b').width,
+            nodeRects.get('node-c').x + nodeRects.get('node-c').width,
+            nodeRects.get('node-d').x + nodeRects.get('node-d').width
+        );
+
+        expect(route.points).toHaveLength(4);
+        expect(route.points[1][0]).toBeGreaterThan(subtreeRight);
+        expect(route.points[2][0]).toBeGreaterThan(subtreeRight);
+        expect(route.sourceConnection[0]).toBe(1);
+        expect(route.targetConnection[0]).toBe(1);
     });
 });

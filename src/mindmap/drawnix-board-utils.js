@@ -47,9 +47,9 @@ const NODE_VERTICAL_GAP = 26;
 const COMPONENT_VERTICAL_GAP = 140;
 const OUTER_EDGE_LANE_GAP = 56;
 const OUTER_EDGE_MARGIN = 96;
-const EXTRA_EDGE_EXIT = 72;
-const DETACHED_PORT_OFFSET = 24;
-const PORT_SLOT_SPACING = 18;
+const EXTRA_EDGE_EXIT = 40;
+const DETACHED_PORT_OFFSET = 16;
+const PORT_SLOT_SPACING = 10;
 const PORT_EDGE_MARGIN = 10;
 const GRID_GAP_X = 72;
 const GRID_GAP_Y = 56;
@@ -223,6 +223,8 @@ function buildForest(nodesById, edges, nodeOrderMap) {
     const incomingCount = new Map();
     const treeChildren = new Map();
     const treeEdgeIds = new Set();
+    const parentById = new Map();
+    const depthById = new Map();
     const roots = [];
     const visited = new Set();
     const nodeIds = Array.from(nodesById.keys());
@@ -262,10 +264,13 @@ function buildForest(nodesById, edges, nodeOrderMap) {
         roots.push(rootId);
         const queue = [rootId];
         visited.add(rootId);
+        parentById.set(rootId, null);
+        depthById.set(rootId, 0);
 
         while (queue.length > 0) {
             const currentId = queue.shift();
             const nextEdges = outgoing.get(currentId) || [];
+            const currentDepth = depthById.get(currentId) || 0;
 
             nextEdges.forEach((edge) => {
                 if (visited.has(edge.targetId)) {
@@ -275,6 +280,8 @@ function buildForest(nodesById, edges, nodeOrderMap) {
                 visited.add(edge.targetId);
                 treeEdgeIds.add(edge.id);
                 treeChildren.get(currentId).push(edge.targetId);
+                parentById.set(edge.targetId, currentId);
+                depthById.set(edge.targetId, currentDepth + 1);
                 queue.push(edge.targetId);
             });
         }
@@ -289,7 +296,9 @@ function buildForest(nodesById, edges, nodeOrderMap) {
     return {
         roots,
         treeChildren,
-        treeEdgeIds
+        treeEdgeIds,
+        parentById,
+        depthById
     };
 }
 
@@ -567,16 +576,15 @@ function routeTreeEdge(sourceRect, targetRect, siblingIndex = 0, siblingCount = 
     const direction = Math.sign(end[0] - start[0]) || 1;
     const detachedStart = [start[0] + DETACHED_PORT_OFFSET * direction, sourceSlotY];
     const detachedEnd = [end[0] - DETACHED_PORT_OFFSET * direction, targetSlotY];
-    const horizontalGap = Math.abs(end[0] - start[0]);
-    const maxControlOffset = Math.max(18, horizontalGap / 2 - 8);
-    const controlOffset = clamp(horizontalGap * 0.34, 18, maxControlOffset);
-    const spreadOffset = (siblingIndex - (siblingCount - 1) / 2) * (PORT_SLOT_SPACING * 0.5);
+    const horizontalGap = Math.abs(detachedEnd[0] - detachedStart[0]);
+    const midpointX = detachedStart[0] + direction * Math.max(18, horizontalGap * 0.52);
+    const spreadOffset = (siblingIndex - (siblingCount - 1) / 2) * 3;
+    const midpointY = ((sourceSlotY + targetSlotY) / 2) + spreadOffset;
 
     return {
         points: [
             detachedStart,
-            [detachedStart[0] + direction * controlOffset, sourceSlotY],
-            [detachedEnd[0] - direction * controlOffset, targetSlotY + spreadOffset],
+            [midpointX, midpointY],
             detachedEnd
         ],
         sourceConnection: [sourceAnchor[0], getConnectionRatio(sourceRect, sourceSlotY)],
@@ -589,18 +597,44 @@ function routeOuterCurve(sourceRect, targetRect, laneY) {
     const direction = Math.sign(end[0] - start[0]) || 1;
     const detachedStart = [start[0] + DETACHED_PORT_OFFSET * direction, start[1]];
     const detachedEnd = [end[0] - DETACHED_PORT_OFFSET * direction, end[1]];
+    const approachX = EXTRA_EDGE_EXIT * 0.9;
+    const laneLift = (laneY - ((detachedStart[1] + detachedEnd[1]) / 2)) * 0.92;
 
     return {
         points: [
             detachedStart,
-            [detachedStart[0] + EXTRA_EDGE_EXIT * direction, detachedStart[1]],
-            [detachedStart[0] + EXTRA_EDGE_EXIT * 1.4 * direction, laneY],
-            [detachedEnd[0] - EXTRA_EDGE_EXIT * 1.4 * direction, laneY],
-            [detachedEnd[0] - EXTRA_EDGE_EXIT * direction, detachedEnd[1]],
+            [detachedStart[0] + approachX * direction, detachedStart[1] + laneLift * 0.45],
+            [detachedEnd[0] - approachX * direction, detachedEnd[1] + laneLift * 0.45],
             detachedEnd
         ],
         sourceConnection: [sourceAnchor[0], getConnectionRatio(sourceRect, start[1])],
         targetConnection: [targetAnchor[0], getConnectionRatio(targetRect, end[1])]
+    };
+}
+
+function routeSiblingCurve(sourceRect, targetRect, laneX, siblingIndex = 0, siblingCount = 1) {
+    const sourceBounds = getRectBounds(sourceRect);
+    const targetBounds = getRectBounds(targetRect);
+    const useRightSide = laneX >= Math.max(sourceBounds.right, targetBounds.right);
+    const sourceSlotY = getClampedPortY(sourceRect, siblingIndex, siblingCount);
+    const targetSlotY = getClampedPortY(targetRect, siblingIndex, siblingCount);
+    const side = useRightSide ? 1 : 0;
+    const sourceX = useRightSide ? sourceBounds.right : sourceBounds.left;
+    const targetX = useRightSide ? targetBounds.right : targetBounds.left;
+    const direction = useRightSide ? 1 : -1;
+    const detachedStart = [sourceX + DETACHED_PORT_OFFSET * direction, sourceSlotY];
+    const detachedEnd = [targetX + DETACHED_PORT_OFFSET * direction, targetSlotY];
+    const laneBendX = laneX - direction * 6;
+
+    return {
+        points: [
+            detachedStart,
+            [laneBendX, sourceSlotY],
+            [laneBendX, targetSlotY],
+            detachedEnd
+        ],
+        sourceConnection: [side, getConnectionRatio(sourceRect, sourceSlotY)],
+        targetConnection: [side, getConnectionRatio(targetRect, targetSlotY)]
     };
 }
 
@@ -619,10 +653,46 @@ function buildChildIndexMap(treeChildren) {
     return childIndexMap;
 }
 
-function routeEdges(edges, rects, treeEdgeIds, treeChildren) {
+function buildSubtreeBounds(rects, roots, treeChildren) {
+    const subtreeBounds = new Map();
+
+    const visit = (nodeId) => {
+        const ownRect = rects.get(nodeId);
+        if (!ownRect) {
+            return null;
+        }
+
+        let bounds = getRectBounds(ownRect);
+        (treeChildren.get(nodeId) || []).forEach((childId) => {
+            const childBounds = visit(childId);
+            if (!childBounds) {
+                return;
+            }
+
+            bounds = {
+                left: Math.min(bounds.left, childBounds.left),
+                right: Math.max(bounds.right, childBounds.right),
+                top: Math.min(bounds.top, childBounds.top),
+                bottom: Math.max(bounds.bottom, childBounds.bottom)
+            };
+        });
+
+        subtreeBounds.set(nodeId, bounds);
+        return bounds;
+    };
+
+    roots.forEach((rootId) => {
+        visit(rootId);
+    });
+
+    return subtreeBounds;
+}
+
+function routeEdges(edges, rects, treeEdgeIds, treeChildren, roots, parentById, depthById) {
     const routes = new Map();
     const bounds = getBoundsFromRects(rects);
     const childIndexMap = buildChildIndexMap(treeChildren);
+    const subtreeBounds = buildSubtreeBounds(rects, roots, treeChildren);
 
     if (!bounds) {
         return routes;
@@ -630,6 +700,7 @@ function routeEdges(edges, rects, treeEdgeIds, treeChildren) {
 
     let upperLaneIndex = 0;
     let lowerLaneIndex = 0;
+    const siblingLaneOffsets = new Map();
     const centerY = bounds.top + bounds.height / 2;
 
     edges.forEach((edge) => {
@@ -652,6 +723,46 @@ function routeEdges(edges, rects, treeEdgeIds, treeChildren) {
                     sourceInfo.count
                 )
             );
+            return;
+        }
+
+        const sourceParentId = parentById.get(edge.sourceId) ?? null;
+        const targetParentId = parentById.get(edge.targetId) ?? null;
+        const sourceDepth = depthById.get(edge.sourceId) ?? 0;
+        const targetDepth = depthById.get(edge.targetId) ?? 0;
+        const sharedParent = sourceParentId && sourceParentId === targetParentId;
+        const sameDepth = sourceDepth === targetDepth;
+
+        if (sharedParent || sameDepth) {
+            const laneKey = sharedParent ? `parent:${sourceParentId}` : `depth:${sourceDepth}`;
+            const laneIndex = siblingLaneOffsets.get(laneKey) || 0;
+            siblingLaneOffsets.set(laneKey, laneIndex + 1);
+
+            const corridorBounds = sharedParent
+                ? subtreeBounds.get(sourceParentId)
+                : {
+                    left: Math.min(
+                        subtreeBounds.get(edge.sourceId)?.left ?? sourceRect.x,
+                        subtreeBounds.get(edge.targetId)?.left ?? targetRect.x
+                    ),
+                    right: Math.max(
+                        subtreeBounds.get(edge.sourceId)?.right ?? (sourceRect.x + sourceRect.width),
+                        subtreeBounds.get(edge.targetId)?.right ?? (targetRect.x + targetRect.width)
+                    )
+                };
+            const laneX = (corridorBounds?.right ?? bounds.right) + OUTER_EDGE_MARGIN + laneIndex * OUTER_EDGE_LANE_GAP;
+            const laneSourceInfo = {
+                index: Math.min(laneIndex, 2),
+                count: Math.max(2, Math.min((treeChildren.get(sourceParentId) || []).length, 4))
+            };
+
+            routes.set(edge.id, routeSiblingCurve(
+                sourceRect,
+                targetRect,
+                laneX,
+                laneSourceInfo.index,
+                laneSourceInfo.count
+            ));
             return;
         }
 
@@ -701,7 +812,7 @@ export function buildAutoLayoutPlan(children, options = {}) {
         };
     }
 
-    const { roots, treeChildren, treeEdgeIds } = buildForest(nodesById, edges, nodeOrderMap);
+    const { roots, treeChildren, treeEdgeIds, parentById, depthById } = buildForest(nodesById, edges, nodeOrderMap);
     const laidOutRects = layoutForest(roots, treeChildren, nodesById);
     const newBounds = getBoundsFromRects(laidOutRects);
 
@@ -714,6 +825,6 @@ export function buildAutoLayoutPlan(children, options = {}) {
 
     return {
         nodeRects: centeredRects,
-        edgeRoutes: routeEdges(edges, centeredRects, treeEdgeIds, treeChildren)
+        edgeRoutes: routeEdges(edges, centeredRects, treeEdgeIds, treeChildren, roots, parentById, depthById)
     };
 }
