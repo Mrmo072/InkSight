@@ -3,6 +3,9 @@ import { useDrawnix } from '../../hooks/use-drawnix';
 import './clean-confirm.scss';
 import { useBoard } from '@plait-board/react-board';
 import { useI18n } from '../../i18n';
+import { createLogger } from '../../../../../core/logger.js';
+
+const logger = createLogger('CleanBoard');
 
 export const CleanConfirm = ({
   container,
@@ -45,7 +48,7 @@ export const CleanConfirm = ({
               // but when nodes are deleted, the sync mechanism will mark cards as deleted
               // and eventually clean up the data. We just need to clean the DOM immediately.
               if ((window as any).inksight?.pdfReader?.clearAllHighlights) {
-                console.log('[CleanBoard] Clearing PDF highlight overlays');
+                logger.debug('Clearing PDF highlight overlays');
                 (window as any).inksight.pdfReader.clearAllHighlights();
               }
 

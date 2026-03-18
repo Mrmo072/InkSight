@@ -20,6 +20,9 @@ import {
 } from '@plait/core';
 import type { MermaidConfig } from '@plait-board/mermaid-to-drawnix/dist';
 import type { MermaidToDrawnixResult } from '@plait-board/mermaid-to-drawnix/dist/interfaces';
+import { createLogger } from '../../../../../core/logger.js';
+
+const logger = createLogger('MermaidToDrawnix');
 
 export interface MermaidToDrawnixLibProps {
   loaded: boolean;
@@ -66,7 +69,7 @@ const MermaidToDrawnix = () => {
       });
       return module;
     } catch (err) {
-      console.error('Failed to load mermaid library:', err);
+      logger.error('Failed to load mermaid library', err);
       setError(new Error(t('dialog.error.loadMermaid')));
       throw err;
     }

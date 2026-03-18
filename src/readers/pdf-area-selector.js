@@ -1,4 +1,7 @@
 import { cardSystem } from '../core/card-system.js';
+import { createLogger } from '../core/logger.js';
+
+const logger = createLogger('PDFAreaSelector');
 
 /**
  * PDFAreaSelector - Manages rectangle and ellipse area selection on PDF pages
@@ -70,7 +73,7 @@ export class PDFAreaSelector {
     }
 
     onSelectionStart(e, wrapper, pageNum) {
-        if (this.selectionMode === 'text' || this.selectionMode === 'highlighter') return;
+        if (this.selectionMode !== 'rect' && this.selectionMode !== 'rectangle' && this.selectionMode !== 'ellipse') return;
         if (this.isDrawing) return; // Prevent re-entry if already drawing
 
         e.preventDefault(); // Prevent default selection
@@ -236,7 +239,7 @@ export class PDFAreaSelector {
                 wrapper.appendChild(borderDiv);
             }
         } catch (e) {
-            console.error('Error creating image card:', e);
+            logger.error('Error creating image card', e);
         }
     }
 }

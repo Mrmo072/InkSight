@@ -1,5 +1,8 @@
 import { getAppContext } from './app-context.js';
 import { registerEventListeners } from './event-listeners.js';
+import { createLogger } from '../core/logger.js';
+
+const logger = createLogger('SelectionSync');
 
 export function setupSelectionSync({
     findCardById,
@@ -8,7 +11,7 @@ export function setupSelectionSync({
     collapseNotesPanel
 }) {
     const handleSelectionSync = (itemId, origin) => {
-        console.log('[Sync] Selection sync:', { itemId, origin });
+        logger.debug('Selection sync', { itemId, origin });
 
         if (origin !== 'highlight' && getAppContext().pdfReader) {
             const highlightId = origin === 'mindmap' || origin === 'annotation'

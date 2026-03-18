@@ -1,4 +1,7 @@
 import { getAppContext } from '../app/app-context.js';
+import { createLogger } from '../core/logger.js';
+
+const logger = createLogger('OutlineSidebar');
 
 export class OutlineSidebar {
     constructor(sidebarId, contentId, toggleBtnId) {
@@ -54,7 +57,7 @@ export class OutlineSidebar {
             // }
 
         } catch (e) {
-            console.error('Error rendering outline:', e);
+            logger.error('Error rendering outline', e);
             this.content.innerHTML = '<div class="outline-empty">Error loading outline</div>';
         }
     }

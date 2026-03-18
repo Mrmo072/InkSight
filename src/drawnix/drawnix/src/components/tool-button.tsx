@@ -77,8 +77,6 @@ export const ToolButton = React.forwardRef((props: ToolButtonProps, ref) => {
       } catch (error: any) {
         if (!(error instanceof AbortError)) {
           throw error;
-        } else {
-          console.warn(error);
         }
       } finally {
         if (isMountedRef.current) {

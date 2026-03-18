@@ -61,53 +61,123 @@ export function setupPdfPanHandling(container, getSelectionMode) {
         movePan(e.pageX, e.pageY);
     };
 
-    const handleTouchStart = (e) => {
-        if (getSelectionMode() === 'pan' && e.touches.length === 1) {
-            if (e.cancelable) e.preventDefault();
-            startPan(e.touches[0].pageX, e.touches[0].pageY);
-        }
-    };
-
-    const handleTouchMove = (e) => {
-        if (isPanning && e.touches.length === 1) {
-            if (e.cancelable) e.preventDefault();
-            movePan(e.touches[0].pageX, e.touches[0].pageY);
-        }
-    };
-
     container.addEventListener('mousedown', handleMouseDown);
     container.addEventListener('mouseleave', endPan);
     container.addEventListener('mouseup', endPan);
     container.addEventListener('mousemove', handleMouseMove);
-    container.addEventListener('touchstart', handleTouchStart, { passive: false });
-    container.addEventListener('touchmove', handleTouchMove, { passive: false });
-    container.addEventListener('touchend', endPan);
 
     return () => {
         container.removeEventListener('mousedown', handleMouseDown);
         container.removeEventListener('mouseleave', endPan);
         container.removeEventListener('mouseup', endPan);
         container.removeEventListener('mousemove', handleMouseMove);
-        container.removeEventListener('touchstart', handleTouchStart);
-        container.removeEventListener('touchmove', handleTouchMove);
-        container.removeEventListener('touchend', endPan);
     };
 }
 
-export function setupPdfZoomHandling(container, getScale, onScaleChange) {
+export function setupPdfZoomHandling(container, getScale, onScaleChange, options = {}) {
+    let isPinching = false;
+    let pinchStartDistance = 0;
+    let pinchStartScale = 1;
+    let pinchPreviewScale = null;
+
+    const clampScale = (scale) => Math.max(0.5, Math.min(scale, 3.0));
+    const getTouchDistance = (touches) => {
+        const [first, second] = touches;
+        return Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY);
+    };
+    const getTouchCenter = (touches) => ({
+        x: (touches[0].clientX + touches[1].clientX) / 2,
+        y: (touches[0].clientY + touches[1].clientY) / 2
+    });
+
     const handleWheel = (e) => {
         if (!e.ctrlKey) return;
 
         e.preventDefault();
         const zoomStep = 0.1;
         const delta = -Math.sign(e.deltaY);
-        const newScale = Math.max(0.5, Math.min(getScale() + (delta * zoomStep), 3.0));
+        const newScale = clampScale(getScale() + (delta * zoomStep));
         onScaleChange(newScale);
     };
 
+    const handleTouchStart = (e) => {
+        if (e.touches.length !== 2) {
+            return;
+        }
+
+        if (e.cancelable) e.preventDefault();
+        isPinching = true;
+        pinchStartDistance = getTouchDistance(e.touches);
+        pinchStartScale = getScale();
+        pinchPreviewScale = pinchStartScale;
+        options.onPreviewStart?.({
+            scale: pinchStartScale,
+            center: getTouchCenter(e.touches)
+        });
+    };
+
+    const handleTouchMove = (e) => {
+        if (!isPinching || e.touches.length !== 2) {
+            return;
+        }
+
+        if (e.cancelable) e.preventDefault();
+        const currentDistance = getTouchDistance(e.touches);
+        if (!pinchStartDistance) {
+            pinchStartDistance = currentDistance;
+            return;
+        }
+
+        const nextScale = clampScale(pinchStartScale * (currentDistance / pinchStartDistance));
+        pinchPreviewScale = nextScale;
+        const center = getTouchCenter(e.touches);
+        if (options.onPreviewUpdate) {
+            options.onPreviewUpdate({
+                scale: nextScale,
+                center
+            });
+        } else {
+            onScaleChange(nextScale);
+        }
+    };
+
+    const endPinch = (e) => {
+        if (e.touches.length >= 2) {
+            return;
+        }
+
+        if (isPinching) {
+            const committedScale = clampScale(pinchPreviewScale ?? getScale());
+            if (Math.abs(committedScale - getScale()) > 0.01) {
+                if (options.onPreviewCommit) {
+                    options.onPreviewCommit({
+                        scale: committedScale
+                    });
+                } else {
+                    onScaleChange(committedScale);
+                }
+            } else {
+                options.onPreviewCancel?.();
+            }
+        }
+
+        isPinching = false;
+        pinchStartDistance = 0;
+        pinchStartScale = getScale();
+        pinchPreviewScale = null;
+    };
+
     container.addEventListener('wheel', handleWheel, { passive: false });
+    container.addEventListener('touchstart', handleTouchStart, { passive: false });
+    container.addEventListener('touchmove', handleTouchMove, { passive: false });
+    container.addEventListener('touchend', endPinch);
+    container.addEventListener('touchcancel', endPinch);
 
     return () => {
         container.removeEventListener('wheel', handleWheel);
+        container.removeEventListener('touchstart', handleTouchStart);
+        container.removeEventListener('touchmove', handleTouchMove);
+        container.removeEventListener('touchend', endPinch);
+        container.removeEventListener('touchcancel', endPinch);
     };
 }

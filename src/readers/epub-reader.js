@@ -1,9 +1,17 @@
 import ePub from 'epubjs';
 import { highlightManager } from '../core/highlight-manager.js';
 import { cardSystem } from '../core/card-system.js';
-import { PDFHighlightToolbar } from './pdf-highlight-toolbar.jsx';
 import { getAppContext } from '../app/app-context.js';
-import { registerEventListeners } from '../app/event-listeners.js';
+import {
+    applyReaderSelectionMode,
+    clearSelectedHighlightState,
+    createReaderHighlightToolbar,
+    deleteSelectedReaderHighlight,
+    findCardIdByHighlightId,
+    removeHighlightFromStores,
+    registerBasicReaderListeners,
+    updateHighlightModelColor
+} from './reader-shared.js';
 
 export class EpubReader {
     constructor(container) {
@@ -20,7 +28,7 @@ export class EpubReader {
         this.deletedCFIs = new Set(); // Track deleted CFIs to prevent re-creation with new IDs
         this.cleanupListeners = null;
 
-        this.toolbar = new PDFHighlightToolbar(container, {
+        this.toolbar = createReaderHighlightToolbar(container, {
             onDeleteHighlight: (highlightId, cardId) => {
                 this.deleteHighlight(highlightId, cardId);
             },
@@ -29,52 +37,21 @@ export class EpubReader {
             }
         });
 
-        this.handleMindmapNodeUpdated = (e) => {
-            const { highlightId, color } = e.detail;
-
-            this.updateHighlightColor(highlightId, color);
+        this.beforeDeleteSelectedHighlight = (e) => {
+            e.preventDefault(); // Prevent browser back/navigation
         };
-
-        this.handleCardDeleted = (e) => {
-            const { id: cardId, highlightId, deleted } = e.detail;
-
-
-            if (deleted) {
-                if (highlightId) {
-                    if (this.isDeleting) {
-
-                        return;
-                    }
-
-                    this.removeVisualHighlight(highlightId);
+        this.handleCardRestoredHighlight = (highlightId) => {
+            this.deletedHighlightIds.delete(highlightId);
+        };
+        registerBasicReaderListeners(this, {
+            onCardDeleted: (highlightId) => {
+                if (this.isDeleting) {
+                    return;
                 }
-            } else {
-                // Card restored
-                if (highlightId) {
 
-                    this.deletedHighlightIds.delete(highlightId);
-                }
+                this.removeVisualHighlight(highlightId);
             }
-        };
-
-        // Keydown handler for the main window (if focus is somehow here)
-        this.handleKeyDown = (e) => {
-            if ((e.key === 'Delete' || e.key === 'Backspace') && this.selectedHighlightId) {
-                e.preventDefault(); // Prevent browser back/navigation
-
-                // Find card ID for the selected highlight
-                const card = Array.from(this.getCardSystem().cards.values()).find(c => c.highlightId === this.selectedHighlightId);
-                this.deleteHighlight(this.selectedHighlightId, card ? card.id : null);
-                this.selectedHighlightId = null;
-                this.toolbar.hide();
-            }
-        };
-
-        this.cleanupListeners = registerEventListeners([
-            { target: window, event: 'mindmap-node-updated', handler: this.handleMindmapNodeUpdated },
-            { target: window, event: 'card-soft-deleted', handler: this.handleCardDeleted },
-            { target: document, event: 'keydown', handler: this.handleKeyDown }
-        ]);
+        });
     }
 
     getCardSystem() {
@@ -137,11 +114,7 @@ export class EpubReader {
                         if (this.selectedHighlightId) {
                             e.preventDefault(); // Prevent browser back/navigation
 
-                            // Find card ID
-                            const card = Array.from(this.getCardSystem().cards.values()).find(c => c.highlightId === this.selectedHighlightId);
-                            this.deleteHighlight(this.selectedHighlightId, card ? card.id : null);
-                            this.selectedHighlightId = null;
-                            this.toolbar.hide();
+                            deleteSelectedReaderHighlight(this);
                         }
                     }
                 });
@@ -151,9 +124,7 @@ export class EpubReader {
 
                     // Only clear if we didn't just click a highlight (which stops propagation, but just in case)
                     if (this.selectedHighlightId) {
-
-                        this.selectedHighlightId = null;
-                        this.toolbar.hide();
+                        clearSelectedHighlightState(this);
                     }
                 });
             });
@@ -258,11 +229,11 @@ export class EpubReader {
             this.selectedHighlightId = highlightId;
 
             // Find card
-            const card = Array.from(this.getCardSystem().cards.values()).find(c => c.highlightId === highlightId);
+            const cardId = findCardIdByHighlightId(this.getCardSystem(), highlightId);
 
 
             // Show toolbar
-            this.toolbar.handleHighlightClick(e, highlightId, card ? card.id : null);
+            this.toolbar.handleHighlightClick(e, highlightId, cardId);
 
         }, 'epub-highlight', { 'fill': color, 'fill-opacity': '0.3', 'mix-blend-mode': 'multiply' });
     }
@@ -280,17 +251,7 @@ export class EpubReader {
             this.addAnnotation(highlightId, cfiRange, color);
 
             // Update model
-            if (highlightManager) {
-                const highlight = highlightManager.getHighlight(highlightId);
-                if (highlight) {
-                    highlight.color = color;
-
-                    // Dispatch update event if needed for Mind Map sync
-                    window.dispatchEvent(new CustomEvent('highlight-updated', {
-                        detail: { id: highlightId, color }
-                    }));
-                }
-            }
+            updateHighlightModelColor(highlightId, color);
         }
     }
 
@@ -337,10 +298,7 @@ export class EpubReader {
 
         }
 
-        if (this.selectedHighlightId === highlightId) {
-            this.selectedHighlightId = null;
-            this.toolbar.hide();
-        }
+        clearSelectedHighlightState(this, highlightId);
 
         // Reset flag after a longer delay
         setTimeout(() => {
@@ -356,13 +314,7 @@ export class EpubReader {
 
         this.removeVisualHighlight(highlightId);
 
-        if (cardId && this.getCardSystem()) {
-
-            this.getCardSystem().removeCard(cardId);
-        } else if (highlightManager) {
-
-            highlightManager.removeHighlight(highlightId);
-        }
+        removeHighlightFromStores(this.getCardSystem(), highlightId, cardId);
     }
 
     async scrollToHighlight(highlightId) {
@@ -418,26 +370,14 @@ export class EpubReader {
 
     setSelectionMode(mode) {
         this.selectionMode = mode;
-
-
-        // Similar to TextReader, we primarily support text selection for now.
-        if (mode === 'text') {
-            this.container.style.touchAction = 'pan-x pan-y pinch-zoom';
-            this.rendition?.getContents().forEach((content) => {
-                if (content?.document?.body) {
-                    content.document.body.style.userSelect = 'text';
-                    content.document.body.style.webkitUserSelect = 'text';
-                }
-            });
-        } else {
-            this.container.style.touchAction = 'auto';
-            this.rendition?.getContents().forEach((content) => {
-                if (content?.document?.body) {
-                    content.document.body.style.userSelect = 'none';
-                    content.document.body.style.webkitUserSelect = 'none';
-                }
-            });
-        }
+        applyReaderSelectionMode({
+            container: this.container,
+            mode,
+            targetElements: this.rendition?.getContents().map((content) => content?.document?.body) ?? [],
+            textTouchAction: 'pan-x pan-y pinch-zoom',
+            nonTextTouchAction: 'auto',
+            disableSelectionClass: false
+        });
     }
 
     destroy() {

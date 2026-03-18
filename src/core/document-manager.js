@@ -2,6 +2,10 @@
  * DocumentManager - Manages metadata for multiple documents in the mind map
  * Tracks document names, types, and loaded status for multi-document support
  */
+import { createLogger } from './logger.js';
+
+const logger = createLogger('DocumentManager');
+
 export class DocumentManager {
     constructor() {
         this.documents = new Map(); // id -> {id, name, type, loaded}
@@ -25,7 +29,7 @@ export class DocumentManager {
 
         this.documents.set(id, docInfo);
 
-        console.log('[DocumentManager] Document registered:', { id, name, loaded });
+        logger.debug('Document registered', { id, name, loaded });
 
         // Notify system of document registration
         window.dispatchEvent(new CustomEvent('document-registered', {
@@ -42,13 +46,13 @@ export class DocumentManager {
     unregisterDocument(id) {
         const docInfo = this.documents.get(id);
         if (!docInfo) {
-            console.warn('[DocumentManager] Cannot unregister unknown document:', id);
+            logger.warn('Cannot unregister unknown document:', id);
             return;
         }
 
         this.documents.delete(id);
 
-        console.log('[DocumentManager] Document unregistered:', id);
+        logger.debug('Document unregistered', id);
 
         // Notify system of document removal
         window.dispatchEvent(new CustomEvent('document-unregistered', {
@@ -81,12 +85,12 @@ export class DocumentManager {
     markDocumentLoaded(id, loaded) {
         const docInfo = this.documents.get(id);
         if (!docInfo) {
-            console.warn('[DocumentManager] Cannot mark unknown document:', id);
+            logger.warn('Cannot mark unknown document:', id);
             return;
         }
 
         docInfo.loaded = loaded;
-        console.log('[DocumentManager] Document loaded status updated:', { id, loaded });
+        logger.debug('Document loaded status updated', { id, loaded });
 
         // Notify system of status change
         window.dispatchEvent(new CustomEvent('document-loaded-changed', {
@@ -119,7 +123,7 @@ export class DocumentManager {
      * Used when resetting the workspace
      */
     clearAll() {
-        console.log('[DocumentManager] Clearing all documents');
+        logger.debug('Clearing all documents');
         this.documents.clear();
 
         window.dispatchEvent(new CustomEvent('documents-cleared'));
@@ -142,10 +146,10 @@ export class DocumentManager {
      * @param {object} data - Persistence data
      */
     restorePersistenceData(data) {
-        console.log('[DocumentManager] Restoring documents from persistence');
+        logger.debug('Restoring documents from persistence');
 
         if (!data || !data.documents) {
-            console.warn('[DocumentManager] No documents to restore');
+            logger.warn('No documents to restore');
             return;
         }
 
@@ -160,7 +164,7 @@ export class DocumentManager {
             });
         }
 
-        console.log(`[DocumentManager] Restored ${this.documents.size} document references`);
+        logger.debug(`Restored ${this.documents.size} document references`);
 
         // Notify system
         window.dispatchEvent(new CustomEvent('documents-restored', {

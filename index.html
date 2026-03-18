@@ -37,11 +37,11 @@
     <!-- Left Sidebar: Library & Navigation -->
     <aside id="sidebar" class="sidebar">
       <div class="sidebar-header">
-        <div class="brand" style="display: flex; align-items: center;">
-          <img src="/logo.svg" alt="InkSight Logo" class="logo" style="width: 32px; height: 32px; margin-right: 8px;">
-          <h2 style="margin: 0;">InkSight</h2>
+        <div class="brand">
+          <img src="/logo.svg" alt="InkSight Logo" class="logo">
+          <h2>InkSight</h2>
         </div>
-        <label for="file-input" id="add-file-btn" class="icon-btn" title="Import File" style="cursor: pointer;">
+        <label for="file-input" id="add-file-btn" class="icon-btn import-btn" title="Import File">
           <span class="material-icons-round">add</span>
           <input type="file" id="file-input" accept=".pdf,.epub,.txt,.md" class="hidden-input" />
         </label>
@@ -57,14 +57,17 @@
     <!-- Main Content: Reader View -->
     <main id="reader-container" class="reader-container">
       <div id="reader-toolbar" class="toolbar">
+        <div class="toolbar-section toolbar-section-leading">
         <button id="toggle-sidebar" class="icon-btn" title="Toggle File List">
           <span class="material-icons-round">menu_open</span>
         </button>
         <button id="toggle-outline" class="icon-btn" title="Toggle Outline">
           <span class="material-icons-round">toc</span>
         </button>
+        </div>
+        <div class="toolbar-section toolbar-section-center">
         <span id="doc-title">No document open</span>
-        <div class="spacer"></div>
+        <div class="page-nav-group">
         <button id="prev-page" class="icon-btn" disabled>
           <span class="material-icons-round">chevron_left</span>
         </button>
@@ -72,9 +75,9 @@
         <button id="next-page" class="icon-btn" disabled>
           <span class="material-icons-round">chevron_right</span>
         </button>
-
-        <div class="spacer"></div>
-
+        </div>
+        </div>
+        <div class="toolbar-section toolbar-section-modes">
         <!-- Selection Mode Controls -->
         <div class="selection-mode-group">
           <button id="pan-mode" class="icon-btn mode-btn" title="拖动浏览">
@@ -93,6 +96,7 @@
             <span class="material-icons-round">edit</span>
           </button>
         </div>
+        </div>
 
         <!-- Highlighter Settings Panel -->
         <div id="highlighter-panel" class="highlighter-panel">
@@ -108,10 +112,11 @@
           </div>
         </div>
 
-        <div class="spacer"></div>
+        <div class="toolbar-section toolbar-section-trailing">
         <button id="toggle-notes" class="icon-btn" title="Toggle Notes">
           <span class="material-icons-round">vertical_split</span>
         </button>
+        </div>
       </div>
 
       <div id="reader-content-wrapper" class="reader-content-wrapper">
@@ -139,13 +144,21 @@
     <!-- Right Panel: Mind Map & Notes -->
     <aside id="notes-panel" class="notes-panel">
       <div class="panel-header notes-header">
-        <div class="panel-title-group" style="display: flex; align-items: center; gap: 8px;">
-          <button id="toggle-annotations" class="icon-btn active" title="Toggle Annotations List" style="padding: 4px;">
+        <div class="panel-title-group">
+          <button id="toggle-annotations" class="icon-btn active annotations-toggle-btn" title="Toggle Annotations List">
             <span class="material-icons-round">view_sidebar</span>
           </button>
-          <span style="font-weight: 500; font-size: 14px; color: var(--text-main);">Mind Map & Notes</span>
+          <span class="panel-title-text">Mind Map & Notes</span>
         </div>
         <div class="panel-actions">
+          <div class="mobile-notes-switch" role="tablist" aria-label="Notes view switcher">
+            <button id="show-annotations" class="notes-view-btn active" type="button" role="tab" aria-selected="true">
+              Notes
+            </button>
+            <button id="show-mindmap" class="notes-view-btn" type="button" role="tab" aria-selected="false">
+              Map
+            </button>
+          </div>
           <button id="layout-btn" class="icon-btn small" title="Auto Layout">
             <span class="material-icons-round">auto_fix_high</span>
           </button>

@@ -16,6 +16,9 @@ import {
   WritableClipboardOperationType,
 } from '@plait/core';
 import { MindElement } from '@plait/mind';
+import { createLogger } from '../../../../../core/logger.js';
+
+const logger = createLogger('MarkdownToDrawnix');
 
 export interface MarkdownToDrawnixLibProps {
   loaded: boolean;
@@ -60,7 +63,7 @@ const MarkdownToDrawnix = () => {
       });
       return module;
     } catch (err) {
-      console.error('Failed to load mermaid library:', err);
+      logger.error('Failed to load markdown conversion library', err);
       setError(new Error(t('dialog.error.loadMermaid')));
       throw err;
     }

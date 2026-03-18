@@ -1,6 +1,10 @@
+import { createLogger } from '../core/logger.js';
+
+const logger = createLogger('SplitView');
+
 export class SplitView {
     constructor(options) {
-        console.log('Initializing SplitView with options:', options);
+        logger.debug('Initializing SplitView with options', options);
         this.leftPanel = document.getElementById(options.leftId);
         this.centerPanel = document.getElementById(options.centerId);
         this.rightPanel = document.getElementById(options.rightId);
@@ -9,7 +13,7 @@ export class SplitView {
         this.resizerRight = document.getElementById(options.resizerRightId);
 
         if (!this.leftPanel || !this.centerPanel || !this.rightPanel || !this.resizerLeft || !this.resizerRight) {
-            console.error('SplitView: One or more elements not found!', {
+            logger.error('One or more elements not found', {
                 left: this.leftPanel,
                 center: this.centerPanel,
                 right: this.rightPanel,
@@ -20,20 +24,36 @@ export class SplitView {
         }
 
         this.minWidth = 200;
-        this.compactBreakpoint = options.compactBreakpoint || 820;
+        this.compactBreakpoint = options.compactBreakpoint || 1100;
+        this.mobileBreakpoint = options.mobileBreakpoint || 680;
+        this.mouseResizeMargin = options.mouseResizeMargin || 6;
+        this.touchResizeMargin = options.touchResizeMargin || 18;
         this.isCompact = false;
+        this.viewportMode = 'desktop';
         this.handleViewportChange = () => this.applyResponsiveState();
 
         this.setupResizers();
         window.addEventListener('resize', this.handleViewportChange);
         this.applyResponsiveState();
-        console.log('SplitView initialized successfully');
+        logger.debug('SplitView initialized successfully');
     }
 
     setupResizers() {
         // Left Resizer
         const addResizeListeners = (element, isLeft) => {
+            const isPointerNearHandle = (event) => {
+                const rect = element.getBoundingClientRect();
+                const clientX = event.touches?.[0]?.clientX ?? event.clientX;
+                const margin = event.touches ? this.touchResizeMargin : this.mouseResizeMargin;
+                const handleCenter = rect.left + (rect.width / 2);
+                return Math.abs(clientX - handleCenter) <= margin;
+            };
+
             const startResize = (e) => {
+                if (!isPointerNearHandle(e)) {
+                    return;
+                }
+
                 e.preventDefault();
                 const panel = isLeft ? this.leftPanel : this.rightPanel;
                 panel.classList.add('resizing');
@@ -141,11 +161,18 @@ export class SplitView {
 
     applyResponsiveState() {
         const nextCompact = window.innerWidth <= this.compactBreakpoint;
+        const nextViewportMode = window.innerWidth <= this.mobileBreakpoint ? 'mobile' : nextCompact ? 'tablet' : 'desktop';
         const changed = this.isCompact !== nextCompact;
+        const modeChanged = this.viewportMode !== nextViewportMode;
         this.isCompact = nextCompact;
+        this.viewportMode = nextViewportMode;
         document.body.classList.toggle('compact-layout', this.isCompact);
+        document.body.classList.toggle('tablet-layout', this.viewportMode === 'tablet');
+        document.body.classList.toggle('mobile-layout', this.viewportMode === 'mobile');
+        document.body.classList.toggle('desktop-layout', this.viewportMode === 'desktop');
+        document.body.dataset.viewport = this.viewportMode;
 
-        if (!changed) return;
+        if (!changed && !modeChanged) return;
 
         if (this.isCompact) {
             this.setLeftCollapsed(true);

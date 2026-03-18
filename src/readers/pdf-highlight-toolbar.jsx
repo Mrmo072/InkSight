@@ -1,6 +1,9 @@
 import { createRoot } from 'react-dom/client';
 import React from 'react';
 import { PDFColorPicker } from './pdf-color-picker.jsx';
+import { createLogger } from '../core/logger.js';
+
+const logger = createLogger('PDFHighlightToolbar');
 
 /**
  * PDFHighlightToolbar - Manages the floating toolbar for highlight interactions
@@ -22,7 +25,7 @@ export class PDFHighlightToolbar {
 
     handleHighlightClick(e, highlightId, cardId) {
         // Dispatch event to jump to card in mindmap
-        console.log('[PDFHighlightToolbar] Highlight clicked:', highlightId, 'Card:', cardId);
+        logger.debug('Highlight clicked', { highlightId, cardId });
         window.dispatchEvent(new CustomEvent('highlight-selected', {
             detail: { cardId }
         }));
@@ -81,7 +84,7 @@ export class PDFHighlightToolbar {
             <PDFColorPicker
                 selectedColor={currentColor}
                 onColorChange={(color) => {
-                    console.log('[PDFHighlightToolbar] Color selected:', color);
+                    logger.debug('Color selected', color);
                     this.onUpdateColor(highlightId, color);
                     // We don't hide automatically to allow trying different colors
                 }}
@@ -92,7 +95,7 @@ export class PDFHighlightToolbar {
         this.closeHandler = (e) => {
             const clickedHighlight = e.target.closest?.(`[data-highlight-id="${highlightId}"]`);
             if (!toolbar.contains(e.target) && !clickedHighlight) {
-                console.log('[PDFHighlightToolbar] Closing toolbar (interaction outside)');
+                logger.debug('Closing toolbar after outside interaction');
                 this.hide();
             }
         };

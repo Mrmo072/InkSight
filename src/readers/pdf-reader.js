@@ -1,6 +1,5 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import { highlightManager } from '../core/highlight-manager.js';
-import { PDFHighlightToolbar } from './pdf-highlight-toolbar.jsx';
 import { PDFAreaSelector } from './pdf-area-selector.js';
 import { PDFHighlightRenderer } from './pdf-highlight-renderer.js';
 import { PDFHighlighterTool } from './pdf-highlighter-tool.js';
@@ -11,6 +10,15 @@ import {
     setupPdfZoomHandling
 } from './pdf-reader-events.js';
 import {
+    applyReaderSelectionMode,
+    clearSelectedHighlightState,
+    createReaderHighlightToolbar,
+    handleReaderHighlightClick,
+    registerHighlightToolbarDeletionHandler,
+    removeHighlightFromStores,
+    updateHighlightModelColor
+} from './reader-shared.js';
+import {
     applyHighlightColorToElements,
     collectSelectionRects,
     createPageWrapper,
@@ -19,6 +27,9 @@ import {
     resolveDestinationPageNumber,
     syncDefaultHighlightColor
 } from './pdf-reader-utils.js';
+import { createLogger } from '../core/logger.js';
+
+const logger = createLogger('PDFReader');
 
 // Set worker source
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -45,6 +56,10 @@ export class PDFReader {
         this.container.style.outline = 'none'; // Remove default focus outline
         this.pdfDoc = null;
         this.scale = 1.5;
+        this.pageStack = null;
+        this.pinchFocusPoint = null;
+        this.pinchViewportCenter = null;
+        this.pageDetectionListenerAttached = false;
         this.pages = []; // { num, wrapper, viewport, rendered }
         this.observer = null;
         this.selectionMode = PDFReader.currentSelectionMode; // Initialize from static state
@@ -82,7 +97,7 @@ export class PDFReader {
             }
         });
 
-        this.toolbar = new PDFHighlightToolbar(container, {
+        this.toolbar = createReaderHighlightToolbar(container, {
             onDeleteHighlight: (highlightId, cardId) => {
                 this.deleteHighlight(highlightId, cardId);
             },
@@ -102,7 +117,13 @@ export class PDFReader {
         this.cleanupCallbacks.push(setupPdfZoomHandling(
             this.container,
             () => this.scale,
-            (newScale) => this.setScale(newScale)
+            (newScale) => this.setScale(newScale),
+            {
+                onPreviewStart: (gesture) => this.startPinchPreview(gesture),
+                onPreviewUpdate: (gesture) => this.updatePinchPreview(gesture),
+                onPreviewCommit: (gesture) => this.commitPinchPreview(gesture),
+                onPreviewCancel: () => this.clearPinchPreview()
+            }
         ));
         this.cleanupCallbacks.push(setupPdfPanHandling(
             this.container,
@@ -152,39 +173,102 @@ export class PDFReader {
             this.highlightRenderer.removeHighlightOverlays(highlightId);
         };
 
-        this.handleKeyDown = (e) => {
-            if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+        registerHighlightToolbarDeletionHandler(this, {
+            getSelectedHighlightId: () => this.toolbar.getSelectedHighlightId(),
+            getSelectedCardId: () => this.toolbar.getSelectedCardId(),
+            beforeDelete: (e) => {
+                const activeTag = document.activeElement.tagName;
+                const isContentEditable = document.activeElement.isContentEditable;
+                if (activeTag !== 'INPUT' && activeTag !== 'TEXTAREA' && !isContentEditable) {
+                    e.preventDefault();
+                    return true;
+                }
 
-            const selectedHighlightId = this.toolbar.getSelectedHighlightId();
-            if (!selectedHighlightId) return;
-
-            const activeTag = document.activeElement.tagName;
-            const isContentEditable = document.activeElement.isContentEditable;
-            if (activeTag !== 'INPUT' && activeTag !== 'TEXTAREA' && !isContentEditable) {
-                e.preventDefault();
-                this.deleteHighlight(selectedHighlightId, this.toolbar.getSelectedCardId());
-                this.hideToolbar();
+                return false;
+            },
+            afterDelete: () => {
+                clearSelectedHighlightState(this, this.toolbar.getSelectedHighlightId());
             }
-        };
+        });
     }
 
-    async setScale(newScale) {
+    async setScale(newScale, focusPoint = null, options = {}) {
         if (Math.abs(this.scale - newScale) < 0.01) return;
 
-        // Calculate current center relative position to maintain scroll
-        const scrollTop = this.container.scrollTop;
-        const scrollHeight = this.container.scrollHeight;
-        const ratio = scrollHeight > 0 ? scrollTop / scrollHeight : 0;
+        const { focusPointIsContent = false, viewportFocusPoint = null } = options;
+        const resolvedFocusPoint = focusPoint ?? {
+            x: this.container.clientWidth / 2,
+            y: this.container.clientHeight / 2
+        };
+        const resolvedViewportFocusPoint = viewportFocusPoint ?? (
+            focusPointIsContent
+                ? {
+                    x: this.container.clientWidth / 2,
+                    y: this.container.clientHeight / 2
+                }
+                : resolvedFocusPoint
+        );
+        const contentFocusX = focusPointIsContent
+            ? resolvedFocusPoint.x
+            : this.container.scrollLeft + resolvedFocusPoint.x;
+        const contentFocusY = focusPointIsContent
+            ? resolvedFocusPoint.y
+            : this.container.scrollTop + resolvedFocusPoint.y;
+        const scaleAnchor = this.captureScaleAnchor(contentFocusX, contentFocusY);
 
         this.scale = newScale;
 
         // Reload pages with new scale
-        await this.initPages();
+        const previousStack = this.pageStack;
+        await this.initPages({ preserveExisting: true });
 
-        // Restore scroll position
-        if (ratio > 0) {
-            this.container.scrollTop = this.container.scrollHeight * ratio;
+        this.restoreScaleAnchor(scaleAnchor, resolvedViewportFocusPoint);
+        await this.renderVisiblePages();
+        this.finishPageStackTransition(previousStack);
+    }
+
+    captureScaleAnchor(contentFocusX, contentFocusY) {
+        const anchorPage = this.pages.find((page) => {
+            const top = page.wrapper.offsetTop;
+            const bottom = top + page.wrapper.offsetHeight;
+            return contentFocusY >= top && contentFocusY <= bottom;
+        }) ?? this.pages[0];
+
+        if (!anchorPage?.wrapper) {
+            return null;
         }
+
+        const pageTop = anchorPage.wrapper.offsetTop;
+        const pageLeft = anchorPage.wrapper.offsetLeft;
+        const pageHeight = anchorPage.wrapper.offsetHeight || 1;
+        const pageWidth = anchorPage.wrapper.offsetWidth || 1;
+
+        return {
+            pageNum: anchorPage.num,
+            relativeX: (contentFocusX - pageLeft) / pageWidth,
+            relativeY: (contentFocusY - pageTop) / pageHeight
+        };
+    }
+
+    restoreScaleAnchor(scaleAnchor, focusPoint) {
+        if (!scaleAnchor) {
+            this.container.scrollLeft = Math.max(0, this.container.scrollLeft);
+            this.container.scrollTop = Math.max(0, this.container.scrollTop);
+            return;
+        }
+
+        const anchorPage = this.pages[scaleAnchor.pageNum - 1];
+        if (!anchorPage?.wrapper) {
+            return;
+        }
+
+        const pageTop = anchorPage.wrapper.offsetTop;
+        const pageLeft = anchorPage.wrapper.offsetLeft;
+        const targetX = pageLeft + (anchorPage.wrapper.offsetWidth * scaleAnchor.relativeX);
+        const targetY = pageTop + (anchorPage.wrapper.offsetHeight * scaleAnchor.relativeY);
+
+        this.container.scrollLeft = Math.max(0, targetX - focusPoint.x);
+        this.container.scrollTop = Math.max(0, targetY - focusPoint.y);
     }
 
     initObserver() {
@@ -233,21 +317,69 @@ export class PDFReader {
         // Activate highlighter tool if mode matches
         this.highlighterTool.setIsActive(mode === 'highlighter');
 
+        applyReaderSelectionMode({
+            container: this.container,
+            mode,
+            nonTextTouchAction: mode === 'pan' ? 'pan-x pan-y pinch-zoom' : 'none'
+        });
+    }
 
-        // Toggle disable-selection class on container
-        if (mode === 'text') {
-            this.container.classList.remove('disable-selection');
-            this.container.style.cursor = 'text';
-            this.container.style.touchAction = 'pan-x pan-y pinch-zoom';
-        } else if (mode === 'pan') {
-            this.container.classList.add('disable-selection');
-            this.container.style.cursor = 'grab';
-            this.container.style.touchAction = 'none';
-        } else {
-            this.container.classList.add('disable-selection');
-            this.container.style.cursor = 'default';
-            this.container.style.touchAction = 'none';
+    startPinchPreview(gesture) {
+        if (!this.pageStack) return;
+        if (gesture?.center) {
+            this.pinchViewportCenter = gesture.center;
+            this.pinchFocusPoint = this.resolvePinchFocusPoint(gesture.center);
+            this.pageStack.style.transformOrigin = `${this.pinchFocusPoint.x}px ${this.pinchFocusPoint.y}px`;
         }
+        this.pageStack.classList.add('pinch-zooming');
+    }
+
+    updatePinchPreview(gesture) {
+        if (!this.pageStack) return;
+        if (gesture?.center) {
+            this.pinchViewportCenter = gesture.center;
+            this.pinchFocusPoint = this.resolvePinchFocusPoint(gesture.center);
+            this.pageStack.style.transformOrigin = `${this.pinchFocusPoint.x}px ${this.pinchFocusPoint.y}px`;
+        }
+        const scaleRatio = gesture.scale / this.scale;
+        this.pageStack.classList.add('pinch-zooming');
+        this.pageStack.style.setProperty('--pinch-scale', String(scaleRatio));
+    }
+
+    async commitPinchPreview(gesture) {
+        const containerRect = this.container.getBoundingClientRect();
+        const viewportFocusPoint = this.pinchViewportCenter
+            ? {
+                x: this.pinchViewportCenter.x - containerRect.left,
+                y: this.pinchViewportCenter.y - containerRect.top
+            }
+            : {
+                x: this.container.clientWidth / 2,
+                y: this.container.clientHeight / 2
+            };
+
+        await this.setScale(gesture.scale, this.pinchFocusPoint, {
+            focusPointIsContent: true,
+            viewportFocusPoint
+        });
+        this.clearPinchPreview();
+    }
+
+    clearPinchPreview() {
+        if (!this.pageStack) return;
+        this.pageStack.classList.remove('pinch-zooming');
+        this.pageStack.style.removeProperty('--pinch-scale');
+        this.pageStack.style.removeProperty('transform-origin');
+        this.pinchFocusPoint = null;
+        this.pinchViewportCenter = null;
+    }
+
+    resolvePinchFocusPoint(center) {
+        const containerRect = this.container.getBoundingClientRect();
+        return {
+            x: this.container.scrollLeft + (center.x - containerRect.left),
+            y: this.container.scrollTop + (center.y - containerRect.top)
+        };
     }
 
     handleSelection(pageNum) {
@@ -373,7 +505,7 @@ export class PDFReader {
                     setAppService('pendingRestore', null);
                 }
             } catch (e) {
-                console.error('[PDFReader] Error calculating hash:', e);
+                logger.error('Error calculating hash', e);
             }
 
             const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
@@ -386,7 +518,7 @@ export class PDFReader {
             // Reset scroll position to show first page
             // Store timeout so it can be cancelled if a jump occurs immediately
             if (initialPage > 1) { // Removed numPages check as this.pdfDoc might not be fully populated? No, it is awaited above.
-                console.log('[PDFReader] Jumping to initial page:', initialPage);
+                logger.debug('Jumping to initial page', initialPage);
                 // Use a short delay to ensure layout
                 setTimeout(() => {
                     this.scrollToPage(initialPage);
@@ -404,35 +536,92 @@ export class PDFReader {
 
             return this.pdfDoc;
         } catch (error) {
-            console.error('Error loading PDF:', error);
+            logger.error('Error loading PDF', error);
             throw error;
         }
     }
 
-    async initPages() {
-        this.container.innerHTML = '';
-        // Clear array instead of reassigning to maintain reference in highlightRenderer
-        this.pages.length = 0;
+    async initPages(options = {}) {
+        const { preserveExisting = false } = options;
+        const previousPages = [...this.pages];
+        previousPages.forEach((page) => {
+            if (page.wrapper) {
+                this.observer.unobserve(page.wrapper);
+            }
+        });
 
+        if (!preserveExisting) {
+            this.container.innerHTML = '';
+        } else if (this.pageStack) {
+            this.pageStack.classList.add('pdf-page-stack-overlay');
+        }
+
+        const { pageStack, pages } = await this.createPageStack();
+        this.pageStack = pageStack;
+        this.pages.length = 0;
+        this.pages.push(...pages);
+        this.container.appendChild(this.pageStack);
+
+        if (!this.pageDetectionListenerAttached) {
+            this.container.addEventListener('scroll', this.boundDetectCurrentPage);
+            this.pageDetectionListenerAttached = true;
+            this.cleanupCallbacks.push(() => {
+                this.container.removeEventListener('scroll', this.boundDetectCurrentPage);
+            });
+        }
+    }
+
+    async createPageStack() {
+        const pageStack = document.createElement('div');
+        pageStack.className = 'pdf-page-stack';
+        pageStack.style.position = 'relative';
+        pageStack.style.display = 'flex';
+        pageStack.style.flexDirection = 'column';
+        pageStack.style.alignItems = 'center';
+        pageStack.style.transformOrigin = 'top center';
+        pageStack.style.width = '100%';
+
+        const pages = [];
         for (let num = 1; num <= this.pdfDoc.numPages; num++) {
             const page = await this.pdfDoc.getPage(num);
             const viewport = page.getViewport({ scale: this.scale });
             const wrapper = createPageWrapper(num, viewport);
 
-            this.container.appendChild(wrapper);
+            pageStack.appendChild(wrapper);
 
-            this.pages.push({
+            const pageInfo = {
                 num,
                 wrapper,
                 viewport,
                 rendered: false
-            });
-
+            };
+            pages.push(pageInfo);
             this.observer.observe(wrapper);
         }
-        this.container.addEventListener('scroll', this.boundDetectCurrentPage);
-        this.cleanupCallbacks.push(() => {
-            this.container.removeEventListener('scroll', this.boundDetectCurrentPage);
+
+        return { pageStack, pages };
+    }
+
+    async renderVisiblePages() {
+        const viewportTop = this.container.scrollTop - 160;
+        const viewportBottom = this.container.scrollTop + this.container.clientHeight + 160;
+        const pagesToRender = this.pages.filter((page) => {
+            const top = page.wrapper.offsetTop;
+            const bottom = top + page.wrapper.offsetHeight;
+            return bottom >= viewportTop && top <= viewportBottom;
+        });
+
+        await Promise.all(pagesToRender.map((page) => this.renderPage(page)));
+    }
+
+    finishPageStackTransition(previousStack) {
+        if (!previousStack || previousStack === this.pageStack) return;
+
+        requestAnimationFrame(() => {
+            previousStack.classList.add('fade-out');
+            window.setTimeout(() => {
+                previousStack.remove();
+            }, 140);
         });
     }
 
@@ -506,7 +695,7 @@ export class PDFReader {
     }
 
     async renderPage(pageInfo) {
-        if (pageInfo.rendered) return;
+        if (pageInfo.rendered) return pageInfo.renderTask ?? Promise.resolve();
         pageInfo.rendered = true;
 
         const viewport = pageInfo.viewport;
@@ -540,7 +729,7 @@ export class PDFReader {
             return page.render(renderContext).promise;
         });
 
-        pageInfo.renderTask.then(() => {
+        return pageInfo.renderTask.then(() => {
             // Render Text Layer
             this.renderTextLayer(pageInfo);
             // Render highlights for this page
@@ -552,7 +741,7 @@ export class PDFReader {
             }, 0);
         }).catch(err => {
             if (err.name !== 'RenderingCancelledException') {
-                console.error('Render error:', err);
+                logger.error('Render error', err);
             }
         });
     }
@@ -652,32 +841,19 @@ export class PDFReader {
     handleHighlightClick(e, highlightId, cardId) {
         // Focus the container to ensure keyboard events are captured here
         this.container.focus();
-        this.toolbar.handleHighlightClick(e, highlightId, cardId);
-
-        // Dispatch global event for sync (Mindmap, Annotation List)
-        window.dispatchEvent(new CustomEvent('highlight-clicked', {
-            detail: { highlightId, cardId }
-        }));
+        handleReaderHighlightClick(this, e, highlightId, cardId, ({ highlightId: selectedId, cardId: selectedCardId }) => {
+            window.dispatchEvent(new CustomEvent('highlight-clicked', {
+                detail: { highlightId: selectedId, cardId: selectedCardId }
+            }));
+        });
     }
 
     hideToolbar() {
-        this.toolbar.hide();
+        clearSelectedHighlightState(this, this.toolbar.getSelectedHighlightId());
     }
 
     deleteHighlight(highlightId, cardId) {
-        // Removed confirmation dialog as requested
-
-        if (cardId && getAppContext().cardSystem) {
-            // Remove from card system. 
-            // CardSystem will dispatch 'card-removed', which it listens to itself to then call highlightManager.removeHighlight.
-            // This avoids double deletion and "unknown ID" errors.
-
-            getAppContext().cardSystem.removeCard(cardId);
-        } else if (getAppContext().highlightManager) {
-            // If no card associated (orphan highlight), remove highlight directly
-
-            getAppContext().highlightManager.removeHighlight(highlightId);
-        }
+        removeHighlightFromStores(getAppContext().cardSystem, highlightId, cardId);
     }
 
     removeHighlightOverlays(highlightId) {
@@ -702,10 +878,8 @@ export class PDFReader {
 
         // Update model
         if (getAppContext().highlightManager) {
-            const highlight = findHighlightById(getAppContext().highlightManager.highlights, highlightId);
+            const highlight = updateHighlightModelColor(highlightId, color);
             if (highlight) {
-                highlight.color = color;
-
                 syncDefaultHighlightColor(PDFReader.defaultColors, highlight.type, color);
 
                 if (highlight.type === 'highlighter') {
@@ -722,11 +896,6 @@ export class PDFReader {
                         this.areaSelector.setColor(color);
                     }
                 }
-
-                // Dispatch update event if needed for Mind Map sync
-                window.dispatchEvent(new CustomEvent('highlight-updated', {
-                    detail: { id: highlightId, color }
-                }));
             }
         }
     }
@@ -748,12 +917,12 @@ export class PDFReader {
 
             this.scrollToPage(pageNum);
         } catch (e) {
-            console.error('[PDFReader] Navigation error:', e);
+            logger.error('Navigation error', e);
         }
     }
 
     scrollToPage(pageNum) {
-        console.log('[PDFReader] scrollToPage requested:', pageNum);
+        logger.debug('scrollToPage requested', pageNum);
 
         // Cancel initial scroll reset if it's pending (Fix for auto-restore race condition)
         if (this.initialScrollTimeout) {
@@ -765,7 +934,7 @@ export class PDFReader {
         const pageInfo = this.pages[pageNum - 1];
 
         if (pageInfo && pageInfo.wrapper) {
-            console.log('[PDFReader] Rolling to wrapper for page:', pageNum, 'Top:', pageInfo.wrapper.offsetTop);
+            logger.debug('Rolling to wrapper for page', { pageNum, top: pageInfo.wrapper.offsetTop });
 
             // Use 'auto' instead of 'smooth' to prevent race conditions during heavy render
             pageInfo.wrapper.scrollIntoView({ behavior: 'auto', block: 'start' });

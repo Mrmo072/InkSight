@@ -1,8 +1,16 @@
 import { parse } from 'marked';
 import { highlightManager } from '../core/highlight-manager.js';
-import { PDFHighlightToolbar } from './pdf-highlight-toolbar.jsx';
 import { getAppContext } from '../app/app-context.js';
-import { registerEventListeners } from '../app/event-listeners.js';
+import {
+    applyReaderSelectionMode,
+    clearSelectedHighlightState,
+    createReaderHighlightToolbar,
+    handleReaderHighlightClick,
+    findCardIdByHighlightId,
+    removeHighlightFromStores,
+    registerBasicReaderListeners,
+    updateHighlightModelColor
+} from './reader-shared.js';
 
 export class TextReader {
     constructor(container) {
@@ -13,58 +21,20 @@ export class TextReader {
         this.selectedHighlightId = null;
         this.cleanupListeners = null;
 
-        // Bind handlers
-        this.handleMindmapNodeUpdated = (e) => {
-            const { highlightId, color } = e.detail;
-
-            this.updateHighlightColor(highlightId, color);
-        };
-
-        this.handleCardDeleted = (e) => {
-            const { id: cardId, highlightId, deleted } = e.detail;
-
-            if (deleted && highlightId) {
+        registerBasicReaderListeners(this, {
+            onCardDeleted: (highlightId) => {
                 this.removeVisualHighlight(highlightId);
             }
-        };
-
-        this.handleKeyDown = (e) => {
-            if ((e.key === 'Delete' || e.key === 'Backspace') && this.selectedHighlightId) {
-
-                // Find card ID
-                let cardId = null;
-                if (this.getCardSystem()) {
-                    const card = Array.from(this.getCardSystem().cards.values()).find(c => c.highlightId === this.selectedHighlightId);
-                    if (card) cardId = card.id;
-                }
-                this.deleteHighlight(this.selectedHighlightId, cardId);
-                this.selectedHighlightId = null;
-                this.toolbar.hide();
-            }
-        };
-
-        this.cleanupListeners = registerEventListeners([
-            { target: window, event: 'mindmap-node-updated', handler: this.handleMindmapNodeUpdated },
-            { target: window, event: 'card-soft-deleted', handler: this.handleCardDeleted },
-            { target: document, event: 'keydown', handler: this.handleKeyDown }
-        ]);
+        });
 
         // Initialize Toolbar
-        this.toolbar = new PDFHighlightToolbar(container, {
+        this.toolbar = createReaderHighlightToolbar(container, {
             onDeleteHighlight: (highlightId, cardId) => {
                 this.deleteHighlight(highlightId, cardId);
             },
             onUpdateColor: (highlightId, color) => {
                 this.updateHighlightColor(highlightId, color);
-                // Also update model
-                const highlight = highlightManager.getHighlight(highlightId);
-                if (highlight) {
-                    highlight.color = color;
-                    // Dispatch update for Mind Map
-                    window.dispatchEvent(new CustomEvent('highlight-updated', {
-                        detail: { id: highlightId, color }
-                    }));
-                }
+                updateHighlightModelColor(highlightId, color);
             }
         });
     }
@@ -112,8 +82,7 @@ export class TextReader {
             // Global click to hide toolbar
             this.content.addEventListener('mousedown', (e) => {
                 if (!e.target.closest('.modern-highlight-toolbar') && !e.target.classList.contains('highlight')) {
-                    this.toolbar.hide();
-                    this.selectedHighlightId = null;
+                    clearSelectedHighlightState(this);
                 }
             });
 
@@ -243,15 +212,8 @@ export class TextReader {
     }
 
     handleHighlightClick(e, highlightId) {
-        this.selectedHighlightId = highlightId;
-        let cardId = null;
-        if (this.getCardSystem()) {
-            const card = Array.from(this.getCardSystem().cards.values()).find(c => c.highlightId === highlightId);
-            if (card) cardId = card.id;
-        }
-
-
-        this.toolbar.handleHighlightClick(e, highlightId, cardId);
+        const cardId = findCardIdByHighlightId(this.getCardSystem(), highlightId);
+        handleReaderHighlightClick(this, e, highlightId, cardId);
     }
 
     removeVisualHighlight(highlightId) {
@@ -265,21 +227,14 @@ export class TextReader {
             });
             this.content.normalize();
         }
-        if (this.selectedHighlightId === highlightId) {
-            this.selectedHighlightId = null;
-            this.toolbar.hide();
-        }
+        clearSelectedHighlightState(this, highlightId);
     }
 
     deleteHighlight(highlightId, cardId) {
 
         this.removeVisualHighlight(highlightId);
 
-        if (cardId && this.getCardSystem()) {
-            this.getCardSystem().removeCard(cardId);
-        } else {
-            highlightManager.removeHighlight(highlightId);
-        }
+        removeHighlightFromStores(this.getCardSystem(), highlightId, cardId);
     }
 
     updateHighlightColor(highlightId, color) {
@@ -365,25 +320,15 @@ export class TextReader {
 
     setSelectionMode(mode) {
         this.selectionMode = mode;
-
-
-        if (mode === 'text') {
-            this.container.style.cursor = 'text';
-            this.container.classList.remove('disable-selection');
-            this.container.style.touchAction = 'pan-x pan-y pinch-zoom';
-            if (this.content) {
-                this.content.style.userSelect = 'text';
-                this.content.style.webkitUserSelect = 'text';
-            }
-        } else {
-            this.container.style.cursor = 'grab';
-            this.container.classList.add('disable-selection');
-            this.container.style.touchAction = 'auto';
-            if (this.content) {
-                this.content.style.userSelect = 'none';
-                this.content.style.webkitUserSelect = 'none';
-            }
-        }
+        applyReaderSelectionMode({
+            container: this.container,
+            mode,
+            targetElements: [this.content],
+            textCursor: 'text',
+            nonTextCursor: 'grab',
+            disableSelectionClass: true,
+            nonTextTouchAction: 'auto'
+        });
     }
 
     destroy() {

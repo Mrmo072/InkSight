@@ -9,6 +9,9 @@ import { getAppContext, initAppContext, setAppService, updateCurrentBook } from 
 import { createReaderLoader } from './app/reader-loader.js';
 import { registerEventListeners } from './app/event-listeners.js';
 import { setupSelectionSync } from './app/selection-sync.js';
+import { createLogger } from './core/logger.js';
+
+const logger = createLogger('Main');
 
 suppressResizeObserverLoop();
 
@@ -199,7 +202,7 @@ async function init() {
                 handler: (e) => {
                     const page = e.detail.page;
                     if (page && currentReader && page > 1) {
-                        console.log('[Main] Received restore-page-position event. Jumping to:', page);
+                        logger.debug('Received restore-page-position event. Jumping to', page);
                         currentReader.scrollToPage(page);
                     }
                 }
@@ -207,7 +210,7 @@ async function init() {
         ]));
 
     } catch (e) {
-        console.error('Error opening file:', e);
+        logger.error('Error opening file', e);
         // showToast('无法打开文件: ' + e.message);
     }
 }
@@ -216,6 +219,32 @@ function setupLayoutToggles() {
     // Annotation List Toggle
     const toggleAnnotationsBtn = document.getElementById('toggle-annotations');
     const annotationListContainer = document.getElementById('annotation-list');
+    const showAnnotationsBtn = document.getElementById('show-annotations');
+    const showMindmapBtn = document.getElementById('show-mindmap');
+
+    const setMobileNotesView = (view) => {
+        const nextView = view === 'mindmap' ? 'mindmap' : 'annotations';
+        document.body.dataset.notesView = nextView;
+        showAnnotationsBtn?.classList.toggle('active', nextView === 'annotations');
+        showAnnotationsBtn?.setAttribute('aria-selected', String(nextView === 'annotations'));
+        showMindmapBtn?.classList.toggle('active', nextView === 'mindmap');
+        showMindmapBtn?.setAttribute('aria-selected', String(nextView === 'mindmap'));
+    };
+
+    const syncNotesLayoutMode = () => {
+        if (document.body.classList.contains('mobile-layout')) {
+            annotationListContainer?.classList.remove('collapsed');
+            toggleAnnotationsBtn?.classList.add('active');
+            setMobileNotesView(document.body.dataset.notesView || 'annotations');
+            return;
+        }
+
+        delete document.body.dataset.notesView;
+        showAnnotationsBtn?.classList.remove('active');
+        showAnnotationsBtn?.setAttribute('aria-selected', 'false');
+        showMindmapBtn?.classList.remove('active');
+        showMindmapBtn?.setAttribute('aria-selected', 'false');
+    };
 
     if (toggleAnnotationsBtn && annotationListContainer) {
         registerCleanup(registerEventListeners([
@@ -223,12 +252,37 @@ function setupLayoutToggles() {
                 target: toggleAnnotationsBtn,
                 event: 'click',
                 handler: () => {
+                    if (document.body.classList.contains('mobile-layout')) {
+                        setMobileNotesView('annotations');
+                        return;
+                    }
+
                     const isCollapsed = annotationListContainer.classList.toggle('collapsed');
                     toggleAnnotationsBtn.classList.toggle('active', !isCollapsed);
                 }
             }
         ]));
     }
+
+    registerCleanup(registerEventListeners([
+        {
+            target: showAnnotationsBtn,
+            event: 'click',
+            handler: () => setMobileNotesView('annotations')
+        },
+        {
+            target: showMindmapBtn,
+            event: 'click',
+            handler: () => setMobileNotesView('mindmap')
+        },
+        {
+            target: window,
+            event: 'resize',
+            handler: syncNotesLayoutMode
+        }
+    ].filter(({ target }) => target)));
+
+    syncNotesLayoutMode();
 
     // Sidebar Toggles (Existing)
     if (elements.toggleSidebarBtn) {
@@ -490,7 +544,7 @@ function setupEventListeners() {
                     if (window.applyAutoLayout) {
                         window.applyAutoLayout();
                     } else {
-                        console.warn('Auto-layout function not available yet');
+                        logger.warn('Auto-layout function not available yet');
                     }
                 }
             }
@@ -535,7 +589,7 @@ async function generateHash(message) {
             const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
             return hashHex.substring(0, 32);
         } catch (e) {
-            console.warn('[Hash] Crypto API failed, falling back:', e);
+            logger.warn('Crypto API failed, falling back', e);
         }
     }
 
@@ -554,11 +608,25 @@ async function generateHash(message) {
 }
 
 function renderFileList() {
-    elements.fileList.innerHTML = state.files.map(file => `
+    if (!state.files.length) {
+        elements.fileList.innerHTML = `
+            <div class="library-empty-state">
+              <span class="material-icons-round">upload_file</span>
+              <h3>Your library is empty</h3>
+              <p>Import a PDF, EPUB, TXT, or Markdown file to start reading.</p>
+            </div>
+        `;
+        return;
+    }
+
+    elements.fileList.innerHTML = state.files.map((file, index) => `
         <div class="file-item ${state.currentFile?.id === file.id ? 'active' : ''}" 
              onclick="window.openFileById('${file.id}')">
-          <span class="material-icons-round">description</span>
-          <span class="text-truncate">${file.name}</span>
+          <span class="material-icons-round file-item-icon">description</span>
+          <span class="file-item-body">
+            <span class="text-truncate file-item-name">${file.name}</span>
+            <span class="file-item-meta">Document ${index + 1}</span>
+          </span>
         </div>
     `).join('');
 }
@@ -575,12 +643,12 @@ async function handleJumpToSource(sourceId, highlightId) {
     const effectiveSourceId = highlight ? highlight.sourceId : sourceId;
     const file = state.files.find(f => f.id === effectiveSourceId);
     if (!file) {
-        console.warn('[Main] Source file not found:', effectiveSourceId, 'Original:', sourceId);
+        logger.warn('Source file not found', { effectiveSourceId, sourceId });
         return;
     }
 
     if (!highlight) {
-        console.warn('[Main] Highlight not found:', highlightId);
+        logger.warn('Highlight not found', highlightId);
         return;
     }
 

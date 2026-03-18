@@ -28,6 +28,9 @@ import { useContext } from 'react';
 import { MenuContentPropsContext } from '../../menu/common';
 import { EVENT } from '../../../constants';
 import { getShortcutKey } from '../../../utils/common';
+import { createLogger } from '../../../../../../core/logger.js';
+
+const logger = createLogger('DrawnixMenu');
 
 export const SaveToFile = () => {
   const board = useBoard();
@@ -57,7 +60,7 @@ export const SaveToFile = () => {
         }
         // Strip extension from book name
         const fileName = extraData.bookName ? extraData.bookName.replace(/\.[^/.]+$/, "") : undefined;
-        console.log('[SaveToFile] Exporting with filename:', { original: extraData.bookName, stripped: fileName });
+        logger.debug('Exporting with filename', { original: extraData.bookName, stripped: fileName });
         saveAsJSON(board, fileName, extraData);
       }}
       icon={SaveFileIcon}
@@ -90,7 +93,7 @@ export const OpenFile = () => {
     // Clear edit history to prevent undo back to pre-import state
     board.history.undos = [];
     board.history.redos = [];
-    console.log('[Import] Edit history cleared');
+    logger.debug('Import edit history cleared');
   };
   return (
     <MenuItem
@@ -112,7 +115,7 @@ export const OpenFile = () => {
               if (currentMd5 && savedMd5 !== currentMd5) {
                 alert(`Warning: This mind map was saved for a different book (${extraData.bookName || 'Unknown'}).\nNodes might not link correctly.`);
               } else if (!currentMd5) {
-                console.log('Opened mind map without an active book. Nodes will be displayed independently.');
+                logger.debug('Opened mind map without an active book. Nodes will be displayed independently.');
               }
             }
 
@@ -123,7 +126,7 @@ export const OpenFile = () => {
               const shouldRemap = currentMd5 && savedMd5 && currentMd5 === savedMd5;
               const newId = shouldRemap ? ag.currentBook.id : null;
 
-              console.log('[Restore] MD5 Check:', { currentMd5, savedMd5, match: currentMd5 === savedMd5, newId });
+              logger.debug('Restore MD5 check', { currentMd5, savedMd5, match: currentMd5 === savedMd5, newId });
 
               if (!currentMd5 && savedMd5) {
                 console.warn('[Restore] No book loaded. Setting pending restore.');
@@ -145,7 +148,7 @@ export const OpenFile = () => {
 
               // Clear all existing PDF highlight overlays before restoring
               if (ag.pdfReader && ag.pdfReader.clearAllHighlights) {
-                console.log('[Import] Clearing existing PDF highlights before restore');
+                logger.debug('Clearing existing PDF highlights before restore');
                 ag.pdfReader.clearAllHighlights();
               }
 

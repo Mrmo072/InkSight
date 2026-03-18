@@ -16,6 +16,9 @@ import {
     saveDocumentHistory,
     updateDocumentHistoryPage
 } from './document-history-store.js';
+import { createLogger } from './logger.js';
+
+const logger = createLogger('DocumentHistoryManager');
 
 export class DocumentHistoryManager {
     constructor() {
@@ -71,7 +74,7 @@ export class DocumentHistoryManager {
         this.currentMd5 = md5;
         this.currentBookName = bookName;
 
-        console.log('[DocumentHistoryManager] Starting auto-save for:', bookName);
+        logger.debug('Starting auto-save for', bookName);
 
         // Auto-save every 3 minutes
         this.autoSaveInterval = setInterval(() => {
@@ -101,7 +104,7 @@ export class DocumentHistoryManager {
 
         // SAFETY: Do not save if restore hasn't confirmed success
         if (!this.isStatsRestored && this.hasPendingRestore) {
-            console.warn('[DocumentHistoryManager] Skipping auto-save: Restore pending or in progress.');
+            logger.warn('Skipping auto-save: Restore pending or in progress.');
             return;
         }
 
@@ -112,7 +115,7 @@ export class DocumentHistoryManager {
             // SAFETY VALVE: Empty Board Protection
             // If we expected elements (from restore) but board is empty, DO NOT SAVE.
             if (this.initialElementCount > 0 && board.children.length === 0) {
-                console.error('[DocumentHistoryManager] CRITICAL: Attempted to save EMPTY board over existing data. Aborting save.');
+                logger.error('CRITICAL: Attempted to save EMPTY board over existing data. Aborting save.');
                 return;
             }
 
@@ -131,7 +134,7 @@ export class DocumentHistoryManager {
             const result = await this.ipcRenderer.saveFile(safeFileName, jsonStr);
 
             if (result.success) {
-                console.log('[DocumentHistoryManager] Auto-saved to', result.path);
+                logger.debug('Auto-saved to', result.path);
                 applySaveResultToHistory({
                     history: this.history,
                     md5: this.currentMd5,
@@ -140,11 +143,11 @@ export class DocumentHistoryManager {
                 });
                 this.saveHistory();
             } else {
-                console.error('[DocumentHistoryManager] IPC save failed:', result.error);
+                logger.error('IPC save failed:', result.error);
             }
 
         } catch (e) {
-            console.error('[DocumentHistoryManager] Auto-save failed', e);
+            logger.error('Auto-save failed', e);
         }
     }
 
@@ -163,7 +166,7 @@ export class DocumentHistoryManager {
 
         const searchResult = await this.ipcRenderer.findSaveByMd5(md5);
         if (searchResult.success && searchResult.filename) {
-            console.log('[DocumentHistoryManager] MD5 match found:', searchResult.filename);
+            logger.debug('MD5 match found', searchResult.filename);
             this.cacheResolvedFilename(md5, searchResult.filename);
             return searchResult.filename;
         }
@@ -180,15 +183,15 @@ export class DocumentHistoryManager {
         const bookName = getAppContext().currentBook?.name;
         if (bookName) {
             const candidates = this.getRestoreCandidates(bookName);
-            console.log('[DocumentHistoryManager] No history found, trying fallback candidates:', candidates);
+            logger.debug('No history found, trying fallback candidates', candidates);
             const fallbackFilename = candidates[0] || null;
-            console.log('[DocumentHistoryManager] Selected fallback filename:', fallbackFilename);
+            logger.debug('Selected fallback filename', fallbackFilename);
             if (fallbackFilename) {
                 return fallbackFilename;
             }
         }
 
-        console.log('[DocumentHistoryManager] No filename determined for restore. Attempting MD5 match...');
+        logger.debug('No filename determined for restore. Attempting MD5 match...');
         return await this.findFilenameByMd5(md5);
     }
 
@@ -197,19 +200,19 @@ export class DocumentHistoryManager {
         let result = { success: false };
 
         if (activeFilename) {
-            console.log('[DocumentHistoryManager] Requesting restore for', activeFilename);
+            logger.debug('Requesting restore for', activeFilename);
             result = await this.ipcRenderer.loadFile(activeFilename);
         }
 
         if (!result.success) {
-            console.warn('[DocumentHistoryManager] Primary load failed (' + (result.error || 'No filename') + '). Attempting MD5 Auto-Discovery...');
+            logger.warn('Primary load failed (' + (result.error || 'No filename') + '). Attempting MD5 Auto-Discovery...');
             const discoveredFilename = await this.findFilenameByMd5(md5);
             if (discoveredFilename) {
                 activeFilename = discoveredFilename;
-                console.log('[DocumentHistoryManager] MD5 match found! Recovering from:', activeFilename);
+                logger.debug('MD5 match found. Recovering from', activeFilename);
                 result = await this.ipcRenderer.loadFile(activeFilename);
             } else {
-                console.log('[DocumentHistoryManager] MD5 Auto-Discovery found no matches.');
+                logger.debug('MD5 Auto-Discovery found no matches.');
             }
         }
 
@@ -223,7 +226,7 @@ export class DocumentHistoryManager {
 
     async restoreBoardWhenReady(data) {
         const performBoardRestore = () => {
-            console.log('[DocumentHistoryManager] Dispatching restore-board-state (Elements:', data.elements.length, ')');
+            logger.debug('Dispatching restore-board-state', { elements: data.elements.length });
             window.dispatchEvent(new CustomEvent('restore-board-state', {
                 detail: {
                     elements: data.elements,
@@ -238,7 +241,7 @@ export class DocumentHistoryManager {
             return;
         }
 
-        console.log('[DocumentHistoryManager] Board not ready. Waiting for board-ready event...');
+        logger.debug('Board not ready. Waiting for board-ready event...');
         await new Promise((resolve) => {
             let settled = false;
 
@@ -251,7 +254,7 @@ export class DocumentHistoryManager {
             };
 
             const onBoardReady = () => {
-                console.log('[DocumentHistoryManager] Board ready signal received. Proceeding with restore.');
+                logger.debug('Board ready signal received. Proceeding with restore.');
                 performBoardRestore();
                 finish();
             };
@@ -259,7 +262,7 @@ export class DocumentHistoryManager {
             window.addEventListener('board-ready', onBoardReady);
             setTimeout(() => {
                 if (!settled) {
-                    console.warn('[DocumentHistoryManager] Board restore timed out. FORCE ENABLING auto-save but checking element count.');
+                    logger.warn('Board restore timed out. FORCE ENABLING auto-save but checking element count.');
                     finish();
                 }
             }, 5000);
@@ -268,7 +271,7 @@ export class DocumentHistoryManager {
 
     validateRestorePayload(md5, data) {
         if (data.bookMd5 && data.bookMd5 !== md5) {
-            console.warn('[DocumentHistoryManager] MD5 mismatch in save file', { expected: md5, actual: data.bookMd5 });
+            logger.warn('MD5 mismatch in save file', { expected: md5, actual: data.bookMd5 });
         }
     }
 
@@ -277,7 +280,7 @@ export class DocumentHistoryManager {
             return;
         }
 
-        console.log('[DocumentHistoryManager] Found lastPage in save file:', data.lastPage);
+        logger.debug('Found lastPage in save file', data.lastPage);
         this.updatePage(md5, data.lastPage);
         window.dispatchEvent(new CustomEvent('restore-page-position', {
             detail: { page: data.lastPage }
@@ -290,7 +293,7 @@ export class DocumentHistoryManager {
         }
 
         this.initialElementCount = data.elements.length;
-        console.log('[DocumentHistoryManager] Expecting to restore', this.initialElementCount, 'elements.');
+        logger.debug('Expecting to restore elements', this.initialElementCount);
     }
 
     restoreHighlights(data, appContext) {
@@ -328,7 +331,7 @@ export class DocumentHistoryManager {
 
         const filename = await this.determineRestoreFilename(md5);
         if (!filename) {
-            console.log('[DocumentHistoryManager] No filename determined after all fallbacks. Assuming new document.');
+            logger.debug('No filename determined after all fallbacks. Assuming new document.');
             this.completeRestore({ restored: true });
             return;
         }
@@ -337,7 +340,7 @@ export class DocumentHistoryManager {
             const { result } = await this.loadRestorePayload(md5, filename);
 
             if (!result.success) {
-                console.warn('[DocumentHistoryManager] All restore attempts failed. Assuming valid NEW document.');
+                logger.warn('All restore attempts failed. Assuming valid NEW document.');
                 this.completeRestore({ restored: true });
                 return;
             }
@@ -359,7 +362,7 @@ export class DocumentHistoryManager {
             }
 
         } catch (e) {
-            console.error('[DocumentHistoryManager] Restore failed', e);
+            logger.error('Restore failed', e);
             // On hard failure, avoid auto-save to protect file
             this.completeRestore({ restored: false });
         }

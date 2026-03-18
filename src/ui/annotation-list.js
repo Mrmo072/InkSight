@@ -1,5 +1,8 @@
 import { getAppContext } from '../app/app-context.js';
 import { registerEventListeners } from '../app/event-listeners.js';
+import { createLogger } from '../core/logger.js';
+
+const logger = createLogger('AnnotationList');
 
 export class AnnotationList {
     constructor(containerId, cardSystem) {
@@ -41,7 +44,7 @@ export class AnnotationList {
 
     refresh() {
         if (!this.currentFileId || !this.cardSystem) {
-            console.warn('[AnnotationList] Missing fileId or cardSystem', { fileId: this.currentFileId, system: !!this.cardSystem });
+            logger.warn('Missing fileId or cardSystem', { fileId: this.currentFileId, system: !!this.cardSystem });
             return;
         }
 
@@ -54,7 +57,11 @@ export class AnnotationList {
         // Valid cards are those with sourceId matching current file AND not deleted
         const cards = allCards.filter(c => c.sourceId === this.currentFileId && !c.deleted);
 
-        console.log('[AnnotationList] Refreshing. FileId:', this.currentFileId, 'TotalCards:', allCards.length, 'Matched:', cards.length);
+        logger.debug('Refreshing annotation list', {
+            fileId: this.currentFileId,
+            totalCards: allCards.length,
+            matchedCards: cards.length
+        });
 
         // Sort by page (we need highlight info for this)
         // We'll trust that card order or card.highlightId can help lookup location

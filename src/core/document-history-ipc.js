@@ -1,3 +1,7 @@
+import { createLogger } from './logger.js';
+
+const logger = createLogger('DocumentHistoryIPC');
+
 export function createWrappedIpcRenderer(rawIpc) {
     if (!rawIpc?.invoke) {
         return null;
@@ -14,36 +18,36 @@ export function createWrappedIpcRenderer(rawIpc) {
 export function resolveDocumentHistoryIpc() {
     try {
         if (window.ipcRenderer) {
-            console.log('[DocumentHistoryManager] IPC initialized via window.ipcRenderer (Wrapped)');
+            logger.debug('IPC initialized via window.ipcRenderer (wrapped)');
             return createWrappedIpcRenderer(window.ipcRenderer);
         }
 
         if (window.electronAPI) {
-            console.log('[DocumentHistoryManager] IPC initialized via window.electronAPI');
+            logger.debug('IPC initialized via window.electronAPI');
             return window.electronAPI;
         }
 
         if (window.require) {
             const electron = window.require('electron');
-            console.log('[DocumentHistoryManager] IPC initialized via window.require (Wrapped)');
+            logger.debug('IPC initialized via window.require (wrapped)');
             return createWrappedIpcRenderer(electron.ipcRenderer);
         }
 
         if (typeof require !== 'undefined') {
             try {
                 const electron = require('electron');
-                console.log('[DocumentHistoryManager] IPC initialized via global require (Wrapped)');
+                logger.debug('IPC initialized via global require (wrapped)');
                 return createWrappedIpcRenderer(electron.ipcRenderer);
             } catch (err) {
-                console.warn('[DocumentHistoryManager] global require found but failed to load electron', err);
+                logger.warn('global require found but failed to load electron', err);
                 return null;
             }
         }
 
-        console.warn('[DocumentHistoryManager] IPC not available. Auto-save disabled. (Retries may occur)');
+        logger.warn('IPC not available. Auto-save disabled. (Retries may occur)');
         return null;
     } catch (error) {
-        console.error('[DocumentHistoryManager] Failed to init IPC', error);
+        logger.error('Failed to init IPC', error);
         return null;
     }
 }

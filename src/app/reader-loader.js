@@ -1,4 +1,7 @@
 import { getAppContext, setAppService } from './app-context.js';
+import { createLogger } from '../core/logger.js';
+
+const logger = createLogger('ReaderLoader');
 
 export function createReaderLoader({
     elements,
@@ -148,7 +151,7 @@ export function createReaderLoader({
             return reader;
         } catch (e) {
             elements.viewer.innerHTML = `<div class="error">Error loading ${config.errorLabel}: ${e.message}</div>`;
-            console.error(e);
+            logger.error(`Error loading ${config.errorLabel}`, e);
             return reader;
         }
     };
