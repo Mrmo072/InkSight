@@ -6,6 +6,21 @@ export function createViewportCenterResolver(boardRef, board, containerRef) {
     return () => {
         const currentBoard = boardRef.current || board;
         const container = containerRef.current;
+        const host = currentBoard ? PlaitBoard.getHost(currentBoard) : null;
+        const rect = container?.getBoundingClientRect?.();
+        const clientX = rect ? rect.left + rect.width / 2 : (window.innerWidth / 2);
+        const clientY = rect ? rect.top + rect.height / 2 : (window.innerHeight / 2);
+
+        if (currentBoard && host) {
+            const hostPoint = toHostPoint(currentBoard, clientX, clientY);
+            const viewBoxPoint = toViewBoxPoint(currentBoard, hostPoint);
+
+            return {
+                boardX: viewBoxPoint[0],
+                boardY: viewBoxPoint[1]
+            };
+        }
+
         const zoom = currentBoard?.viewport?.zoom || 1;
         const viewX = currentBoard?.viewport?.x || 0;
         const viewY = currentBoard?.viewport?.y || 0;
@@ -62,8 +77,10 @@ export function insertCardIntoBoard({ data, boardRef, board, cardSystem, resolve
         return;
     }
 
-    const position = resolveViewportCenter();
     const targetBoard = boardRef.current || board;
+    const position = (typeof data.boardX === 'number' && typeof data.boardY === 'number')
+        ? { boardX: data.boardX, boardY: data.boardY }
+        : resolveViewportCenter();
     const { boardX, boardY } = position;
     const existingNode = targetBoard.children.find((child) => child.data?.cardId === data.id);
 

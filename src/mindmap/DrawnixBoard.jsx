@@ -1,17 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Drawnix } from '@drawnix/drawnix';
 import { Transforms, PlaitBoard } from '@plait/core';
-import { setAppService } from '../app/app-context.js';
+import { getAppContext, setAppService } from '../app/app-context.js';
 import { registerEventListeners } from '../app/event-listeners.js';
 import { cardSystem } from '../core/card-system.js';
 import { themeManager } from '../core/theme-manager.js';
 import { createLogger } from '../core/logger.js';
 import {
+    buildAutoLayoutPlan,
     calculateNodeSize,
-    createCenteredPoints,
-    createLayoutGraph,
-    extractEdgeSectionPoints,
-    simplifyOrthogonalPoints
+    createCenteredPoints
 } from './drawnix-board-utils.js';
 import { handleBoardOperations, syncMindmapSelection } from './drawnix-board-state.js';
 import {
@@ -24,6 +22,62 @@ import {
 
 const logger = createLogger('DrawnixBoard');
 
+function parseDateOrder(value) {
+    if (!value) {
+        return Number.POSITIVE_INFINITY;
+    }
+
+    const timestamp = Date.parse(value);
+    return Number.isNaN(timestamp) ? Number.POSITIVE_INFINITY : timestamp;
+}
+
+function buildLocationOrder(location) {
+    if (!location) {
+        return null;
+    }
+
+    const page = typeof location.page === 'number' ? location.page : Number.POSITIVE_INFINITY;
+    const firstRect = Array.isArray(location.rects) && location.rects.length > 0 ? location.rects[0] : null;
+    const rectPage = typeof firstRect?.page === 'number' ? firstRect.page : page;
+    const rectTop = typeof firstRect?.top === 'number' ? firstRect.top : Number.POSITIVE_INFINITY;
+    const rectLeft = typeof firstRect?.left === 'number' ? firstRect.left : Number.POSITIVE_INFINITY;
+    const index = typeof location.index === 'number' ? location.index : Number.POSITIVE_INFINITY;
+    const cfi = typeof location.cfi === 'string' ? location.cfi : '';
+
+    if (Number.isFinite(rectPage) || Number.isFinite(rectTop) || Number.isFinite(index) || cfi) {
+        return [rectPage, rectTop, rectLeft, index, cfi];
+    }
+
+    return null;
+}
+
+function createNodeOrderResolver() {
+    return (element) => {
+        const cardId = element?.data?.cardId;
+        if (!cardId) {
+            return null;
+        }
+
+        const appContext = getAppContext();
+        const card = appContext.cardSystem?.cards?.get?.(cardId);
+        if (!card) {
+            return null;
+        }
+
+        const highlight = card.highlightId
+            ? appContext.highlightManager?.getHighlight?.(card.highlightId)
+            : null;
+        const locationOrder = buildLocationOrder(highlight?.location || card.location);
+
+        return [
+            card.sourceId || '',
+            ...(locationOrder || []),
+            parseDateOrder(card.createdAt),
+            card.id
+        ];
+    };
+}
+
 export const DrawnixBoardComponent = () => {
     const [board, setBoard] = useState(null);
     const boardRef = useRef(null); // Use ref to access board in callbacks without stale closures
@@ -32,17 +86,6 @@ export const DrawnixBoardComponent = () => {
     const [flashOverlay, setFlashOverlay] = useState(null);
     const containerRef = useRef(null);
     const processingCardIds = useRef(new Set()); // Track cards being processed to avoid loops
-    const elkRef = useRef(null);
-
-    const getElkInstance = async () => {
-        if (elkRef.current) {
-            return elkRef.current;
-        }
-
-        const { default: ELK } = await import('elkjs/lib/elk.bundled.js');
-        elkRef.current = new ELK();
-        return elkRef.current;
-    };
 
     // Initialize with existing cards once board is ready
     useEffect(() => {
@@ -308,52 +351,46 @@ export const DrawnixBoardComponent = () => {
     };
     const applyAutoLayout = async (boardInstance) => {
         if (!boardInstance || !boardInstance.children) return;
-
-        const elk = await getElkInstance();
-        const { graph, nodeMap } = createLayoutGraph(boardInstance.children);
-
-        if (graph.children.length === 0) return;
-
         try {
-            const layoutedGraph = await elk.layout(graph);
-
-            // Update Nodes
-            layoutedGraph.children.forEach(node => {
-                const originalNode = nodeMap.get(node.id);
-                if (originalNode) {
-                    const newX = node.x;
-                    const newY = node.y;
-                    const width = node.width;
-                    const height = node.height;
-
-                    const path = [boardInstance.children.findIndex(c => c.id === node.id)];
-                    if (path[0] !== -1) {
-                        Transforms.setNode(boardInstance, {
-                            points: [[newX, newY], [newX + width, newY + height]]
-                        }, path);
-                    }
-                }
+            const { nodeRects, edgeRoutes } = buildAutoLayoutPlan(boardInstance.children, {
+                getNodeOrder: createNodeOrderResolver()
             });
 
-            // Update Edges
-            if (layoutedGraph.edges) {
-                layoutedGraph.edges.forEach(edge => {
-                    if (edge.sections && edge.sections.length > 0) {
-                        const section = edge.sections[0];
-                        const points = simplifyOrthogonalPoints(extractEdgeSectionPoints(section));
+            nodeRects.forEach((rect, nodeId) => {
+                const path = [boardInstance.children.findIndex(c => c.id === nodeId)];
+                if (path[0] === -1) {
+                    return;
+                }
 
-                        const path = [boardInstance.children.findIndex(c => c.id === edge.id)];
-                        if (path[0] !== -1) {
-                            Transforms.setNode(boardInstance, {
-                                points: points
-                            }, path);
-                        }
-                    }
-                });
-            }
+                Transforms.setNode(boardInstance, {
+                    points: [[rect.x, rect.y], [rect.x + rect.width, rect.y + rect.height]]
+                }, path);
+            });
 
+            edgeRoutes.forEach((points, edgeId) => {
+                const path = [boardInstance.children.findIndex(c => c.id === edgeId)];
+                if (path[0] === -1) {
+                    return;
+                }
+
+                const edgeNode = boardInstance.children[path[0]];
+                Transforms.setNode(boardInstance, {
+                    shape: 'curve',
+                    points,
+                    source: edgeNode?.source ? {
+                        ...edgeNode.source,
+                        boundId: undefined,
+                        connection: undefined
+                    } : undefined,
+                    target: edgeNode?.target ? {
+                        ...edgeNode.target,
+                        boundId: undefined,
+                        connection: undefined
+                    } : undefined
+                }, path);
+            });
         } catch (error) {
-            logger.error('ELK layout failed', error);
+            logger.error('Auto layout failed', error);
         }
     };
 
