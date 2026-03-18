@@ -367,7 +367,7 @@ export const DrawnixBoardComponent = () => {
                 }, path);
             });
 
-            edgeRoutes.forEach((points, edgeId) => {
+            edgeRoutes.forEach((route, edgeId) => {
                 const path = [boardInstance.children.findIndex(c => c.id === edgeId)];
                 if (path[0] === -1) {
                     return;
@@ -376,17 +376,16 @@ export const DrawnixBoardComponent = () => {
                 const edgeNode = boardInstance.children[path[0]];
                 Transforms.setNode(boardInstance, {
                     shape: 'curve',
-                    points,
-                    source: edgeNode?.source ? {
-                        ...edgeNode.source,
-                        boundId: undefined,
-                        connection: undefined
-                    } : undefined,
-                    target: edgeNode?.target ? {
-                        ...edgeNode.target,
-                        boundId: undefined,
-                        connection: undefined
-                    } : undefined
+                    points: route.points,
+                    source: {
+                        ...edgeNode?.source,
+                        connection: route.sourceConnection
+                    },
+                    target: {
+                        ...edgeNode?.target,
+                        connection: route.targetConnection
+                    },
+                    texts: edgeNode?.texts ?? []
                 }, path);
             });
         } catch (error) {

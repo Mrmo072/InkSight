@@ -20,7 +20,7 @@ function createEdge(id, sourceId, targetId) {
 }
 
 describe('buildAutoLayoutPlan', () => {
-    it('splits a single-root mind map into left and right branches around the root', () => {
+    it('lays out a single-root mind map as a clean one-sided tree', () => {
         const children = [
             createNode('root', 420, 260),
             createNode('child-a', 140, 120),
@@ -36,17 +36,14 @@ describe('buildAutoLayoutPlan', () => {
         const { nodeRects, edgeRoutes } = buildAutoLayoutPlan(children);
         const rootRect = nodeRects.get('root');
         const childRects = ['child-a', 'child-b', 'child-c'].map((id) => nodeRects.get(id));
-        const leftCount = childRects.filter((rect) => rect.x + rect.width <= rootRect.x).length;
         const rightCount = childRects.filter((rect) => rect.x >= rootRect.x + rootRect.width).length;
-        const leftEdge = ['edge-root-a', 'edge-root-b', 'edge-root-c']
-            .map((id) => edgeRoutes.get(id))
-            .find((points) => points[points.length - 1][0] <= rootRect.x);
+        const outwardEdge = ['edge-root-a', 'edge-root-b', 'edge-root-c']
+            .map((id) => edgeRoutes.get(id)?.points)
+            .find((points) => points[0][0] > rootRect.x + rootRect.width);
 
-        expect(leftCount).toBeGreaterThan(0);
         expect(rightCount).toBeGreaterThan(0);
-        expect(leftEdge).toBeTruthy();
-        expect(leftEdge[0][0]).toBeLessThan(rootRect.x);
-        expect(leftEdge[leftEdge.length - 1][0]).toBeLessThan(rootRect.x);
+        expect(outwardEdge).toBeTruthy();
+        expect(outwardEdge[outwardEdge.length - 1][0]).toBeGreaterThan(rootRect.x + rootRect.width);
     });
 
     it('arranges connected nodes into a readable outward tree and routes tree edges without horizontal backtracking', () => {
@@ -65,15 +62,16 @@ describe('buildAutoLayoutPlan', () => {
         const childARect = nodeRects.get('child-a');
         const childBRect = nodeRects.get('child-b');
         const grandchildRect = nodeRects.get('grandchild');
-        const rootEdge = edgeRoutes.get('edge-root-a');
+        const rootEdge = edgeRoutes.get('edge-root-a').points;
 
-        expect(childARect.x + childARect.width).toBeLessThan(rootRect.x);
+        expect(childARect.x).toBeGreaterThan(rootRect.x + rootRect.width);
         expect(childBRect.x).toBeGreaterThan(rootRect.x + rootRect.width);
         expect(grandchildRect.x).toBeGreaterThan(childBRect.x + childBRect.width);
 
         expect(rootEdge).toHaveLength(4);
-        expect(rootEdge[0][0]).toBeLessThan(rootRect.x);
-        expect(rootEdge[rootEdge.length - 1][0]).toBeGreaterThan(childARect.x + childARect.width);
+        expect(rootEdge[0][0]).toBeGreaterThan(rootRect.x + rootRect.width);
+        expect(rootEdge[1][0]).toBeGreaterThan(rootEdge[0][0]);
+        expect(rootEdge[rootEdge.length - 1][0]).toBeLessThan(childARect.x);
     });
 
     it('pushes non-tree edges to outer lanes so they avoid the node cluster', () => {
@@ -89,7 +87,7 @@ describe('buildAutoLayoutPlan', () => {
         ];
 
         const { nodeRects, edgeRoutes } = buildAutoLayoutPlan(children);
-        const extraEdge = edgeRoutes.get('edge-extra');
+        const extraEdge = edgeRoutes.get('edge-extra').points;
         const bounds = Array.from(nodeRects.values()).reduce((acc, rect) => ({
             top: Math.min(acc.top, rect.y),
             bottom: Math.max(acc.bottom, rect.y + rect.height)
@@ -164,7 +162,7 @@ describe('buildAutoLayoutPlan', () => {
         });
 
         const startYs = ['edge-root-a', 'edge-root-b', 'edge-root-c']
-            .map((id) => edgeRoutes.get(id)[0][1]);
+            .map((id) => edgeRoutes.get(id).points[0][1]);
 
         expect(startYs[0]).toBeLessThan(startYs[1]);
         expect(startYs[1]).toBeLessThan(startYs[2]);

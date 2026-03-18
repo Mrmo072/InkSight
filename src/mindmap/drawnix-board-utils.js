@@ -86,6 +86,14 @@ function getRectBounds(rect) {
     };
 }
 
+function getConnectionRatio(rect, y) {
+    if (!rect.height) {
+        return 0.5;
+    }
+
+    return clamp((y - rect.y) / rect.height, 0, 1);
+}
+
 function getRectCenter(rect) {
     return {
         x: rect.x + rect.width / 2,
@@ -476,13 +484,10 @@ function layoutForest(roots, treeChildren, nodesById) {
 
     roots.forEach((rootId) => {
         const originRoot = buildOriginNode(rootId, treeChildren, nodesById);
-        const shouldUseSplitLayout = roots.length === 1 && (treeChildren.get(rootId) || []).length >= 2;
-        const componentRects = shouldUseSplitLayout
-            ? layoutSingleRootMindmap(rootId, treeChildren, nodesById)
-            : normalizeLayoutRects(
-                GlobalLayout.layout(originRoot, createLayoutOptions(), MindLayoutType.right),
-                nodesById
-            ).rects;
+        const componentRects = normalizeLayoutRects(
+            GlobalLayout.layout(originRoot, createLayoutOptions(), MindLayoutType.right),
+            nodesById
+        ).rects;
         const bounds = getBoundsFromRects(componentRects);
 
         const shiftedRects = translateRects(componentRects, 0, currentTop - bounds.top);
@@ -543,16 +548,20 @@ function getHorizontalConnectionEndpoints(sourceRect, targetRect) {
     return targetIsOnRight
         ? {
             start: [sourceBounds.right, sourceCenterY],
-            end: [targetBounds.left, targetCenterY]
+            end: [targetBounds.left, targetCenterY],
+            sourceAnchor: [1, 0.5],
+            targetAnchor: [0, 0.5]
         }
         : {
             start: [sourceBounds.left, sourceCenterY],
-            end: [targetBounds.right, targetCenterY]
+            end: [targetBounds.right, targetCenterY],
+            sourceAnchor: [0, 0.5],
+            targetAnchor: [1, 0.5]
         };
 }
 
 function routeTreeEdge(sourceRect, targetRect, siblingIndex = 0, siblingCount = 1) {
-    const { start, end } = getHorizontalConnectionEndpoints(sourceRect, targetRect);
+    const { start, end, sourceAnchor, targetAnchor } = getHorizontalConnectionEndpoints(sourceRect, targetRect);
     const sourceSlotY = getClampedPortY(sourceRect, siblingIndex, siblingCount);
     const targetSlotY = getClampedPortY(targetRect, siblingIndex, siblingCount);
     const direction = Math.sign(end[0] - start[0]) || 1;
@@ -563,28 +572,36 @@ function routeTreeEdge(sourceRect, targetRect, siblingIndex = 0, siblingCount = 
     const controlOffset = clamp(horizontalGap * 0.34, 18, maxControlOffset);
     const spreadOffset = (siblingIndex - (siblingCount - 1) / 2) * (PORT_SLOT_SPACING * 0.5);
 
-    return [
-        detachedStart,
-        [detachedStart[0] + direction * controlOffset, sourceSlotY],
-        [detachedEnd[0] - direction * controlOffset, targetSlotY + spreadOffset],
-        detachedEnd
-    ];
+    return {
+        points: [
+            detachedStart,
+            [detachedStart[0] + direction * controlOffset, sourceSlotY],
+            [detachedEnd[0] - direction * controlOffset, targetSlotY + spreadOffset],
+            detachedEnd
+        ],
+        sourceConnection: [sourceAnchor[0], getConnectionRatio(sourceRect, sourceSlotY)],
+        targetConnection: [targetAnchor[0], getConnectionRatio(targetRect, targetSlotY)]
+    };
 }
 
 function routeOuterCurve(sourceRect, targetRect, laneY) {
-    const { start, end } = getHorizontalConnectionEndpoints(sourceRect, targetRect);
+    const { start, end, sourceAnchor, targetAnchor } = getHorizontalConnectionEndpoints(sourceRect, targetRect);
     const direction = Math.sign(end[0] - start[0]) || 1;
     const detachedStart = [start[0] + DETACHED_PORT_OFFSET * direction, start[1]];
     const detachedEnd = [end[0] - DETACHED_PORT_OFFSET * direction, end[1]];
 
-    return [
-        detachedStart,
-        [detachedStart[0] + EXTRA_EDGE_EXIT * direction, detachedStart[1]],
-        [detachedStart[0] + EXTRA_EDGE_EXIT * 1.4 * direction, laneY],
-        [detachedEnd[0] - EXTRA_EDGE_EXIT * 1.4 * direction, laneY],
-        [detachedEnd[0] - EXTRA_EDGE_EXIT * direction, detachedEnd[1]],
-        detachedEnd
-    ];
+    return {
+        points: [
+            detachedStart,
+            [detachedStart[0] + EXTRA_EDGE_EXIT * direction, detachedStart[1]],
+            [detachedStart[0] + EXTRA_EDGE_EXIT * 1.4 * direction, laneY],
+            [detachedEnd[0] - EXTRA_EDGE_EXIT * 1.4 * direction, laneY],
+            [detachedEnd[0] - EXTRA_EDGE_EXIT * direction, detachedEnd[1]],
+            detachedEnd
+        ],
+        sourceConnection: [sourceAnchor[0], getConnectionRatio(sourceRect, start[1])],
+        targetConnection: [targetAnchor[0], getConnectionRatio(targetRect, end[1])]
+    };
 }
 
 function buildChildIndexMap(treeChildren) {
