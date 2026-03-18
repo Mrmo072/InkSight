@@ -1,6 +1,8 @@
 import { parse } from 'marked';
 import { highlightManager } from '../core/highlight-manager.js';
 import { PDFHighlightToolbar } from './pdf-highlight-toolbar.jsx';
+import { getAppContext } from '../app/app-context.js';
+import { registerEventListeners } from '../app/event-listeners.js';
 
 export class TextReader {
     constructor(container) {
@@ -9,6 +11,7 @@ export class TextReader {
         this.content = null;
         this.defaultColor = '#FFE234'; // Default yellow
         this.selectedHighlightId = null;
+        this.cleanupListeners = null;
 
         // Bind handlers
         this.handleMindmapNodeUpdated = (e) => {
@@ -30,8 +33,8 @@ export class TextReader {
 
                 // Find card ID
                 let cardId = null;
-                if (window.inksight && window.inksight.cardSystem) {
-                    const card = Array.from(window.inksight.cardSystem.cards.values()).find(c => c.highlightId === this.selectedHighlightId);
+                if (this.getCardSystem()) {
+                    const card = Array.from(this.getCardSystem().cards.values()).find(c => c.highlightId === this.selectedHighlightId);
                     if (card) cardId = card.id;
                 }
                 this.deleteHighlight(this.selectedHighlightId, cardId);
@@ -40,9 +43,11 @@ export class TextReader {
             }
         };
 
-        window.addEventListener('mindmap-node-updated', this.handleMindmapNodeUpdated);
-        window.addEventListener('card-soft-deleted', this.handleCardDeleted);
-        document.addEventListener('keydown', this.handleKeyDown);
+        this.cleanupListeners = registerEventListeners([
+            { target: window, event: 'mindmap-node-updated', handler: this.handleMindmapNodeUpdated },
+            { target: window, event: 'card-soft-deleted', handler: this.handleCardDeleted },
+            { target: document, event: 'keydown', handler: this.handleKeyDown }
+        ]);
 
         // Initialize Toolbar
         this.toolbar = new PDFHighlightToolbar(container, {
@@ -62,6 +67,10 @@ export class TextReader {
                 }
             }
         });
+    }
+
+    getCardSystem() {
+        return getAppContext().cardSystem;
     }
 
     async load(fileData) {
@@ -236,8 +245,8 @@ export class TextReader {
     handleHighlightClick(e, highlightId) {
         this.selectedHighlightId = highlightId;
         let cardId = null;
-        if (window.inksight && window.inksight.cardSystem) {
-            const card = Array.from(window.inksight.cardSystem.cards.values()).find(c => c.highlightId === highlightId);
+        if (this.getCardSystem()) {
+            const card = Array.from(this.getCardSystem().cards.values()).find(c => c.highlightId === highlightId);
             if (card) cardId = card.id;
         }
 
@@ -266,8 +275,8 @@ export class TextReader {
 
         this.removeVisualHighlight(highlightId);
 
-        if (cardId && window.inksight && window.inksight.cardSystem) {
-            window.inksight.cardSystem.removeCard(cardId);
+        if (cardId && this.getCardSystem()) {
+            this.getCardSystem().removeCard(cardId);
         } else {
             highlightManager.removeHighlight(highlightId);
         }
@@ -378,9 +387,8 @@ export class TextReader {
     }
 
     destroy() {
-        window.removeEventListener('mindmap-node-updated', this.handleMindmapNodeUpdated);
-        window.removeEventListener('card-soft-deleted', this.handleCardDeleted);
-        document.removeEventListener('keydown', this.handleKeyDown);
+        this.cleanupListeners?.();
+        this.cleanupListeners = null;
         if (this.toolbar) this.toolbar.hide();
         this.container.innerHTML = '';
         this.onPageChange = null;

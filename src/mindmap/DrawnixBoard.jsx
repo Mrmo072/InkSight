@@ -3,6 +3,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { Drawnix } from '@drawnix/drawnix';
 import ELK from 'elkjs/lib/elk.bundled.js';
 import { Transforms, PlaitBoard, getSelectedElements, BoardTransforms, toViewBoxPoint, toHostPoint } from '@plait/core';
+import { setAppService } from '../app/app-context.js';
+import { registerEventListeners } from '../app/event-listeners.js';
 import { cardSystem } from '../core/card-system.js';
 import { themeManager } from '../core/theme-manager.js';
 import {
@@ -209,10 +211,6 @@ export const DrawnixBoardComponent = () => {
             insertCardIntoBoard(e.detail);
         };
 
-        window.addEventListener('drop', globalDropHandler, true);
-        window.addEventListener('dragover', globalDragOverHandler, true);
-        window.addEventListener('add-card-to-board', handleAddCardToBoard);
-
         const handleCardSoftDeleted = (e) => {
             const { id } = e.detail;
 
@@ -241,15 +239,16 @@ export const DrawnixBoardComponent = () => {
             }
         };
 
-        window.addEventListener('card-soft-deleted', handleCardSoftDeleted);
-        window.addEventListener('card-restored', handleCardRestored);
+        const cleanupListeners = registerEventListeners([
+            { target: window, event: 'drop', handler: globalDropHandler, options: true },
+            { target: window, event: 'dragover', handler: globalDragOverHandler, options: true },
+            { target: window, event: 'add-card-to-board', handler: handleAddCardToBoard },
+            { target: window, event: 'card-soft-deleted', handler: handleCardSoftDeleted },
+            { target: window, event: 'card-restored', handler: handleCardRestored }
+        ]);
 
         return () => {
-            window.removeEventListener('card-soft-deleted', handleCardSoftDeleted);
-            window.removeEventListener('card-restored', handleCardRestored);
-            window.removeEventListener('drop', globalDropHandler, true);
-            window.removeEventListener('dragover', globalDragOverHandler, true);
-            window.removeEventListener('add-card-to-board', handleAddCardToBoard);
+            cleanupListeners();
         };
     }, [board]);
 
@@ -328,8 +327,6 @@ export const DrawnixBoardComponent = () => {
             }
         };
 
-        window.addEventListener('highlight-selected', handleHighlightSelected);
-
         const handleHighlightUpdated = (e) => {
             const { id, color } = e.detail;
 
@@ -349,11 +346,13 @@ export const DrawnixBoardComponent = () => {
                 }
             }
         };
-        window.addEventListener('highlight-updated', handleHighlightUpdated);
+        const cleanupListeners = registerEventListeners([
+            { target: window, event: 'highlight-selected', handler: handleHighlightSelected },
+            { target: window, event: 'highlight-updated', handler: handleHighlightUpdated }
+        ]);
 
         return () => {
-            window.removeEventListener('highlight-selected', handleHighlightSelected);
-            window.removeEventListener('highlight-updated', handleHighlightUpdated);
+            cleanupListeners();
         };
     }, [board]);
 
@@ -428,9 +427,7 @@ export const DrawnixBoardComponent = () => {
     const handleBoardInit = (b) => {
         setBoard(b);
         boardRef.current = b; // Store ref for callbacks
-        if (window.inksight) {
-            window.inksight.board = b;
-        }
+        setAppService('board', b);
 
         // Signal that board is ready for restoring data
         console.log('[DrawnixBoard] Board initialized and ready');
@@ -438,7 +435,7 @@ export const DrawnixBoardComponent = () => {
 
         // Add click listener for jump-to-source
         const container = PlaitBoard.getBoardContainer(b);
-        container.addEventListener('click', (e) => {
+        const handleBoardClick = () => {
             const selection = b.selection;
             if (selection && selection.anchor && selection.focus) {
                 const selectedElements = getSelectedElements(b);
@@ -459,7 +456,11 @@ export const DrawnixBoardComponent = () => {
                     }
                 }
             }
-        });
+        };
+        container.addEventListener('click', handleBoardClick);
+        b.__inksightCleanup = () => {
+            container.removeEventListener('click', handleBoardClick);
+        };
 
 
         // Expose auto-layout function globally
@@ -533,8 +534,16 @@ export const DrawnixBoardComponent = () => {
                 }
             }
         };
-        window.addEventListener('restore-board-state', handleRestore);
-        return () => window.removeEventListener('restore-board-state', handleRestore);
+        const cleanupListeners = registerEventListeners([
+            { target: window, event: 'restore-board-state', handler: handleRestore }
+        ]);
+        return () => cleanupListeners();
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            boardRef.current?.__inksightCleanup?.();
+        };
     }, []);
 
     return (

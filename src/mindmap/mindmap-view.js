@@ -1,10 +1,12 @@
 import { cardSystem } from '../core/card-system.js';
 import { modalManager } from '../ui/modal-manager.js';
+import { registerEventListeners } from '../app/event-listeners.js';
 
 export class MindmapView {
     constructor(container) {
         this.container = container;
         this.cards = new Map(); // id -> element
+        this.cleanupListeners = [];
 
         // SVG Layer for connections
         this.svgLayer = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -25,26 +27,26 @@ export class MindmapView {
         this.isDragging = false;
         this.dragStartTime = 0;
 
-        window.addEventListener('card-removed', (e) => {
+        this.handleCardRemoved = (e) => {
             const cardId = typeof e.detail === 'object' ? e.detail.id : e.detail;
             this.removeCardElement(cardId);
-        });
+        };
 
-        window.addEventListener('connections-updated', () => {
+        this.handleConnectionsUpdated = () => {
             this.renderConnections();
-        });
+        };
 
         // Render existing cards
         cardSystem.getCards().forEach(card => this.renderCard(card));
         this.renderConnections();
 
         // Listen for card-added event
-        window.addEventListener('card-added', (e) => {
+        this.handleCardAdded = (e) => {
             this.renderCard(e.detail);
-        });
+        };
 
         // Listen for cards-restored event
-        window.addEventListener('cards-restored', (e) => {
+        this.handleCardsRestored = (e) => {
             // Clear existing cards from DOM
             this.cards.forEach(el => el.remove());
             this.cards.clear();
@@ -52,18 +54,35 @@ export class MindmapView {
             // Render all restored cards
             e.detail.cards.forEach(card => this.renderCard(card));
             this.renderConnections();
-        });
+        };
+
+        this.cleanupListeners.push(registerEventListeners([
+            { target: window, event: 'card-removed', handler: this.handleCardRemoved },
+            { target: window, event: 'connections-updated', handler: this.handleConnectionsUpdated },
+            { target: window, event: 'card-added', handler: this.handleCardAdded },
+            { target: window, event: 'cards-restored', handler: this.handleCardsRestored }
+        ]));
     }
 
     setupListeners() {
         // Setup global mouse event listeners for dragging
-        this.container.addEventListener('mousemove', (e) => this.onMouseMove(e));
-        this.container.addEventListener('mouseup', () => this.onMouseUp());
+        this.handleMouseMove = (e) => this.onMouseMove(e);
+        this.handleMouseUp = () => this.onMouseUp();
+        this.container.addEventListener('mousemove', this.handleMouseMove);
+        this.container.addEventListener('mouseup', this.handleMouseUp);
+        this.cleanupListeners.push(() => {
+            this.container.removeEventListener('mousemove', this.handleMouseMove);
+            this.container.removeEventListener('mouseup', this.handleMouseUp);
+        });
 
         // Layout button
         const layoutBtn = document.getElementById('layout-btn');
         if (layoutBtn) {
-            layoutBtn.addEventListener('click', () => this.autoLayout());
+            this.handleLayoutClick = () => this.autoLayout();
+            layoutBtn.addEventListener('click', this.handleLayoutClick);
+            this.cleanupListeners.push(() => {
+                layoutBtn.removeEventListener('click', this.handleLayoutClick);
+            });
         }
     }
 
@@ -248,6 +267,14 @@ export class MindmapView {
             cardEl.remove();
             this.cards.delete(id);
         }
+    }
+
+    destroy() {
+        this.cleanupListeners.forEach((cleanup) => cleanup());
+        this.cleanupListeners = [];
+        this.cards.forEach((cardEl) => cardEl.remove());
+        this.cards.clear();
+        this.svgLayer?.remove();
     }
 
     startConnection(sourceId, e) {

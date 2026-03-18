@@ -2,6 +2,8 @@ import ePub from 'epubjs';
 import { highlightManager } from '../core/highlight-manager.js';
 import { cardSystem } from '../core/card-system.js';
 import { PDFHighlightToolbar } from './pdf-highlight-toolbar.jsx';
+import { getAppContext } from '../app/app-context.js';
+import { registerEventListeners } from '../app/event-listeners.js';
 
 export class EpubReader {
     constructor(container) {
@@ -16,6 +18,7 @@ export class EpubReader {
         this.isDeleting = false; // Flag to suppress selection events during deletion
         this.deletedHighlightIds = new Set(); // Track deleted highlight IDs
         this.deletedCFIs = new Set(); // Track deleted CFIs to prevent re-creation with new IDs
+        this.cleanupListeners = null;
 
         this.toolbar = new PDFHighlightToolbar(container, {
             onDeleteHighlight: (highlightId, cardId) => {
@@ -60,16 +63,22 @@ export class EpubReader {
                 e.preventDefault(); // Prevent browser back/navigation
 
                 // Find card ID for the selected highlight
-                const card = Array.from(cardSystem.cards.values()).find(c => c.highlightId === this.selectedHighlightId);
+                const card = Array.from(this.getCardSystem().cards.values()).find(c => c.highlightId === this.selectedHighlightId);
                 this.deleteHighlight(this.selectedHighlightId, card ? card.id : null);
                 this.selectedHighlightId = null;
                 this.toolbar.hide();
             }
         };
 
-        window.addEventListener('mindmap-node-updated', this.handleMindmapNodeUpdated);
-        window.addEventListener('card-soft-deleted', this.handleCardDeleted);
-        document.addEventListener('keydown', this.handleKeyDown);
+        this.cleanupListeners = registerEventListeners([
+            { target: window, event: 'mindmap-node-updated', handler: this.handleMindmapNodeUpdated },
+            { target: window, event: 'card-soft-deleted', handler: this.handleCardDeleted },
+            { target: document, event: 'keydown', handler: this.handleKeyDown }
+        ]);
+    }
+
+    getCardSystem() {
+        return getAppContext().cardSystem || cardSystem;
     }
 
     async load(fileData) {
@@ -129,7 +138,7 @@ export class EpubReader {
                             e.preventDefault(); // Prevent browser back/navigation
 
                             // Find card ID
-                            const card = Array.from(cardSystem.cards.values()).find(c => c.highlightId === this.selectedHighlightId);
+                            const card = Array.from(this.getCardSystem().cards.values()).find(c => c.highlightId === this.selectedHighlightId);
                             this.deleteHighlight(this.selectedHighlightId, card ? card.id : null);
                             this.selectedHighlightId = null;
                             this.toolbar.hide();
@@ -249,7 +258,7 @@ export class EpubReader {
             this.selectedHighlightId = highlightId;
 
             // Find card
-            const card = Array.from(cardSystem.cards.values()).find(c => c.highlightId === highlightId);
+            const card = Array.from(this.getCardSystem().cards.values()).find(c => c.highlightId === highlightId);
 
 
             // Show toolbar
@@ -347,9 +356,9 @@ export class EpubReader {
 
         this.removeVisualHighlight(highlightId);
 
-        if (cardId && cardSystem) {
+        if (cardId && this.getCardSystem()) {
 
-            cardSystem.removeCard(cardId);
+            this.getCardSystem().removeCard(cardId);
         } else if (highlightManager) {
 
             highlightManager.removeHighlight(highlightId);
@@ -432,9 +441,8 @@ export class EpubReader {
     }
 
     destroy() {
-        window.removeEventListener('mindmap-node-updated', this.handleMindmapNodeUpdated);
-        window.removeEventListener('card-soft-deleted', this.handleCardDeleted);
-        document.removeEventListener('keydown', this.handleKeyDown);
+        this.cleanupListeners?.();
+        this.cleanupListeners = null;
         if (this.toolbar) {
             this.toolbar.hide();
         }

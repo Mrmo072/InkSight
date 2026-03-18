@@ -1,4 +1,5 @@
 import { getAppContext } from './app-context.js';
+import { registerEventListeners } from './event-listeners.js';
 
 export function setupSelectionSync({
     findCardById,
@@ -44,22 +45,34 @@ export function setupSelectionSync({
         }
     };
 
-    window.addEventListener('jump-to-source', (e) => {
-        const { highlightId, cardId } = e.detail;
-        handleSelectionSync(cardId || highlightId, 'mindmap');
-    });
-
-    window.addEventListener('annotation-selected', (e) => {
-        handleSelectionSync(e.detail.cardId, 'annotation');
-        if (isCompactLayout()) {
-            collapseNotesPanel();
+    return registerEventListeners([
+        {
+            target: window,
+            event: 'jump-to-source',
+            handler: (e) => {
+                const { highlightId, cardId } = e.detail;
+                handleSelectionSync(cardId || highlightId, 'mindmap');
+            }
+        },
+        {
+            target: window,
+            event: 'annotation-selected',
+            handler: (e) => {
+                handleSelectionSync(e.detail.cardId, 'annotation');
+                if (isCompactLayout()) {
+                    collapseNotesPanel();
+                }
+            }
+        },
+        {
+            target: window,
+            event: 'highlight-clicked',
+            handler: (e) => {
+                handleSelectionSync(e.detail.highlightId, 'highlight');
+                if (isCompactLayout()) {
+                    collapseNotesPanel();
+                }
+            }
         }
-    });
-
-    window.addEventListener('highlight-clicked', (e) => {
-        handleSelectionSync(e.detail.highlightId, 'highlight');
-        if (isCompactLayout()) {
-            collapseNotesPanel();
-        }
-    });
+    ]);
 }

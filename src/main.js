@@ -9,6 +9,7 @@ import { suppressResizeObserverLoop } from './drawnix/react-board/src/utils/resi
 import { documentHistoryManager } from './core/document-history-manager.js'; // Import History Manager
 import { getAppContext, initAppContext, setAppService, updateCurrentBook } from './app/app-context.js';
 import { createReaderLoader } from './app/reader-loader.js';
+import { registerEventListeners } from './app/event-listeners.js';
 import { setupSelectionSync } from './app/selection-sync.js';
 
 suppressResizeObserverLoop();
@@ -56,6 +57,14 @@ let outlineSidebar = null;
 let annotationList = null;
 let currentToolMode = 'pan';
 let readerLoader = null;
+const appCleanupCallbacks = [];
+
+function registerCleanup(cleanup) {
+    if (typeof cleanup === 'function') {
+        appCleanupCallbacks.push(cleanup);
+    }
+    return cleanup;
+}
 
 function getCardsCollection() {
     const cards = getAppContext().cardSystem?.cards;
@@ -132,13 +141,18 @@ function resetAuxiliaryPanels() {
 }
 
 function setupResponsiveLayout() {
-    elements.panelBackdrop?.addEventListener('click', () => {
-        closeCompactPanels();
-    });
-
-    window.addEventListener('layout-panel-toggled', updatePanelControls);
-    window.addEventListener('outline-visibility-changed', updatePanelControls);
-    window.addEventListener('resize', updatePanelControls);
+    registerCleanup(registerEventListeners([
+        {
+            target: elements.panelBackdrop,
+            event: 'click',
+            handler: () => {
+                closeCompactPanels();
+            }
+        },
+        { target: window, event: 'layout-panel-toggled', handler: updatePanelControls },
+        { target: window, event: 'outline-visibility-changed', handler: updatePanelControls },
+        { target: window, event: 'resize', handler: updatePanelControls }
+    ].filter(({ target }) => target)));
 
     updatePanelControls();
 }
@@ -181,13 +195,19 @@ function init() {
         setupResponsiveLayout();
 
         // Listen for live page restore events (from History Manager recovery)
-        window.addEventListener('restore-page-position', (e) => {
-            const page = e.detail.page;
-            if (page && currentReader && page > 1) {
-                console.log('[Main] Received restore-page-position event. Jumping to:', page);
-                currentReader.scrollToPage(page);
+        registerCleanup(registerEventListeners([
+            {
+                target: window,
+                event: 'restore-page-position',
+                handler: (e) => {
+                    const page = e.detail.page;
+                    if (page && currentReader && page > 1) {
+                        console.log('[Main] Received restore-page-position event. Jumping to:', page);
+                        currentReader.scrollToPage(page);
+                    }
+                }
             }
-        });
+        ]));
 
     } catch (e) {
         console.error('Error opening file:', e);
@@ -201,44 +221,64 @@ function setupLayoutToggles() {
     const annotationListContainer = document.getElementById('annotation-list');
 
     if (toggleAnnotationsBtn && annotationListContainer) {
-        toggleAnnotationsBtn.addEventListener('click', () => {
-            const isCollapsed = annotationListContainer.classList.toggle('collapsed');
-            toggleAnnotationsBtn.classList.toggle('active', !isCollapsed);
-        });
+        registerCleanup(registerEventListeners([
+            {
+                target: toggleAnnotationsBtn,
+                event: 'click',
+                handler: () => {
+                    const isCollapsed = annotationListContainer.classList.toggle('collapsed');
+                    toggleAnnotationsBtn.classList.toggle('active', !isCollapsed);
+                }
+            }
+        ]));
     }
 
     // Sidebar Toggles (Existing)
     if (elements.toggleSidebarBtn) {
-        elements.toggleSidebarBtn.addEventListener('click', () => {
-            if (splitView) splitView.toggleLeft();
-        });
+        registerCleanup(registerEventListeners([
+            {
+                target: elements.toggleSidebarBtn,
+                event: 'click',
+                handler: () => {
+                    if (splitView) splitView.toggleLeft();
+                }
+            }
+        ]));
     }
 
     if (elements.toggleNotesBtn) {
-        elements.toggleNotesBtn.addEventListener('click', () => {
-            if (splitView) splitView.toggleRight();
-        });
+        registerCleanup(registerEventListeners([
+            {
+                target: elements.toggleNotesBtn,
+                event: 'click',
+                handler: () => {
+                    if (splitView) splitView.toggleRight();
+                }
+            }
+        ]));
     }
 }
 
 
 function setupEventListeners() {
     // File Import
-    elements.fileInput.addEventListener('change', handleFileSelect);
-
-    // Navigation
-    elements.prevBtn.addEventListener('click', () => currentReader?.onPrevPage());
-    elements.nextBtn.addEventListener('click', () => currentReader?.onNextPage());
-
-    // Backlinks
-    window.addEventListener('jump-to-source', (e) => {
-        const { sourceId, highlightId } = e.detail;
-        handleJumpToSource(sourceId, highlightId);
-        closeCompactPanels();
-    });
+    registerCleanup(registerEventListeners([
+        { target: elements.fileInput, event: 'change', handler: handleFileSelect },
+        { target: elements.prevBtn, event: 'click', handler: () => currentReader?.onPrevPage() },
+        { target: elements.nextBtn, event: 'click', handler: () => currentReader?.onNextPage() },
+        {
+            target: window,
+            event: 'jump-to-source',
+            handler: (e) => {
+                const { sourceId, highlightId } = e.detail;
+                handleJumpToSource(sourceId, highlightId);
+                closeCompactPanels();
+            }
+        }
+    ].filter(({ target }) => target)));
 
     const highlighterPanel = document.getElementById('highlighter-panel');
-    setupSelectionSync({
+    registerCleanup(setupSelectionSync({
         findCardById,
         findCardByHighlightId,
         isCompactLayout,
@@ -246,7 +286,7 @@ function setupEventListeners() {
             splitView?.setRightCollapsed(true);
             updatePanelControls();
         }
-    });
+    }));
 
     // Layout Toggles moved to setupLayoutToggles()
 
@@ -309,37 +349,29 @@ function setupEventListeners() {
     setAppService('setToolMode', (mode, options = {}) => setActiveMode(mode, options));
     setAppService('syncToolMode', (mode) => syncModeButtons(mode));
 
-    if (panModeBtn) {
-        panModeBtn.addEventListener('click', () => setActiveMode('pan'));
-    }
-
-    if (textModeBtn) {
-        textModeBtn.addEventListener('click', () => setActiveMode('text'));
-    }
-
-    if (rectModeBtn) {
-        rectModeBtn.addEventListener('click', () => setActiveMode('rectangle'));
-    }
-
-    if (ellipseModeBtn) {
-        ellipseModeBtn.addEventListener('click', () => setActiveMode('ellipse'));
-    }
-
-    if (highlighterModeBtn && highlighterPanel) {
-        highlighterModeBtn.addEventListener('click', () => {
-            // Toggle panel if already active (for mobile/tablet where no hover)
-            if (highlighterModeBtn.classList.contains('active')) {
-                const isVisible = highlighterPanel.classList.contains('visible');
-                if (isVisible) {
-                    highlighterPanel.classList.remove('visible');
+    registerCleanup(registerEventListeners([
+        panModeBtn && { target: panModeBtn, event: 'click', handler: () => setActiveMode('pan') },
+        textModeBtn && { target: textModeBtn, event: 'click', handler: () => setActiveMode('text') },
+        rectModeBtn && { target: rectModeBtn, event: 'click', handler: () => setActiveMode('rectangle') },
+        ellipseModeBtn && { target: ellipseModeBtn, event: 'click', handler: () => setActiveMode('ellipse') },
+        highlighterModeBtn && highlighterPanel && {
+            target: highlighterModeBtn,
+            event: 'click',
+            handler: () => {
+                // Toggle panel if already active (for mobile/tablet where no hover)
+                if (highlighterModeBtn.classList.contains('active')) {
+                    const isVisible = highlighterPanel.classList.contains('visible');
+                    if (isVisible) {
+                        highlighterPanel.classList.remove('visible');
+                    } else {
+                        positionHighlighterPanel();
+                    }
                 } else {
-                    positionHighlighterPanel();
+                    setActiveMode('highlighter', { showHighlighterPanel: isCoarsePointer() });
                 }
-            } else {
-                setActiveMode('highlighter', { showHighlighterPanel: isCoarsePointer() });
             }
-        });
-    }
+        }
+    ].filter(Boolean)));
 
     // Highlighter Height Control Panel
     const heightSlider = document.getElementById('highlighter-height');
@@ -349,12 +381,6 @@ function setupEventListeners() {
         let startY = 0;
         let startHeight = 16;
         let clickThreshold = 5;
-
-        highlighterModeBtn.addEventListener('mouseenter', () => {
-            if (highlighterModeBtn.classList.contains('active') && !isCoarsePointer()) {
-                positionHighlighterPanel();
-            }
-        });
 
         const startDrag = (y) => {
             isDragging = false;
@@ -379,11 +405,17 @@ function setupEventListeners() {
             }
         };
 
-        highlighterModeBtn.addEventListener('mousedown', (e) => {
-            startDrag(e.clientY);
-            document.addEventListener('mousemove', onMouseMove);
-            document.addEventListener('mouseup', onMouseUp);
-        });
+        const cleanupPointerDrag = registerEventListeners([
+            {
+                target: highlighterModeBtn,
+                event: 'mouseenter',
+                handler: () => {
+                    if (highlighterModeBtn.classList.contains('active') && !isCoarsePointer()) {
+                        positionHighlighterPanel();
+                    }
+                }
+            }
+        ]);
 
         const onMouseMove = (e) => {
             onMove(e.clientY);
@@ -395,42 +427,77 @@ function setupEventListeners() {
         };
 
         const onMouseUp = () => {
-            document.removeEventListener('mousemove', onMouseMove);
-            document.removeEventListener('mouseup', onMouseUp);
+            pointerCleanup?.();
+            pointerCleanup = null;
         };
 
         const onTouchEnd = () => {
-            document.removeEventListener('touchmove', onTouchMove);
-            document.removeEventListener('touchend', onTouchEnd);
+            pointerCleanup?.();
+            pointerCleanup = null;
         };
 
+        let pointerCleanup = null;
+        const handleMouseDown = (e) => {
+            startDrag(e.clientY);
+            pointerCleanup?.();
+            pointerCleanup = registerEventListeners([
+                { target: document, event: 'mousemove', handler: onMouseMove },
+                { target: document, event: 'mouseup', handler: onMouseUp }
+            ]);
+        };
+        registerCleanup(() => pointerCleanup?.());
+
         if (heightSlider) {
-            heightSlider.addEventListener('input', (e) => {
-                const newHeight = parseInt(e.target.value);
-                if (currentReader && currentReader.highlighterTool) {
-                    currentReader.highlighterTool.setHeight(newHeight);
+            registerCleanup(registerEventListeners([
+                {
+                    target: heightSlider,
+                    event: 'input',
+                    handler: (e) => {
+                        const newHeight = parseInt(e.target.value);
+                        if (currentReader && currentReader.highlighterTool) {
+                            currentReader.highlighterTool.setHeight(newHeight);
+                        }
+                    }
                 }
-            });
+            ]));
         }
 
-        document.addEventListener('click', (e) => {
-            const clickedInsideButton = highlighterModeBtn.contains(e.target);
-            if (!highlighterPanel.contains(e.target) && !clickedInsideButton) {
-                highlighterPanel.classList.remove('visible');
-            }
+        registerCleanup(() => {
+            cleanupPointerDrag();
+            pointerCleanup?.();
         });
+
+        registerCleanup(registerEventListeners([
+            { target: highlighterModeBtn, event: 'mousedown', handler: handleMouseDown },
+            {
+                target: document,
+                event: 'click',
+                handler: (e) => {
+                    const clickedInsideButton = highlighterModeBtn.contains(e.target);
+                    if (!highlighterPanel.contains(e.target) && !clickedInsideButton) {
+                        highlighterPanel.classList.remove('visible');
+                    }
+                }
+            }
+        ]));
     }
 
     // Auto-layout button
     const layoutBtn = document.getElementById('layout-btn');
     if (layoutBtn) {
-        layoutBtn.addEventListener('click', () => {
-            if (window.applyAutoLayout) {
-                window.applyAutoLayout();
-            } else {
-                console.warn('Auto-layout function not available yet');
+        registerCleanup(registerEventListeners([
+            {
+                target: layoutBtn,
+                event: 'click',
+                handler: () => {
+                    if (window.applyAutoLayout) {
+                        window.applyAutoLayout();
+                    } else {
+                        console.warn('Auto-layout function not available yet');
+                    }
+                }
             }
-        });
+        ]));
     }
 }
 

@@ -1,8 +1,12 @@
+import { getAppContext } from '../app/app-context.js';
+import { registerEventListeners } from '../app/event-listeners.js';
+
 export class AnnotationList {
     constructor(containerId, cardSystem) {
         this.container = document.getElementById(containerId);
         this.cardSystem = cardSystem;
         this.activeCardId = null;
+        this.cleanupListeners = null;
 
         this.init();
     }
@@ -10,23 +14,24 @@ export class AnnotationList {
     init() {
         if (!this.container) return;
 
-        // Global Event Listeners for Sync
-        window.addEventListener('highlight-clicked', (e) => this.handleHighlightSelection(e.detail.highlightId));
-        window.addEventListener('highlight-updated', (e) => this.handleHighlightUpdate(e.detail));
-        window.addEventListener('highlight-removed', (e) => this.removeCard(e.detail)); // Highlight ID
-        window.addEventListener('card-added', () => this.refresh());
-        window.addEventListener('card-updated', () => this.refresh()); // Or granular update
-        window.addEventListener('card-removed', () => this.refresh());
-        window.addEventListener('card-soft-deleted', () => this.refresh()); // Sync with Mindmap deletions
-        window.addEventListener('cards-restored', () => this.refresh()); // Auto-Restore Sync
-
-        // Listen for internal active card changes (from CardSystem or Drawnix)
-        window.addEventListener('card-selected', (e) => {
+        this.handleHighlightClicked = (e) => this.handleHighlightSelection(e.detail.highlightId);
+        this.handleRefreshRequested = () => this.refresh();
+        this.handleCardSelected = (e) => {
             const cardId = e.detail;
-            // Find highlight ID from card? Hard without map, but we can match by ID if same or look up
-            // For now, refresh selection visual
             this.highlightItem(cardId);
-        });
+        };
+
+        this.cleanupListeners = registerEventListeners([
+            { target: window, event: 'highlight-clicked', handler: this.handleHighlightClicked },
+            { target: window, event: 'highlight-updated', handler: (e) => this.handleHighlightUpdate(e.detail) },
+            { target: window, event: 'highlight-removed', handler: (e) => this.removeCard(e.detail) },
+            { target: window, event: 'card-added', handler: this.handleRefreshRequested },
+            { target: window, event: 'card-updated', handler: this.handleRefreshRequested },
+            { target: window, event: 'card-removed', handler: this.handleRefreshRequested },
+            { target: window, event: 'card-soft-deleted', handler: this.handleRefreshRequested },
+            { target: window, event: 'cards-restored', handler: this.handleRefreshRequested },
+            { target: window, event: 'card-selected', handler: this.handleCardSelected }
+        ]);
     }
 
     load(fileId) {
@@ -103,7 +108,7 @@ export class AnnotationList {
     }
 
     getHighlightMap() {
-        const highlights = window.inksight?.highlightManager?.highlights;
+        const highlights = getAppContext().highlightManager?.highlights;
         if (!Array.isArray(highlights)) {
             return new Map();
         }
@@ -312,5 +317,10 @@ export class AnnotationList {
         // But we can optimistically remove from DOM
         const item = this.container.querySelector(`[data-highlight-id="${highlightId}"]`);
         if (item) item.remove();
+    }
+
+    destroy() {
+        this.cleanupListeners?.();
+        this.cleanupListeners = null;
     }
 }
