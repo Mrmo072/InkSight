@@ -1,10 +1,24 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import { highlightManager } from '../core/highlight-manager.js';
-import { cardSystem } from '../core/card-system.js';
 import { PDFHighlightToolbar } from './pdf-highlight-toolbar.jsx';
 import { PDFAreaSelector } from './pdf-area-selector.js';
 import { PDFHighlightRenderer } from './pdf-highlight-renderer.js';
 import { PDFHighlighterTool } from './pdf-highlighter-tool.js';
+import { getAppContext, setAppService, updateCurrentBook } from '../app/app-context.js';
+import {
+    registerPdfReaderGlobalListeners,
+    setupPdfPanHandling,
+    setupPdfZoomHandling
+} from './pdf-reader-events.js';
+import {
+    applyHighlightColorToElements,
+    collectSelectionRects,
+    createPageWrapper,
+    findHighlightById,
+    getNearestPageNumber,
+    resolveDestinationPageNumber,
+    syncDefaultHighlightColor
+} from './pdf-reader-utils.js';
 
 // Set worker source
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -36,6 +50,17 @@ export class PDFReader {
         this.selectionMode = PDFReader.currentSelectionMode; // Initialize from static state
         this.fileId = null;
         this.initialScrollTimeout = null;
+        this.cleanupCallbacks = [];
+        this.boundDetectCurrentPage = this.detectCurrentPage.bind(this);
+        this.handleScrollTick = () => {
+            if (!this.scrollTicking) {
+                window.requestAnimationFrame(() => {
+                    this.detectCurrentPage();
+                    this.scrollTicking = false;
+                });
+                this.scrollTicking = true;
+            }
+        };
 
         // Initialize modules
         this.highlightRenderer = new PDFHighlightRenderer(container, this.pages, this.fileId);
@@ -67,11 +92,27 @@ export class PDFReader {
         });
 
         this.initObserver();
+        this.initEventHandlers();
 
-        // Bind handlers for cleanup
+        this.cleanupCallbacks.push(registerPdfReaderGlobalListeners(this));
+
+        // Initialize selection mode and colors
+        this.setSelectionMode(this.selectionMode);
+
+        this.cleanupCallbacks.push(setupPdfZoomHandling(
+            this.container,
+            () => this.scale,
+            (newScale) => this.setScale(newScale)
+        ));
+        this.cleanupCallbacks.push(setupPdfPanHandling(
+            this.container,
+            () => this.selectionMode
+        ));
+    }
+
+    initEventHandlers() {
         this.handleCardSoftDeleted = (e) => {
             const { highlightId } = e.detail;
-
             if (highlightId) {
                 this.removeHighlightOverlays(highlightId);
             }
@@ -79,27 +120,19 @@ export class PDFReader {
 
         this.handleCardRestored = (e) => {
             const { highlightId } = e.detail;
+            const highlight = findHighlightById(getAppContext().highlightManager?.highlights, highlightId);
+            if (!highlight) return;
 
-            if (highlightId && window.inksight && window.inksight.highlightManager) {
-                const highlight = window.inksight.highlightManager.highlights.find(h => h.id === highlightId);
-                if (highlight) {
-                    const pageInfo = this.pages[highlight.location.page - 1];
-                    if (pageInfo && pageInfo.rendered) {
-                        // Remove existing overlays first (defensive)
-                        this.removeHighlightOverlays(highlightId);
-                        // Re-render highlights for this page
-                        this.renderHighlightsForPage(highlight.location.page, window.inksight.highlightManager.highlights);
-                    }
-                }
+            const pageInfo = this.pages[highlight.location.page - 1];
+            if (pageInfo?.rendered) {
+                this.removeHighlightOverlays(highlightId);
+                this.renderHighlightsForPage(highlight.location.page, getAppContext().highlightManager.highlights);
             }
         };
 
         this.handleHighlightsRestored = (e) => {
             const highlights = e.detail.highlights;
-
-
-            // Re-render highlights for all rendered pages
-            this.pages.forEach(pageInfo => {
+            this.pages.forEach((pageInfo) => {
                 if (pageInfo.rendered) {
                     this.renderHighlightsForPage(pageInfo.num, highlights);
                 }
@@ -108,7 +141,6 @@ export class PDFReader {
 
         this.handleMindmapNodeUpdated = (e) => {
             const { highlightId, color } = e.detail;
-
             this.updateHighlightColor(highlightId, color);
         };
 
@@ -117,138 +149,23 @@ export class PDFReader {
             if (this.highlighterTool) {
                 this.highlighterTool.removeHighlight(highlightId);
             }
-            // Also remove from renderer if needed (though renderer usually re-renders on page change)
             this.highlightRenderer.removeHighlightOverlays(highlightId);
         };
 
         this.handleKeyDown = (e) => {
-            // console.log('[PDFReader] Keydown:', e.key); // Reduced logging
+            if (e.key !== 'Delete' && e.key !== 'Backspace') return;
 
-            if ((e.key === 'Delete' || e.key === 'Backspace')) {
-                const selectedHighlightId = this.toolbar.getSelectedHighlightId();
-                if (selectedHighlightId) {
-                    // Check if we are not in an input field
-                    const activeTag = document.activeElement.tagName;
-                    const isContentEditable = document.activeElement.isContentEditable;
+            const selectedHighlightId = this.toolbar.getSelectedHighlightId();
+            if (!selectedHighlightId) return;
 
-                    if (activeTag !== 'INPUT' && activeTag !== 'TEXTAREA' && !isContentEditable) {
-                        // console.log('[PDFReader] Deleting highlight via key:', selectedHighlightId);
-                        e.preventDefault(); // Prevent browser back navigation or other default actions
-                        this.deleteHighlight(selectedHighlightId, this.toolbar.getSelectedCardId());
-                        this.hideToolbar();
-                    }
-                }
-            }
-        };
-
-        // Listen for card soft deletion to hide highlights
-        window.addEventListener('card-soft-deleted', this.handleCardSoftDeleted);
-
-        // Listen for card restoration to show highlights
-        window.addEventListener('card-restored', this.handleCardRestored);
-
-        // Listen for highlights restored
-        window.addEventListener('highlights-restored', this.handleHighlightsRestored);
-
-        // Listen for Mind Map node updates (color sync)
-        window.addEventListener('mindmap-node-updated', this.handleMindmapNodeUpdated);
-
-        // Global keydown listener for delete
-        document.addEventListener('keydown', this.handleKeyDown);
-
-        // Initialize selection mode and colors
-        this.setSelectionMode(this.selectionMode);
-
-        this.setupZoomHandling();
-        this.setupPanHandling();
-    }
-
-    setupPanHandling() {
-        let isPanning = false;
-        let startX = 0;
-        let startY = 0;
-        let scrollLeft = 0;
-        let scrollTop = 0;
-
-        const startPan = (pageX, pageY) => {
-            isPanning = true;
-            this.container.style.cursor = 'grabbing';
-            startX = pageX - this.container.offsetLeft;
-            startY = pageY - this.container.offsetTop;
-            scrollLeft = this.container.scrollLeft;
-            scrollTop = this.container.scrollTop;
-        };
-
-        const movePan = (pageX, pageY) => {
-            if (!isPanning) return;
-            const x = pageX - this.container.offsetLeft;
-            const y = pageY - this.container.offsetTop;
-            const walkX = (x - startX);
-            const walkY = (y - startY);
-            this.container.scrollLeft = scrollLeft - walkX;
-            this.container.scrollTop = scrollTop - walkY;
-        };
-
-        const endPan = () => {
-            isPanning = false;
-            // Restore cursor based on mode
-            if (this.selectionMode === 'pan') {
-                this.container.style.cursor = 'grab';
-            } else {
-                this.container.style.cursor = '';
-            }
-        };
-
-        // Mouse Events
-        this.container.addEventListener('mousedown', (e) => {
-            // Middle Click OR (Left Click AND Pan Mode)
-            if (e.button === 1 || (e.button === 0 && this.selectionMode === 'pan')) {
+            const activeTag = document.activeElement.tagName;
+            const isContentEditable = document.activeElement.isContentEditable;
+            if (activeTag !== 'INPUT' && activeTag !== 'TEXTAREA' && !isContentEditable) {
                 e.preventDefault();
-                startPan(e.pageX, e.pageY);
+                this.deleteHighlight(selectedHighlightId, this.toolbar.getSelectedCardId());
+                this.hideToolbar();
             }
-        });
-
-        this.container.addEventListener('mouseleave', endPan);
-        this.container.addEventListener('mouseup', endPan);
-
-        this.container.addEventListener('mousemove', (e) => {
-            if (isPanning) {
-                e.preventDefault();
-                movePan(e.pageX, e.pageY);
-            }
-        });
-
-        // Touch Events
-        this.container.addEventListener('touchstart', (e) => {
-            if (this.selectionMode === 'pan' && e.touches.length === 1) {
-                // e.preventDefault(); // Do not prevent default here, might interfere with pinch zoom? 
-                // Actually for panning we usually want to prevent default scroll
-                if (e.cancelable) e.preventDefault();
-                startPan(e.touches[0].pageX, e.touches[0].pageY);
-            }
-        }, { passive: false });
-
-        this.container.addEventListener('touchmove', (e) => {
-            if (isPanning && e.touches.length === 1) {
-                if (e.cancelable) e.preventDefault();
-                movePan(e.touches[0].pageX, e.touches[0].pageY);
-            }
-        }, { passive: false });
-
-        this.container.addEventListener('touchend', endPan);
-    }
-
-    setupZoomHandling() {
-        this.container.addEventListener('wheel', (e) => {
-            if (e.ctrlKey) {
-                e.preventDefault();
-                const zoomStep = 0.1;
-                const delta = -Math.sign(e.deltaY);
-                const newScale = Math.max(0.5, Math.min(this.scale + (delta * zoomStep), 3.0));
-
-                this.setScale(newScale);
-            }
-        }, { passive: false });
+        };
     }
 
     async setScale(newScale) {
@@ -279,20 +196,17 @@ export class PDFReader {
                 rootMargin: '200px' // Preload margin
             }
         );
-        // Listen for highlight removal to sync with Mind Map deletion
-        window.addEventListener('highlight-removed', this.handleHighlightRemoved);
+        this.cleanupCallbacks.push(() => {
+            if (this.observer) {
+                this.observer.disconnect();
+            }
+        });
 
         // Add scroll listener for smoother page updates
-        this.container.addEventListener('scroll', () => {
-            // Basic throttle
-            if (!this.scrollTicking) {
-                window.requestAnimationFrame(() => {
-                    this.detectCurrentPage();
-                    this.scrollTicking = false;
-                });
-                this.scrollTicking = true;
-            }
-        }, { passive: true });
+        this.container.addEventListener('scroll', this.handleScrollTick, { passive: true });
+        this.cleanupCallbacks.push(() => {
+            this.container.removeEventListener('scroll', this.handleScrollTick);
+        });
     }
 
     setPageCountCallback(callback) {
@@ -336,10 +250,6 @@ export class PDFReader {
         }
     }
 
-    removeHighlightOverlays(highlightId) {
-        this.highlightRenderer.removeHighlightOverlays(highlightId);
-    }
-
     handleSelection(pageNum) {
         const selection = window.getSelection();
         if (!selection.rangeCount || selection.isCollapsed) return;
@@ -352,97 +262,15 @@ export class PDFReader {
         // NEW LOGIC: Support cross-page selection
         // Instead of assuming everything is on `pageNum`, we check which page each rect belongs to.
 
-        const rects = range.getClientRects();
-        const highlightRects = [];
-        const highlightOverlays = [];
-
-        // We need to group rects by page to render temporary overlays correctly
-        // and to store correct page info in the highlight data.
-
-        // Helper to check intersection
-        const getIntersection = (rect1, rect2) => {
-            const x1 = Math.max(rect1.left, rect2.left);
-            const y1 = Math.max(rect1.top, rect2.top);
-            const x2 = Math.min(rect1.left + rect1.width, rect2.left + rect2.width);
-            const y2 = Math.min(rect1.top + rect1.height, rect2.top + rect2.height);
-
-            if (x2 <= x1 || y2 <= y1) return 0;
-            return (x2 - x1) * (y2 - y1);
-        };
-
-        const processedRects = [];
-
-        for (let i = 0; i < rects.length; i++) {
-            const rect = rects[i];
-            if (rect.width === 0 || rect.height === 0) continue;
-
-            // Find which page this rect belongs to
-            // We iterate through all rendered pages to find the one containing this rect
-            let bestPage = null;
-            let maxIntersection = 0;
-
-            for (const page of this.pages) {
-                if (!page.wrapper) continue;
-
-                const wrapperRect = page.wrapper.getBoundingClientRect();
-                const intersection = getIntersection(rect, wrapperRect);
-
-                if (intersection > maxIntersection && intersection > (rect.width * rect.height * 0.5)) {
-                    // Must overlap at least 50% of the rect (avoids tiny fragments on wrong pages)
-                    maxIntersection = intersection;
-                    bestPage = page;
-                }
-            }
-
-            if (!bestPage) {
-                // console.warn('Rect does not belong to any known page', rect);
-                continue;
-            }
-
-            const wrapperRect = bestPage.wrapper.getBoundingClientRect();
-
-            // BUG FIX: Ignore rects that are likely the page vessel/container itself
-            if (rect.width > wrapperRect.width * 0.9 && rect.height > wrapperRect.height * 0.9) {
-                continue;
-            }
-
-            // Convert to relative normalized coordinates for THAT page
-            const topPx = rect.top - wrapperRect.top;
-            const leftPx = rect.left - wrapperRect.left;
-
-            const normalizedTop = topPx / wrapperRect.height;
-            const normalizedLeft = leftPx / wrapperRect.width;
-            const normalizedWidth = rect.width / wrapperRect.width;
-            const normalizedHeight = rect.height / wrapperRect.height;
-
-            const currentRect = {
-                page: bestPage.num, // IMPORTANT: Associate rect with its specific page
-                top: normalizedTop,
-                left: normalizedLeft,
-                width: normalizedWidth,
-                height: normalizedHeight
-            };
-
-            // Deduplication (per page)
-            const isDuplicate = processedRects.some(pr =>
-                pr.page === currentRect.page &&
-                Math.abs(pr.top - currentRect.top) < 0.01 &&
-                Math.abs(pr.left - currentRect.left) < 0.01 &&
-                Math.abs(pr.width - currentRect.width) < 0.01
-            );
-
-            if (isDuplicate) continue;
-            processedRects.push(currentRect);
-            highlightRects.push(currentRect);
-
-            // Create temporary overlay
+        const { highlightRects, overlayDescriptors } = collectSelectionRects(range, this.pages);
+        const highlightOverlays = overlayDescriptors.map((descriptor) => {
             const highlightDiv = document.createElement('div');
             highlightDiv.className = 'highlight-overlay';
             highlightDiv.style.position = 'absolute';
-            highlightDiv.style.top = `${topPx}px`;
-            highlightDiv.style.left = `${leftPx}px`;
-            highlightDiv.style.width = `${rect.width}px`;
-            highlightDiv.style.height = `${rect.height}px`;
+            highlightDiv.style.top = `${descriptor.topPx}px`;
+            highlightDiv.style.left = `${descriptor.leftPx}px`;
+            highlightDiv.style.width = `${descriptor.width}px`;
+            highlightDiv.style.height = `${descriptor.height}px`;
             highlightDiv.style.backgroundColor = PDFReader.defaultColors.text;
             if (PDFReader.defaultColors.text.startsWith('#')) {
                 highlightDiv.style.opacity = '0.4';
@@ -450,9 +278,9 @@ export class PDFReader {
             highlightDiv.style.pointerEvents = 'none';
             highlightDiv.style.zIndex = '100';
 
-            bestPage.wrapper.appendChild(highlightDiv);
-            highlightOverlays.push(highlightDiv);
-        }
+            descriptor.pageWrapper.appendChild(highlightDiv);
+            return highlightDiv;
+        });
 
         if (highlightRects.length === 0) return;
 
@@ -475,8 +303,8 @@ export class PDFReader {
             // Wait for card creation
             setTimeout(() => {
                 let cardId = null;
-                if (window.inksight && window.inksight.cardSystem) {
-                    const card = Array.from(window.inksight.cardSystem.cards.values()).find(c => c.highlightId === highlight.id);
+                if (getAppContext().cardSystem) {
+                    const card = Array.from(getAppContext().cardSystem.cards.values()).find(c => c.highlightId === highlight.id);
                     if (card) {
                         cardId = card.id;
                         div.addEventListener('click', (e) => {
@@ -509,8 +337,8 @@ export class PDFReader {
             }
 
             // Notify DocumentManager that this document is now loaded
-            if (window.inksight && window.inksight.documentManager) {
-                window.inksight.documentManager.markDocumentLoaded(fileData.id, true);
+            if (getAppContext().documentManager) {
+                getAppContext().documentManager.markDocumentLoaded(fileData.id, true);
             }
 
             const arrayBuffer = await fileData.fileObj.arrayBuffer();
@@ -521,31 +349,28 @@ export class PDFReader {
                 const hashArray = Array.from(new Uint8Array(hashBuffer));
                 const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 
-                if (window.inksight) {
-                    window.inksight.currentBook.md5 = hashHex;
-                    window.inksight.currentBook.name = fileData.name;
-                    window.inksight.currentBook.id = this.fileId;
+                updateCurrentBook({
+                    md5: hashHex,
+                    name: fileData.name,
+                    id: this.fileId
+                });
 
-
-                    // Check if we have a pending restore for this book
-                    if (window.inksight.pendingRestore && window.inksight.pendingRestore.md5 === hashHex) {
-
-
-                        const oldId = window.inksight.pendingRestore.id;
-                        if (oldId) {
-                            if (window.inksight.highlightManager) {
-                                window.inksight.highlightManager.remapSourceIds(this.fileId, oldId);
-                            }
-                            if (window.inksight.cardSystem) {
-                                window.inksight.cardSystem.remapSourceIds(this.fileId, oldId);
-                            }
-                        } else {
-                            console.warn('[PDFReader] Pending restore found but no old ID. Skipping remapping to be safe.');
+                // Check if we have a pending restore for this book
+                if (getAppContext().pendingRestore && getAppContext().pendingRestore.md5 === hashHex) {
+                    const oldId = getAppContext().pendingRestore.id;
+                    if (oldId) {
+                        if (getAppContext().highlightManager) {
+                            getAppContext().highlightManager.remapSourceIds(this.fileId, oldId);
                         }
-
-                        // Clear pending restore
-                        window.inksight.pendingRestore = null;
+                        if (getAppContext().cardSystem) {
+                            getAppContext().cardSystem.remapSourceIds(this.fileId, oldId);
+                        }
+                    } else {
+                        console.warn('[PDFReader] Pending restore found but no old ID. Skipping remapping to be safe.');
                     }
+
+                    // Clear pending restore
+                    setAppService('pendingRestore', null);
                 }
             } catch (e) {
                 console.error('[PDFReader] Error calculating hash:', e);
@@ -584,56 +409,15 @@ export class PDFReader {
         }
     }
 
-    async getOutline() {
-        if (!this.pdfDoc) return null;
-        return await this.pdfDoc.getOutline();
-    }
-
-    async navigateToDest(dest) {
-        if (!this.pdfDoc) return;
-
-        try {
-            // Resolve destination if it's a string (named dest)
-            if (typeof dest === 'string') {
-                dest = await this.pdfDoc.getDestination(dest);
-            }
-
-            if (!dest) return;
-
-            // dest is [pageRef, {name: "XYZ"}, left, top, zoom]
-            const pageRef = dest[0];
-            const pageIndex = await this.pdfDoc.getPageIndex(pageRef);
-            const pageNum = pageIndex + 1;
-
-            this.scrollToPage(pageNum);
-
-        } catch (e) {
-            console.error('[PDFReader] Navigation error:', e);
-        }
-    }
-
     async initPages() {
         this.container.innerHTML = '';
         // Clear array instead of reassigning to maintain reference in highlightRenderer
         this.pages.length = 0;
 
         for (let num = 1; num <= this.pdfDoc.numPages; num++) {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'pdf-page-wrapper';
-            wrapper.style.position = 'relative';
-            wrapper.style.backgroundColor = 'white';
-            wrapper.style.boxShadow = '0 2px 5px rgba(0,0,0,0.1)';
-            wrapper.style.overflow = 'hidden';
-            wrapper.style.margin = '20px auto'; // Center the page
-            wrapper.style.flexShrink = '0'; // Prevent collapse in flex container
-            wrapper.style.isolation = 'isolate';
-            wrapper.dataset.pageNum = num;
-
             const page = await this.pdfDoc.getPage(num);
             const viewport = page.getViewport({ scale: this.scale });
-
-            wrapper.style.width = `${viewport.width}px`;
-            wrapper.style.height = `${viewport.height}px`;
+            const wrapper = createPageWrapper(num, viewport);
 
             this.container.appendChild(wrapper);
 
@@ -646,7 +430,10 @@ export class PDFReader {
 
             this.observer.observe(wrapper);
         }
-        this.container.addEventListener('scroll', this.detectCurrentPage.bind(this));
+        this.container.addEventListener('scroll', this.boundDetectCurrentPage);
+        this.cleanupCallbacks.push(() => {
+            this.container.removeEventListener('scroll', this.boundDetectCurrentPage);
+        });
     }
 
     handleIntersection(entries) {
@@ -758,8 +545,8 @@ export class PDFReader {
             this.renderTextLayer(pageInfo);
             // Render highlights for this page
             setTimeout(() => {
-                if (this.highlightRenderer && window.inksight && window.inksight.highlightManager) {
-                    const highlights = window.inksight.highlightManager.highlights;
+                if (this.highlightRenderer && getAppContext().highlightManager) {
+                    const highlights = getAppContext().highlightManager.highlights;
                     this.highlightRenderer.renderHighlightsForPage(pageInfo.num, highlights);
                 }
             }, 0);
@@ -829,10 +616,7 @@ export class PDFReader {
         }
 
         // Find highlight
-        let highlight = null;
-        if (window.inksight && window.inksight.highlightManager) {
-            highlight = window.inksight.highlightManager.highlights.find(h => h.id === highlightId);
-        }
+        const highlight = findHighlightById(getAppContext().highlightManager?.highlights, highlightId);
 
         if (!highlight) {
             console.warn('[PDFReader] Highlight not found for scrolling:', highlightId);
@@ -883,16 +667,16 @@ export class PDFReader {
     deleteHighlight(highlightId, cardId) {
         // Removed confirmation dialog as requested
 
-        if (cardId && window.inksight && window.inksight.cardSystem) {
+        if (cardId && getAppContext().cardSystem) {
             // Remove from card system. 
             // CardSystem will dispatch 'card-removed', which it listens to itself to then call highlightManager.removeHighlight.
             // This avoids double deletion and "unknown ID" errors.
 
-            window.inksight.cardSystem.removeCard(cardId);
-        } else if (window.inksight && window.inksight.highlightManager) {
+            getAppContext().cardSystem.removeCard(cardId);
+        } else if (getAppContext().highlightManager) {
             // If no card associated (orphan highlight), remove highlight directly
 
-            window.inksight.highlightManager.removeHighlight(highlightId);
+            getAppContext().highlightManager.removeHighlight(highlightId);
         }
     }
 
@@ -914,61 +698,29 @@ export class PDFReader {
     }
 
     updateHighlightColor(highlightId, color) {
-        // Update visual
-        const overlays = this.container.querySelectorAll(`[data-highlight-id="${highlightId}"]`);
-        overlays.forEach(el => {
-            if (el.classList.contains('highlight-overlay')) {
-                el.style.backgroundColor = color.replace(')', ', 0.4)').replace('rgb', 'rgba');
-                if (color.startsWith('#')) {
-                    el.style.backgroundColor = color;
-                    el.style.opacity = '0.4';
-                }
-            } else if (el.classList.contains('area-highlight-border')) {
-                el.style.borderColor = color;
-                el.style.backgroundColor = color + '1A'; // 10% opacity
-            }
-        });
-
-        // Update SVG highlights (Highlighter Tool)
-        const svgs = this.container.querySelectorAll(`[data-highlight-svg-id="${highlightId}"]`);
-        svgs.forEach(svg => {
-            const rect = svg.querySelector('rect');
-            if (rect) {
-                rect.setAttribute('fill', color);
-                // Ensure opacity is maintained (SVG rect has opacity attribute)
-                rect.setAttribute('opacity', '0.4');
-            }
-        });
+        applyHighlightColorToElements(this.container, highlightId, color);
 
         // Update model
-        if (window.inksight && window.inksight.highlightManager) {
-            const highlight = window.inksight.highlightManager.highlights.find(h => h.id === highlightId);
+        if (getAppContext().highlightManager) {
+            const highlight = findHighlightById(getAppContext().highlightManager.highlights, highlightId);
             if (highlight) {
                 highlight.color = color;
 
-                // Update default color memory
-                if (highlight.type === 'text') {
-                    PDFReader.defaultColors.text = color;
-                } else if (highlight.type === 'highlighter') {
-                    PDFReader.defaultColors.highlighter = color;
+                syncDefaultHighlightColor(PDFReader.defaultColors, highlight.type, color);
+
+                if (highlight.type === 'highlighter') {
                     // If currently using highlighter, update tool immediately
                     if (this.selectionMode === 'highlighter') {
                         this.highlighterTool.setColor(color);
                     }
                 } else if (highlight.type === 'rect' || highlight.type === 'rectangle') {
-                    PDFReader.defaultColors.rect = color;
                     if (this.selectionMode === 'rect' || this.selectionMode === 'rectangle') {
                         this.areaSelector.setColor(color);
                     }
                 } else if (highlight.type === 'ellipse') {
-                    PDFReader.defaultColors.ellipse = color;
                     if (this.selectionMode === 'ellipse') {
                         this.areaSelector.setColor(color);
                     }
-                } else if (highlight.type === 'image') {
-                    // Fallback for generic images if any
-                    PDFReader.defaultColors.rect = color;
-                    PDFReader.defaultColors.ellipse = color;
                 }
 
                 // Dispatch update event if needed for Mind Map sync
@@ -988,28 +740,13 @@ export class PDFReader {
         if (!this.pdfDoc) return;
 
         try {
-            console.log('[PDFReader] navigateToDest:', dest);
-
-            // Resolve destination if it's a string (named dest)
-            if (typeof dest === 'string') {
-                dest = await this.pdfDoc.getDestination(dest);
-                console.log('[PDFReader] Resolved string dest:', dest);
-            }
-
-            if (!dest) {
+            const pageNum = await resolveDestinationPageNumber(this.pdfDoc, dest);
+            if (!pageNum) {
                 console.warn('[PDFReader] Destination is null');
                 return;
             }
 
-            // dest is [pageRef, {name: "XYZ"}, left, top, zoom]
-            const pageRef = dest[0];
-            const pageIndex = await this.pdfDoc.getPageIndex(pageRef);
-            const pageNum = pageIndex + 1;
-
-            console.log(`[PDFReader] Page Ref:`, pageRef, `Index: ${pageIndex}, Num: ${pageNum}`);
-
             this.scrollToPage(pageNum);
-
         } catch (e) {
             console.error('[PDFReader] Navigation error:', e);
         }
@@ -1050,18 +787,7 @@ export class PDFReader {
         // We'll estimate current page from scroll position if needed, or track it.
         // For now, let's look at the first page that intersects or close to top.
         // A heuristic: find page closest to top of container.
-        const containerTop = this.container.scrollTop;
-        let bestPage = 1;
-        let minDiff = Infinity;
-
-        this.pages.forEach(p => {
-            const offset = p.wrapper.offsetTop;
-            const diff = Math.abs(offset - containerTop);
-            if (diff < minDiff) {
-                minDiff = diff;
-                bestPage = p.num;
-            }
-        });
+        const bestPage = getNearestPageNumber(this.pages, this.container.scrollTop);
 
         if (bestPage > 1) {
             this.scrollToPage(bestPage - 1);
@@ -1069,18 +795,7 @@ export class PDFReader {
     }
 
     onNextPage() {
-        const containerTop = this.container.scrollTop;
-        let bestPage = 1;
-        let minDiff = Infinity;
-
-        this.pages.forEach(p => {
-            const offset = p.wrapper.offsetTop;
-            const diff = Math.abs(offset - containerTop);
-            if (diff < minDiff) {
-                minDiff = diff;
-                bestPage = p.num;
-            }
-        });
+        const bestPage = getNearestPageNumber(this.pages, this.container.scrollTop);
 
         if (bestPage < this.pdfDoc.numPages) {
             this.scrollToPage(bestPage + 1);
@@ -1104,13 +819,8 @@ export class PDFReader {
             this.observer = null;
         }
 
-        // Remove global event listeners
-        window.removeEventListener('card-soft-deleted', this.handleCardSoftDeleted);
-        window.removeEventListener('card-restored', this.handleCardRestored);
-        window.removeEventListener('highlights-restored', this.handleHighlightsRestored);
-        window.removeEventListener('mindmap-node-updated', this.handleMindmapNodeUpdated);
-        window.removeEventListener('highlight-removed', this.handleHighlightRemoved);
-        document.removeEventListener('keydown', this.handleKeyDown);
+        this.cleanupCallbacks.forEach((cleanup) => cleanup());
+        this.cleanupCallbacks = [];
 
         // Clean up sub-components
         if (this.areaSelector) {

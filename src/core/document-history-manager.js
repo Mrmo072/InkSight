@@ -1,4 +1,6 @@
 
+import { getAppContext } from '../app/app-context.js';
+
 export class DocumentHistoryManager {
     constructor() {
         this.ipcRenderer = null;
@@ -141,7 +143,8 @@ export class DocumentHistoryManager {
             this.init();
         }
 
-        if (!this.currentMd5 || !this.ipcRenderer || !window.inksight) {
+        const appContext = getAppContext();
+        if (!this.currentMd5 || !this.ipcRenderer || !appContext) {
             return; // Silent fail if not ready
         }
 
@@ -152,7 +155,7 @@ export class DocumentHistoryManager {
         }
 
         try {
-            const board = window.inksight.board;
+            const board = appContext.board;
             if (!board) return;
 
             // SAFETY VALVE: Empty Board Protection
@@ -164,18 +167,18 @@ export class DocumentHistoryManager {
 
             // Collect extra data
             const extraData = {};
-            if (window.inksight.currentBook && window.inksight.currentBook.md5) {
-                extraData.bookMd5 = window.inksight.currentBook.md5;
-                extraData.bookName = window.inksight.currentBook.name;
-                extraData.bookId = window.inksight.currentBook.id;
+            if (appContext.currentBook && appContext.currentBook.md5) {
+                extraData.bookMd5 = appContext.currentBook.md5;
+                extraData.bookName = appContext.currentBook.name;
+                extraData.bookId = appContext.currentBook.id;
             }
-            if (window.inksight.cardSystem && window.inksight.cardSystem.getPersistenceData) {
-                const persistenceData = window.inksight.cardSystem.getPersistenceData();
+            if (appContext.cardSystem && appContext.cardSystem.getPersistenceData) {
+                const persistenceData = appContext.cardSystem.getPersistenceData();
                 extraData.cards = persistenceData.cards;
                 extraData.connections = persistenceData.connections;
             }
-            if (window.inksight.highlightManager && window.inksight.highlightManager.getPersistenceData) {
-                const highlightData = window.inksight.highlightManager.getPersistenceData();
+            if (appContext.highlightManager && appContext.highlightManager.getPersistenceData) {
+                const highlightData = appContext.highlightManager.getPersistenceData();
                 extraData.highlights = highlightData.highlights;
             }
 
@@ -238,8 +241,8 @@ export class DocumentHistoryManager {
             }
         } else {
             // Case B: No history, try fallback to book name
-            if (window.inksight && window.inksight.currentBook && window.inksight.currentBook.name) {
-                const bookName = window.inksight.currentBook.name;
+            if (getAppContext().currentBook?.name) {
+                const bookName = getAppContext().currentBook.name;
                 const candidates = this.getRestoreCandidates(bookName);
 
                 console.log('[DocumentHistoryManager] No history found, trying fallback candidates:', candidates);
@@ -335,7 +338,7 @@ export class DocumentHistoryManager {
             }
 
             // Restore Data
-            const ag = window.inksight;
+            const ag = getAppContext();
             if (!ag) return;
 
             // 1. Restore Highlights (First, so cards can link to them)
@@ -372,7 +375,7 @@ export class DocumentHistoryManager {
             };
 
             if (data.elements) {
-                if (window.inksight.board) {
+                if (getAppContext().board) {
                     performBoardRestore();
                 } else {
                     console.log('[DocumentHistoryManager] Board not ready. Waiting for board-ready event...');

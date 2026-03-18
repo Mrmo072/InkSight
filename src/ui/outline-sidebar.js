@@ -1,3 +1,5 @@
+import { getAppContext } from '../app/app-context.js';
+
 export class OutlineSidebar {
     constructor(sidebarId, contentId, toggleBtnId) {
         this.sidebar = document.getElementById(sidebarId);
@@ -72,8 +74,8 @@ export class OutlineSidebar {
                 div.classList.add('active');
 
                 // Navigate
-                if (window.inksight && window.inksight.pdfReader) {
-                    await window.inksight.pdfReader.navigateToDest(item.dest);
+                if (getAppContext().pdfReader) {
+                    await getAppContext().pdfReader.navigateToDest(item.dest);
                 }
             });
 

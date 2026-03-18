@@ -1,7 +1,4 @@
 import './styles/styles.css';
-import { PDFReader } from './readers/pdf-reader.js';
-import { EpubReader } from './readers/epub-reader.js';
-import { TextReader } from './readers/text-reader.js';
 import { MindmapView } from './mindmap/mindmap-view.js';
 import { DrawnixView } from './mindmap/drawnix-view.js';
 import { highlightManager } from './core/highlight-manager.js';
@@ -10,29 +7,20 @@ import { OutlineSidebar } from './ui/outline-sidebar.js';
 import { AnnotationList } from './ui/annotation-list.js';
 import { suppressResizeObserverLoop } from './drawnix/react-board/src/utils/resizeObserverFix.js';
 import { documentHistoryManager } from './core/document-history-manager.js'; // Import History Manager
+import { getAppContext, initAppContext, setAppService, updateCurrentBook } from './app/app-context.js';
+import { createReaderLoader } from './app/reader-loader.js';
+import { setupSelectionSync } from './app/selection-sync.js';
 
 suppressResizeObserverLoop();
 
-// Initialize global bridge object
-window.inksight = {
-    currentBook: {
-        md5: null,
-        name: null,
-        id: null
-    },
-    cardSystem: null,
-    highlightManager: null,
-    pdfReader: null,
-    outlineSidebar: null,
-    annotationList: null
-};
+initAppContext();
 
 // Import cardSystem (it's already imported by other modules, but we need it here)
 import { cardSystem } from './core/card-system.js';
 import { documentManager } from './core/document-manager.js';
-window.inksight.cardSystem = cardSystem;
-window.inksight.highlightManager = highlightManager;
-window.inksight.documentManager = documentManager;
+setAppService('cardSystem', cardSystem);
+setAppService('highlightManager', highlightManager);
+setAppService('documentManager', documentManager);
 
 // State
 const state = {
@@ -67,13 +55,44 @@ let splitView = null;
 let outlineSidebar = null;
 let annotationList = null;
 let currentToolMode = 'pan';
+let readerLoader = null;
+
+function getCardsCollection() {
+    const cards = getAppContext().cardSystem?.cards;
+    if (cards instanceof Map) {
+        return Array.from(cards.values());
+    }
+
+    return Object.values(cards || {});
+}
+
+function findCardByHighlightId(highlightId) {
+    if (!highlightId) return null;
+    return getCardsCollection().find((card) => card.highlightId === highlightId) ?? null;
+}
+
+function findCardById(cardId) {
+    if (!cardId) return null;
+
+    const cards = getAppContext().cardSystem?.cards;
+    if (cards instanceof Map) {
+        return cards.get(cardId) ?? null;
+    }
+
+    return cards?.[cardId] ?? null;
+}
+
+function findHighlightById(highlightId) {
+    if (!highlightId) return null;
+    return getAppContext().highlightManager?.highlights?.find((highlight) => highlight.id === highlightId) ?? null;
+}
 
 function destroyCurrentReader() {
     if (currentReader?.destroy) {
         currentReader.destroy();
     }
     currentReader = null;
-    window.inksight.pdfReader = null;
+    setAppService('pdfReader', null);
 }
 
 function resetReadingState() {
@@ -105,6 +124,11 @@ function closeCompactPanels() {
     splitView?.closeAll();
     outlineSidebar?.close();
     updatePanelControls();
+}
+
+function resetAuxiliaryPanels() {
+    outlineSidebar?.reset();
+    document.getElementById('highlighter-panel')?.classList.remove('visible');
 }
 
 function setupResponsiveLayout() {
@@ -142,15 +166,15 @@ function init() {
 
         // Init Outline Sidebar
         outlineSidebar = new OutlineSidebar('outline-sidebar', 'outline-content', 'toggle-outline');
-        window.inksight.outlineSidebar = outlineSidebar;
+        setAppService('outlineSidebar', outlineSidebar);
 
         // Init Annotation List
-        annotationList = new AnnotationList('annotation-list', window.inksight.cardSystem);
-        window.inksight.annotationList = annotationList;
+        annotationList = new AnnotationList('annotation-list', getAppContext().cardSystem);
+        setAppService('annotationList', annotationList);
 
         // Setup event listeners AFTER SplitView is initialized
         setupEventListeners();
-        window.inksight.syncToolMode?.(currentToolMode);
+        getAppContext().syncToolMode?.(currentToolMode);
 
         // Setup Layout Toggles (incl. Annotations)
         setupLayoutToggles();
@@ -213,131 +237,12 @@ function setupEventListeners() {
         closeCompactPanels();
     });
 
-    // Mind Map Selection Change (Show Document Name)
-    const docInfoEl = document.getElementById('mindmap-doc-info');
-
-    // Unified Sync Handler
-    const handleSelectionSync = (sourceId, itemId, origin) => {
-        // origin: 'mindmap', 'annotation', 'highlight'
-        console.log('[Sync] Selection sync:', { sourceId, itemId, origin });
-
-        // 1. Sync to Reader (Scroll to Highlight)
-        if (origin !== 'highlight' && window.inksight.pdfReader) {
-            // Check if this item maps to a highlight
-            // If origin is mindmap, itemId is cardId or HighlightId? 
-            // We need to resolve HighlightId.
-            let highlightId = null;
-            if (origin === 'mindmap') {
-                const card = window.inksight.cardSystem.cards.get(itemId);
-                highlightId = card?.highlightId;
-            } else if (origin === 'annotation') {
-                const card = window.inksight.cardSystem.cards.get(itemId);
-                highlightId = card?.highlightId;
-            } else {
-                highlightId = itemId;
-            }
-
-            if (highlightId) {
-                window.inksight.pdfReader.scrollToHighlight(highlightId);
-            }
-        }
-
-        // 2. Sync to MindMap (Select Node)
-        if (origin !== 'mindmap') {
-            let cardId = null;
-            if (origin === 'highlight') {
-                // Find card for highlight
-                const cards = Array.from(window.inksight.cardSystem.cards.values());
-                const card = cards.find(c => c.highlightId === itemId);
-                cardId = card?.id;
-            } else {
-                cardId = itemId;
-            }
-
-            if (cardId) {
-                // Dispatch event for DrawnixBoard to consume
-                window.dispatchEvent(new CustomEvent('highlight-selected', {
-                    detail: { cardId }
-                }));
-            }
-        }
-
-        // 3. Sync to Annotation List (Highlight Item)
-        if (origin !== 'annotation') {
-            let cardId = null;
-            if (origin === 'highlight') {
-                // Find card for highlight
-                const cards = Array.from(window.inksight.cardSystem.cards.values());
-                const card = cards.find(c => c.highlightId === itemId);
-                cardId = card?.id;
-            } else if (origin === 'mindmap') {
-                cardId = itemId;
-            }
-
-            if (cardId) {
-                window.dispatchEvent(new CustomEvent('card-selected', {
-                    detail: cardId
-                }));
-            }
-        }
-    };
-
-    // Listeners invoking the unified handler
-    window.addEventListener('mindmap-selection-changed', (e) => {
-        // e.detail.sourceId is file ID. e.detail.cardId? 
-        // We updated DrawnixBoard to send cardId? NO, currently it sends sourceId.
-        // We need to update DrawnixBoard to send cardId in selection change if we want Sync.
-        // Wait, DrawnixBoard implementation currently:
-        /*
-          window.dispatchEvent(new CustomEvent('mindmap-selection-changed', {
-                detail: {
-                    sourceId: card.sourceId,
-                    sourceName: ...
-                }
-            }));
-        */
-        // This event seems used for "Document Title" update, NOT specific item selection.
-        // We need a NEW event 'mindmap-node-selected' from DrawnixBoard or update this one.
-        // Let's rely on jump-to-source logic which is 'click'.
-    });
-
-    // Re-use existing jumps but route to sync
-    window.addEventListener('jump-to-source', (e) => {
-        // Triggered by MindMap Click
-        const { highlightId, cardId } = e.detail;
-        handleSelectionSync(null, cardId || highlightId, 'mindmap');
-    });
-
-    // Annotation Click
-    // AnnotationList dispatches ???
-    // It calls handleItemClick -> pdfReader.scrollToHighlight direct.
-    // It should dispatch an event instead if we want main.js to orchestrate.
-    // Or we just add listener for 'annotation-clicked' if we create it.
-    // AnnotationList currently has:
-    /*
-        handleItemClick(cardId, highlightId) {
-            this.activeCardId = cardId;
-            this.highlightItem(cardId);
-            if (window.inksight.pdfReader && highlightId) {
-                window.inksight.pdfReader.scrollToHighlight(highlightId);
-            }
-        }
-    */
-    // It does direct call. To sync MindMap, we should add:
-    // window.dispatchEvent(new CustomEvent('annotation-selected', { detail: { cardId, highlightId } }));
-
-    window.addEventListener('annotation-selected', (e) => {
-        handleSelectionSync(null, e.detail.cardId, 'annotation');
-        if (isCompactLayout()) {
-            splitView?.setRightCollapsed(true);
-            updatePanelControls();
-        }
-    });
-
-    // Highlight Click (from Reader)
-    window.addEventListener('highlight-clicked', (e) => {
-        handleSelectionSync(null, e.detail.highlightId, 'highlight');
-        if (isCompactLayout()) {
+    const highlighterPanel = document.getElementById('highlighter-panel');
+    setupSelectionSync({
+        findCardById,
+        findCardByHighlightId,
+        isCompactLayout,
+        collapseNotesPanel: () => {
             splitView?.setRightCollapsed(true);
             updatePanelControls();
         }
@@ -351,7 +256,6 @@ function setupEventListeners() {
     const rectModeBtn = document.getElementById('rect-mode');
     const ellipseModeBtn = document.getElementById('ellipse-mode');
     const highlighterModeBtn = document.getElementById('highlighter-mode');
-    const highlighterPanel = document.getElementById('highlighter-panel');
     const isCoarsePointer = () => window.matchMedia('(pointer: coarse)').matches;
 
     const modeButtons = [panModeBtn, textModeBtn, rectModeBtn, ellipseModeBtn, highlighterModeBtn].filter(Boolean);
@@ -402,8 +306,8 @@ function setupEventListeners() {
         }
     };
 
-    window.inksight.setToolMode = (mode, options = {}) => setActiveMode(mode, options);
-    window.inksight.syncToolMode = (mode) => syncModeButtons(mode);
+    setAppService('setToolMode', (mode, options = {}) => setActiveMode(mode, options));
+    setAppService('syncToolMode', (mode) => syncModeButtons(mode));
 
     if (panModeBtn) {
         panModeBtn.addEventListener('click', () => setActiveMode('pan'));
@@ -602,10 +506,7 @@ window.openFileById = (id) => {
 };
 
 async function handleJumpToSource(sourceId, highlightId) {
-    let highlight = null;
-    if (window.inksight && window.inksight.highlightManager) {
-        highlight = window.inksight.highlightManager.highlights.find(h => h.id === highlightId);
-    }
+    const highlight = findHighlightById(highlightId);
 
     const effectiveSourceId = highlight ? highlight.sourceId : sourceId;
     const file = state.files.find(f => f.id === effectiveSourceId);
@@ -649,15 +550,17 @@ async function openFile(fileData) {
     elements.docTitle.textContent = fileData.name;
 
     // Update Global State for Persistence
-    window.inksight.currentBook.md5 = fileData.id;
-    window.inksight.currentBook.id = fileData.id;
-    window.inksight.currentBook.name = fileData.name;
+    updateCurrentBook({
+        md5: fileData.id,
+        id: fileData.id,
+        name: fileData.name
+    });
 
     renderFileList();
     elements.viewer.innerHTML = '';
 
-    if (window.inksight.documentManager) {
-        window.inksight.documentManager.registerDocument(
+    if (getAppContext().documentManager) {
+        getAppContext().documentManager.registerDocument(
             fileData.id,
             fileData.name,
             fileData.type,
@@ -665,133 +568,19 @@ async function openFile(fileData) {
         );
     }
 
-    if (window.inksight.cardSystem) {
-        window.inksight.cardSystem.updateSourceNames(fileData.id, fileData.name);
+    if (getAppContext().cardSystem) {
+        getAppContext().cardSystem.updateSourceNames(fileData.id, fileData.name);
     }
-    if (window.inksight.highlightManager) {
-        window.inksight.highlightManager.updateSourceNames(fileData.id, fileData.name);
+    if (getAppContext().highlightManager) {
+        getAppContext().highlightManager.updateSourceNames(fileData.id, fileData.name);
     }
 
     // Load Annotations List
-    if (window.inksight.annotationList) {
-        window.inksight.annotationList.load(fileData.id);
+    if (getAppContext().annotationList) {
+        getAppContext().annotationList.load(fileData.id);
     }
 
-    if (fileData.type === 'application/pdf') {
-        // Reset outline
-        outlineSidebar.reset();
-
-        elements.viewer.innerHTML = '<div class="loading">Loading PDF...</div>';
-        currentReader = new PDFReader(elements.viewer);
-        window.inksight.pdfReader = currentReader;
-
-        currentReader.setPageCountCallback((count) => {
-            state.totalPages = count;
-            updatePageInfo();
-        });
-
-        currentReader.setPageChangeCallback((num) => {
-            state.currentPage = num;
-            updatePageInfo();
-
-            // Save Reading Progress
-            if (window.inksight.currentBook && window.inksight.currentBook.md5) {
-                documentHistoryManager.updatePage(window.inksight.currentBook.md5, num);
-            }
-        });
-
-        try {
-            // Get history early for initial scroll
-            const md5 = window.inksight.currentBook.md5;
-            let startPage = 1;
-            let history = null;
-            if (md5) {
-                history = documentHistoryManager.getHistory(md5);
-                if (history && history.lastPage) {
-                    startPage = history.lastPage;
-                }
-            }
-
-            await currentReader.load(fileData, startPage);
-            window.inksight.setToolMode?.('pan');
-            elements.prevBtn.disabled = false;
-            elements.nextBtn.disabled = false;
-
-            // Load Outline
-            const outline = currentReader.getOutline();
-            outlineSidebar.render(outline, currentReader.pdfDoc);
-
-            // --- Auto-Restore Logic ---
-            if (md5) {
-                // 1. Restore Page Position - Handled by load() now
-
-                // 2. Restore MindMap/Highlights State
-                documentHistoryManager.restoreState(md5);
-
-                // 3. Start Auto-Save
-                // Strip extension for book name if needed, or pass full name (Manager handles .inksight extension)
-                const bookName = fileData.name.replace(/\.[^/.]+$/, "");
-                documentHistoryManager.startAutoSave(md5, bookName);
-            }
-
-        } catch (e) {
-            elements.viewer.innerHTML = `<div class="error">Error loading PDF: ${e.message}</div>`;
-            console.error(e);
-        }
-    } else if (fileData.type === 'application/epub+zip' || fileData.type === 'application/epub' || fileData.name.toLowerCase().endsWith('.epub')) {
-        outlineSidebar.reset();
-        elements.viewer.innerHTML = '<div class="loading">Loading EPUB...</div>';
-        currentReader = new EpubReader(elements.viewer);
-        window.inksight.pdfReader = null;
-
-        currentReader.setPageCountCallback((count) => {
-            state.totalPages = count;
-            updatePageInfo();
-        });
-
-        currentReader.setPageChangeCallback((location) => {
-            state.currentPage = location.start.location;
-            updatePageInfo();
-        });
-
-        try {
-            await currentReader.load(fileData);
-            window.inksight.setToolMode?.('text');
-            elements.prevBtn.disabled = false;
-            elements.nextBtn.disabled = false;
-        } catch (e) {
-            elements.viewer.innerHTML = `<div class="error">Error loading EPUB: ${e.message}</div>`;
-            console.error(e);
-        }
-    } else if (fileData.type === 'text/plain' || fileData.type === 'text/markdown' || fileData.name.toLowerCase().endsWith('.md') || fileData.name.toLowerCase().endsWith('.txt')) {
-        outlineSidebar.reset();
-        elements.viewer.innerHTML = '<div class="loading">Loading Text...</div>';
-        currentReader = new TextReader(elements.viewer);
-        window.inksight.pdfReader = null;
-
-        currentReader.setPageCountCallback((count) => {
-            state.totalPages = count;
-            updatePageInfo();
-        });
-
-        currentReader.setPageChangeCallback((num) => {
-            state.currentPage = num;
-            updatePageInfo();
-        });
-
-        try {
-            await currentReader.load(fileData);
-            window.inksight.setToolMode?.('text');
-            elements.prevBtn.disabled = false;
-            elements.nextBtn.disabled = false;
-        } catch (e) {
-            elements.viewer.innerHTML = `<div class="error">Error loading Text: ${e.message}</div>`;
-            console.error(e);
-        }
-    } else {
-        outlineSidebar.reset();
-        elements.viewer.innerHTML = '<div class="error">Unsupported file type: ' + fileData.type + '</div>';
-    }
+    currentReader = await readerLoader.loadReaderForFile(fileData);
 
     updateToolAvailability(fileData.type);
 }
@@ -803,20 +592,24 @@ function updateToolAvailability(fileType) {
     toolsToToggle.forEach(id => {
         const btn = document.getElementById(id);
         if (btn) {
+            if (!btn.dataset.baseTitle) {
+                btn.dataset.baseTitle = btn.title || '';
+            }
+
             btn.disabled = !isPDF;
             if (!isPDF) {
                 btn.classList.add('disabled');
-                btn.title += ' (Only available for PDF)';
+                btn.title = `${btn.dataset.baseTitle} (Only available for PDF)`.trim();
             } else {
                 btn.classList.remove('disabled');
-                btn.title = btn.title.replace(' (Only available for PDF)', '');
+                btn.title = btn.dataset.baseTitle;
             }
         }
     });
 
     const currentModeBtn = document.querySelector('.mode-btn.active');
     if (currentModeBtn && currentModeBtn.disabled) {
-        window.inksight.setToolMode?.('pan');
+        getAppContext().setToolMode?.('pan');
     }
 }
 
@@ -833,4 +626,14 @@ function loadFilesFromStorage() {
 }
 
 // Start app
+readerLoader = createReaderLoader({
+    elements,
+    state,
+    getOutlineSidebar: () => outlineSidebar,
+    documentHistoryManager,
+    resetAuxiliaryPanels,
+    setToolMode: (mode) => getAppContext().setToolMode?.(mode),
+    updatePageInfo
+});
+
 init();

@@ -56,11 +56,9 @@ export class AnnotationList {
         // Best effort: Join with highlights if possible, or assume card.position is mindmap pos (not useful for page sort)
         // Actually, cardSystem doesn't store page info directly usually, but HighlightManager does.
 
+        const highlightMap = this.getHighlightMap();
         const highlightedCards = cards.map(card => {
-            let highlight = null;
-            if (window.inksight.highlightManager) {
-                highlight = window.inksight.highlightManager.highlights.find(h => h.id === card.highlightId);
-            }
+            const highlight = highlightMap.get(card.highlightId) ?? null;
             return {
                 card,
                 highlight,
@@ -89,16 +87,28 @@ export class AnnotationList {
         }
 
         this.container.innerHTML = '';
+        const fragment = document.createDocumentFragment();
 
         items.forEach(item => {
             const el = this.createItemElement(item);
-            this.container.appendChild(el);
+            fragment.appendChild(el);
         });
+
+        this.container.appendChild(fragment);
 
         // Restore active selection if still present
         if (this.activeCardId) {
             this.highlightItem(this.activeCardId);
         }
+    }
+
+    getHighlightMap() {
+        const highlights = window.inksight?.highlightManager?.highlights;
+        if (!Array.isArray(highlights)) {
+            return new Map();
+        }
+
+        return new Map(highlights.map((highlight) => [highlight.id, highlight]));
     }
 
     buildTransferData(card, highlight) {

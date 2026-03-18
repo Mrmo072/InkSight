@@ -5,6 +5,13 @@ import ELK from 'elkjs/lib/elk.bundled.js';
 import { Transforms, PlaitBoard, getSelectedElements, BoardTransforms, toViewBoxPoint, toHostPoint } from '@plait/core';
 import { cardSystem } from '../core/card-system.js';
 import { themeManager } from '../core/theme-manager.js';
+import {
+    calculateNodeSize,
+    createCenteredPoints,
+    createLayoutGraph,
+    extractEdgeSectionPoints,
+    simplifyOrthogonalPoints
+} from './drawnix-board-utils.js';
 
 export const DrawnixBoardComponent = () => {
     const [board, setBoard] = useState(null);
@@ -15,14 +22,6 @@ export const DrawnixBoardComponent = () => {
     const containerRef = useRef(null);
     const processingCardIds = useRef(new Set()); // Track cards being processed to avoid loops
     const elkRef = useRef(new ELK()); // Reuse ELK instance
-
-    const createCenteredPoints = (cx, cy, w, h) => {
-        return [
-            [cx - w / 2, cy - h / 2],
-            [cx + w / 2, cy + h / 2]
-        ];
-    };
-
 
     // Initialize with existing cards once board is ready
     useEffect(() => {
@@ -358,45 +357,6 @@ export const DrawnixBoardComponent = () => {
         };
     }, [board]);
 
-    const calculateNodeSize = (text) => {
-        if (!text) return { width: 200, height: 120 };
-
-        const MIN_WIDTH = 120;
-        const MAX_WIDTH = 320;
-        const PADDING_X = 32; // Left + Right padding
-        const PADDING_Y = 32; // Top + Bottom padding
-        const LINE_HEIGHT = 24;
-        const CHAR_WIDTH_CN = 16;
-        const CHAR_WIDTH_EN = 9;
-
-        // Calculate visual length in pixels
-        let visualLength = 0;
-        for (let char of text) {
-            visualLength += char.charCodeAt(0) > 255 ? CHAR_WIDTH_CN : CHAR_WIDTH_EN;
-        }
-
-        let width, height;
-
-        if (visualLength + PADDING_X <= MAX_WIDTH) {
-            // Text fits in one line (or is short)
-            width = Math.max(MIN_WIDTH, visualLength + PADDING_X);
-            height = LINE_HEIGHT + PADDING_Y;
-        } else {
-            // Text needs wrapping
-            width = MAX_WIDTH;
-            // Estimate lines: visualLength / (available width for text)
-            const textWidth = MAX_WIDTH - PADDING_X;
-            const lines = Math.ceil(visualLength / textWidth);
-            height = lines * LINE_HEIGHT + PADDING_Y;
-        }
-
-        // Ensure reasonable minimums
-        return {
-            width: Math.round(width),
-            height: Math.round(Math.max(height, 60))
-        };
-    };
-
     const addCardNode = (boardInstance, card, index) => {
         const x = 50 + (index % 3) * 220;
         const y = 50 + Math.floor(index / 3) * 160;
@@ -509,116 +469,12 @@ export const DrawnixBoardComponent = () => {
         if (!boardInstance || !boardInstance.children) return;
 
         const elk = elkRef.current;
+        const { graph, nodeMap } = createLayoutGraph(boardInstance.children);
 
-        // Helper: De-zigzag / Simplify Points
-        const simplifyPoints = (points) => {
-            if (!points || points.length < 2) return points;
-
-            const len = points.length;
-            // 1. Threshold Alignment (Snap to orthogonal)
-            // In-place modification for performance since we just created these points from ELK
-            // But ELK returns new objects, so we should be careful. 
-            // Let's map to new arrays to be safe but avoid excessive allocation.
-
-            const snapped = new Array(len);
-            for (let i = 0; i < len; i++) {
-                snapped[i] = [points[i][0], points[i][1]];
-            }
-
-            for (let i = 0; i < len - 1; i++) {
-                const p1 = snapped[i];
-                const p2 = snapped[i + 1];
-
-                // If X difference is small, snap p2.x to p1.x
-                if (Math.abs(p1[0] - p2[0]) < 5) {
-                    p2[0] = p1[0];
-                }
-                // If Y difference is small, snap p2.y to p1.y
-                if (Math.abs(p1[1] - p2[1]) < 5) {
-                    p2[1] = p1[1];
-                }
-            }
-
-            // 2. Collinear Merge
-            const result = [snapped[0]];
-            for (let i = 1; i < len - 1; i++) {
-                const prev = result[result.length - 1];
-                const curr = snapped[i];
-                const next = snapped[i + 1];
-
-                // Check if horizontal or vertical collinear
-                const isHorizontal = Math.abs(prev[1] - curr[1]) < 1 && Math.abs(curr[1] - next[1]) < 1;
-                const isVertical = Math.abs(prev[0] - curr[0]) < 1 && Math.abs(curr[0] - next[0]) < 1;
-
-                if (isHorizontal || isVertical) {
-                    continue;
-                }
-                result.push(curr);
-            }
-            result.push(snapped[len - 1]);
-
-            return result;
-        };
-
-        // 1. Filter Nodes and Edges
-        const nodes = [];
-        const edges = [];
-        const nodeMap = new Map();
-
-        boardInstance.children.forEach((element, index) => {
-            if (element.type === 'geometry' || element.type === 'image') {
-                const width = Math.abs(element.points[1][0] - element.points[0][0]);
-                const height = Math.abs(element.points[1][1] - element.points[0][1]);
-                nodes.push({
-                    id: element.id,
-                    width: width,
-                    height: height,
-                    // Keep track of original index for updating later
-                    _originalIndex: index
-                });
-                nodeMap.set(element.id, element);
-            } else if (element.type === 'arrow-line') {
-                // Ensure source and target exist
-                if (element.source && element.source.boundId && element.target && element.target.boundId) {
-                    edges.push({
-                        id: element.id,
-                        sources: [element.source.boundId],
-                        targets: [element.target.boundId],
-                        _originalIndex: index
-                    });
-                }
-            }
-        });
-
-        if (nodes.length === 0) return;
-
-        // 2. Construct ELK Graph
-        const graph = {
-            id: 'root',
-            layoutOptions: {
-                'elk.algorithm': 'layered',
-                'elk.direction': 'RIGHT',
-                'elk.edgeRouting': 'ORTHOGONAL',
-                'elk.spacing.nodeNode': '80',
-                'elk.layered.spacing.nodeNodeBetweenLayers': '100',
-                // Optimization: Straighten lines
-                'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
-                'elk.layered.nodePlacement.bk.fixedAlignment': 'BALANCED',
-                'elk.portConstraints': 'FIXED_SIDE',
-                'elk.layered.mergeEdges': 'true',
-                'elk.spacing.edgeNode': '20'
-            },
-            children: nodes,
-            edges: edges
-        };
+        if (graph.children.length === 0) return;
 
         try {
-            // 3. Run Layout
-
             const layoutedGraph = await elk.layout(graph);
-
-
-            // 4. Apply Changes to Board
 
             // Update Nodes
             layoutedGraph.children.forEach(node => {
@@ -643,23 +499,7 @@ export const DrawnixBoardComponent = () => {
                 layoutedGraph.edges.forEach(edge => {
                     if (edge.sections && edge.sections.length > 0) {
                         const section = edge.sections[0];
-                        let points = [];
-
-                        // Start point
-                        points.push([section.startPoint.x, section.startPoint.y]);
-
-                        // Bend points
-                        if (section.bendPoints) {
-                            section.bendPoints.forEach(bp => {
-                                points.push([bp.x, bp.y]);
-                            });
-                        }
-
-                        // End point
-                        points.push([section.endPoint.x, section.endPoint.y]);
-
-                        // Apply De-zigzag / Simplification
-                        points = simplifyPoints(points);
+                        const points = simplifyOrthogonalPoints(extractEdgeSectionPoints(section));
 
                         const path = [boardInstance.children.findIndex(c => c.id === edge.id)];
                         if (path[0] !== -1) {
