@@ -17,7 +17,6 @@ import {
   getSelectedElements,
 } from '@plait/core';
 import { MindElement } from '@plait/mind';
-import { loadFromJSON, saveAsJSON } from '../../../data/json';
 import MenuItem from '../../menu/menu-item';
 import MenuItemLink from '../../menu/menu-item-link';
 import { saveAsImage, saveAsSvg } from '../../../utils/image';
@@ -29,6 +28,10 @@ import { MenuContentPropsContext } from '../../menu/common';
 import { EVENT } from '../../../constants';
 import { getShortcutKey } from '../../../utils/common';
 import { createLogger } from '../../../../../../core/logger.js';
+import { getAppContext } from '../../../../../../app/app-context.js';
+import { loadInksightFile, saveInksightFile } from '../../../../../../inksight-file/inksight-file-io.js';
+import { restoreInksightPersistence } from '../../../../../../inksight-file/inksight-file-restore.js';
+import { getBaseBookName } from '../../../../../../core/document-history-helpers.js';
 
 const logger = createLogger('DrawnixMenu');
 
@@ -39,29 +42,14 @@ export const SaveToFile = () => {
     <MenuItem
       data-testid="save-button"
       onSelect={() => {
-        // Collect extra data for persistence
-        const extraData: Record<string, any> = {};
-        if ((window as any).inksight) {
-          const ag = (window as any).inksight;
-          if (ag.currentBook && ag.currentBook.md5) {
-            extraData.bookMd5 = ag.currentBook.md5;
-            extraData.bookName = ag.currentBook.name;
-            extraData.bookId = ag.currentBook.id; // Save book ID for safe remapping
-          }
-          if (ag.cardSystem && ag.cardSystem.getPersistenceData) {
-            const persistenceData = ag.cardSystem.getPersistenceData();
-            extraData.cards = persistenceData.cards;
-            extraData.connections = persistenceData.connections;
-          }
-          if (ag.highlightManager && ag.highlightManager.getPersistenceData) {
-            const highlightData = ag.highlightManager.getPersistenceData();
-            extraData.highlights = highlightData.highlights;
-          }
-        }
-        // Strip extension from book name
-        const fileName = extraData.bookName ? extraData.bookName.replace(/\.[^/.]+$/, "") : undefined;
-        logger.debug('Exporting with filename', { original: extraData.bookName, stripped: fileName });
-        saveAsJSON(board, fileName, extraData);
+        const appContext = getAppContext();
+        const fileName = getBaseBookName(appContext.currentBook?.name) || undefined;
+        logger.debug('Exporting with filename', { original: appContext.currentBook?.name, stripped: fileName });
+        saveInksightFile({
+          board,
+          appContext,
+          name: fileName
+        });
       }}
       icon={SaveFileIcon}
       aria-label={t('menu.saveFile')}
@@ -99,64 +87,14 @@ export const OpenFile = () => {
     <MenuItem
       data-testid="open-button"
       onSelect={() => {
-        loadFromJSON(board).then((data: any) => {
+        loadInksightFile(board).then((data: any) => {
           clearAndLoad(data.elements, data.viewport, data.theme);
 
-          // Restore persistence data
-          if ((window as any).inksight) {
-            const ag = (window as any).inksight;
-            const extraData = data.raw || {};
-
-            // Check MD5
-            if (extraData.bookMd5) {
-              const savedMd5 = extraData.bookMd5;
-              const currentMd5 = ag.currentBook?.md5;
-
-              if (currentMd5 && savedMd5 !== currentMd5) {
-                alert(`Warning: This mind map was saved for a different book (${extraData.bookName || 'Unknown'}).\nNodes might not link correctly.`);
-              } else if (!currentMd5) {
-                logger.debug('Opened mind map without an active book. Nodes will be displayed independently.');
-              }
+          restoreInksightPersistence(data, getAppContext(), {
+            onBookMismatch: ({ bookName }) => {
+              alert(`Warning: This mind map was saved for a different book (${bookName}).\nNodes might not link correctly.`);
             }
-
-            // Restore Cards
-            if (ag.cardSystem && ag.cardSystem.restorePersistenceData) {
-              const currentMd5 = ag.currentBook?.md5;
-              const savedMd5 = extraData.bookMd5;
-              const shouldRemap = currentMd5 && savedMd5 && currentMd5 === savedMd5;
-              const newId = shouldRemap ? ag.currentBook.id : null;
-
-              logger.debug('Restore MD5 check', { currentMd5, savedMd5, match: currentMd5 === savedMd5, newId });
-
-              if (!currentMd5 && savedMd5) {
-                console.warn('[Restore] No book loaded. Setting pending restore.');
-                ag.pendingRestore = { md5: savedMd5, id: extraData.bookId }; // Store ID for safe remapping
-              }
-
-              ag.cardSystem.restorePersistenceData({
-                cards: extraData.cards,
-                connections: extraData.connections
-              }, newId);
-            }
-
-            // Restore Highlights
-            if (ag.highlightManager && ag.highlightManager.restorePersistenceData) {
-              const currentMd5 = ag.currentBook?.md5;
-              const savedMd5 = extraData.bookMd5;
-              const shouldRemap = currentMd5 && savedMd5 && currentMd5 === savedMd5;
-              const newId = shouldRemap ? ag.currentBook.id : null;
-
-              // Clear all existing PDF highlight overlays before restoring
-              if (ag.pdfReader && ag.pdfReader.clearAllHighlights) {
-                logger.debug('Clearing existing PDF highlights before restore');
-                ag.pdfReader.clearAllHighlights();
-              }
-
-              ag.highlightManager.restorePersistenceData({
-                highlights: extraData.highlights
-              }, newId);
-            }
-          }
+          });
         });
       }}
       icon={OpenFileIcon}

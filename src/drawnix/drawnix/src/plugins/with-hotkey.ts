@@ -6,12 +6,14 @@ import {
 } from '@plait/core';
 import { isHotkey } from 'is-hotkey';
 import { addImage, saveAsImage } from '../utils/image';
-import { saveAsJSON } from '../data/json';
 import { DrawnixState } from '../hooks/use-drawnix';
 import { BoardCreationMode, setCreationMode } from '@plait/common';
 import { MindPointerType } from '@plait/mind';
 import { FreehandShape } from './freehand/type';
 import { ArrowLineShape, BasicShapes } from '@plait/draw';
+import { getAppContext } from '../../../../app/app-context.js';
+import { saveInksightFile } from '../../../../inksight-file/inksight-file-io.js';
+import { getBaseBookName } from '../../../../core/document-history-helpers.js';
 
 export const buildDrawnixHotkeyPlugin = (
   updateAppState: (appState: Partial<DrawnixState>) => void
@@ -34,7 +36,12 @@ export const buildDrawnixHotkeyPlugin = (
           return;
         }
         if (isHotkey(['mod+s'], { byKey: true })(event)) {
-          saveAsJSON(board);
+          const appContext = getAppContext();
+          void saveInksightFile({
+            board,
+            appContext,
+            name: getBaseBookName(appContext.currentBook?.name) || undefined
+          });
           event.preventDefault();
           return;
         }

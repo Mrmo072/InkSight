@@ -17,6 +17,11 @@ import {
     updateDocumentHistoryPage
 } from './document-history-store.js';
 import { createLogger } from './logger.js';
+import {
+    getInksightExpectedElementCount,
+    restoreInksightPersistence,
+    validateInksightRestorePayload
+} from '../inksight-file/inksight-file-restore.js';
 
 const logger = createLogger('DocumentHistoryManager');
 
@@ -269,12 +274,6 @@ export class DocumentHistoryManager {
         });
     }
 
-    validateRestorePayload(md5, data) {
-        if (data.bookMd5 && data.bookMd5 !== md5) {
-            logger.warn('MD5 mismatch in save file', { expected: md5, actual: data.bookMd5 });
-        }
-    }
-
     restorePagePosition(md5, data) {
         if (!data.lastPage) {
             return;
@@ -288,40 +287,21 @@ export class DocumentHistoryManager {
     }
 
     trackExpectedElements(data) {
-        if (!data.elements || !Array.isArray(data.elements)) {
+        const expectedCount = getInksightExpectedElementCount(data);
+
+        if (expectedCount === 0 && !Array.isArray(data?.elements)) {
             return;
         }
 
-        this.initialElementCount = data.elements.length;
+        this.initialElementCount = expectedCount;
         logger.debug('Expecting to restore elements', this.initialElementCount);
     }
 
-    restoreHighlights(data, appContext) {
-        if (!appContext.highlightManager?.restorePersistenceData || !data.highlights) {
-            return;
-        }
-
-        const currentBookId = appContext.currentBook ? appContext.currentBook.id : null;
-        appContext.highlightManager.restorePersistenceData({
-            highlights: data.highlights
-        }, currentBookId);
-    }
-
-    restoreCards(data, appContext) {
-        if (!appContext.cardSystem?.restorePersistenceData || !data.cards) {
-            return;
-        }
-
-        const currentBookId = appContext.currentBook ? appContext.currentBook.id : null;
-        appContext.cardSystem.restorePersistenceData({
-            cards: data.cards,
-            connections: data.connections
-        }, currentBookId);
-    }
-
     restorePersistenceState(data, appContext) {
-        this.restoreHighlights(data, appContext);
-        this.restoreCards(data, appContext);
+        restoreInksightPersistence(data, appContext, {
+            clearPdfHighlights: false,
+            fallbackToCurrentBookIdWithoutMd5: true
+        });
     }
 
     async restoreState(md5) {
@@ -346,7 +326,12 @@ export class DocumentHistoryManager {
             }
 
             const data = JSON.parse(result.content);
-            this.validateRestorePayload(md5, data);
+            validateInksightRestorePayload(data, {
+                expectedMd5: md5,
+                onMismatch: ({ expectedMd5, actualMd5 }) => {
+                    logger.warn('MD5 mismatch in save file', { expected: expectedMd5, actual: actualMd5 });
+                }
+            });
             this.restorePagePosition(md5, data);
             this.trackExpectedElements(data);
 

@@ -2,7 +2,7 @@ import { PlaitBoard, PlaitElement } from '@plait/core';
 import { MIME_TYPES, VERSIONS } from '../constants';
 import { fileOpen, fileSave } from './filesystem';
 import { DrawnixExportedData, DrawnixExportedType } from './types';
-import { loadFromBlob, normalizeFile } from './blob';
+import { loadFromBlob, normalizeFile, parseFileContents } from './blob';
 
 export const getDefaultName = () => {
   const time = new Date().getTime();
@@ -11,40 +11,29 @@ export const getDefaultName = () => {
 
 export const saveAsJSON = async (
   board: PlaitBoard,
-  name: string = getDefaultName(),
-  extraData: Record<string, any> = {}
+  name: string = getDefaultName()
 ) => {
-  const serialized = serializeAsJSON(board, extraData);
+  const serialized = serializeAsJSON(board);
   const blob = new Blob([serialized], {
     type: MIME_TYPES.drawnix,
   });
 
   const fileHandle = await fileSave(blob, {
     name,
-    extension: 'inksight',
-    description: 'InkSight file',
+    extension: 'drawnix',
+    description: 'Drawnix file',
   });
   return { fileHandle };
 };
 
 export const loadFromJSON = async (board: PlaitBoard) => {
   const file = await fileOpen({
-    description: 'InkSight files',
-    extensions: ['inksight', 'drawnix', 'json'],
+    description: 'Drawnix files',
+    extensions: ['drawnix', 'json'],
   });
-  const data = await normalizeFile(file);
-  const loadedData = await loadFromBlob(board, data);
-  // Return full data including extra fields
-  return {
-    ...loadedData,
-    // We need to parse the JSON again to get extra fields if loadFromBlob doesn't return them
-    // loadFromBlob returns { elements, viewport } usually.
-    // Let's check loadFromBlob implementation if possible, but assuming it returns partial.
-    // Actually, we can just parse the text content of the file.
-    // But normalizeFile returns a Blob/File.
-    // Let's read the text content here to be sure.
-    raw: JSON.parse(await file.text())
-  };
+  const normalizedFile = await normalizeFile(file);
+  await loadFromBlob(board, normalizedFile);
+  return JSON.parse(await parseFileContents(normalizedFile));
 };
 
 export const isValidDrawnixData = (data?: any): data is DrawnixExportedData => {
@@ -56,7 +45,7 @@ export const isValidDrawnixData = (data?: any): data is DrawnixExportedData => {
   );
 };
 
-export const serializeAsJSON = (board: PlaitBoard, extraData: Record<string, any> = {}): string => {
+export const serializeAsJSON = (board: PlaitBoard): string => {
   const data = {
     type: DrawnixExportedType.drawnix,
     version: VERSIONS.drawnix,
@@ -64,7 +53,6 @@ export const serializeAsJSON = (board: PlaitBoard, extraData: Record<string, any
     elements: board.children,
     viewport: board.viewport,
     theme: board.theme,
-    ...extraData
   };
 
   return JSON.stringify(data, null, 2);

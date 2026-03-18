@@ -8,6 +8,12 @@ const toSvgData = vi.fn(() => Promise.resolve('<svg />'));
 const getBackgroundColor = vi.fn(() => '#123456');
 const isWhite = vi.fn(() => false);
 const setFontSize = vi.fn();
+const saveInksightFile = vi.fn();
+const getAppContext = vi.fn(() => ({
+  currentBook: {
+    name: 'Example.pdf',
+  },
+}));
 
 vi.mock('../src/drawnix/drawnix/src/utils/common', () => ({
   boardToImage,
@@ -24,8 +30,21 @@ vi.mock('@plait/core', () => ({
   DEFAULT_COLOR: '#000000',
   getSelectedElements,
   toSvgData,
+  ThemeColorMode: {
+    default: 'default',
+  },
+  PlaitPointerType: {
+    hand: 'hand',
+    selection: 'selection',
+  },
+  BoardTransforms: {
+    updatePointerType: vi.fn(),
+  },
   PlaitBoard: {
     getThemeColors: vi.fn(() => []),
+    getMovingPointInBoard: vi.fn(() => true),
+    isMovingPointInBoard: vi.fn(() => false),
+    hasBeenTextEditing: vi.fn(() => false),
   },
 }));
 
@@ -33,6 +52,39 @@ vi.mock('@plait/text-plugins', () => ({
   DEFAULT_FONT_SIZE: 14,
   TextTransforms: {
     setFontSize,
+  },
+}));
+
+vi.mock('../src/inksight-file/inksight-file-io.js', () => ({
+  saveInksightFile,
+}));
+
+vi.mock('../src/app/app-context.js', () => ({
+  getAppContext,
+}));
+
+vi.mock('@plait/common', () => ({
+  BoardCreationMode: {
+    dnd: 'dnd',
+    drawing: 'drawing',
+  },
+  setCreationMode: vi.fn(),
+}));
+
+vi.mock('@plait/mind', () => ({
+  MindPointerType: {
+    mind: 'mind',
+  },
+}));
+
+vi.mock('@plait/draw', () => ({
+  ArrowLineShape: {
+    straight: 'straight',
+  },
+  BasicShapes: {
+    rectangle: 'rectangle',
+    ellipse: 'ellipse',
+    text: 'text',
   },
 }));
 
@@ -50,9 +102,11 @@ describe('Drawnix synced updates', () => {
     toSvgData.mockReset();
     toSvgData.mockResolvedValue('<svg />');
     setFontSize.mockReset();
+    saveInksightFile.mockReset();
+    getAppContext.mockClear();
   });
 
-  it('serializes theme alongside InkSight extra data', async () => {
+  it('serializes generic board data including theme', async () => {
     const { serializeAsJSON } = await import('../src/drawnix/drawnix/src/data/json.ts');
     const board = {
       children: [{ id: 'node-1' }],
@@ -60,11 +114,10 @@ describe('Drawnix synced updates', () => {
       theme: { themeColorMode: 'dark' },
     };
 
-    const json = serializeAsJSON(board as any, { bookName: 'Example.pdf' });
+    const json = serializeAsJSON(board as any);
     const parsed = JSON.parse(json);
 
     expect(parsed.theme).toEqual({ themeColorMode: 'dark' });
-    expect(parsed.bookName).toBe('Example.pdf');
     expect(parsed.elements).toEqual([{ id: 'node-1' }]);
   });
 
@@ -121,5 +174,32 @@ describe('Drawnix synced updates', () => {
     setTextFontSize(board as any, 18);
 
     expect(setFontSize).toHaveBeenCalledWith(board, '18', 14);
+  });
+
+  it('routes hotkey save through the InkSight file adapter', async () => {
+    const { buildDrawnixHotkeyPlugin } = await import('../src/drawnix/drawnix/src/plugins/with-hotkey.ts');
+    const board = {
+      globalKeyDown: vi.fn(),
+      keyDown: vi.fn(),
+    };
+    const plugin = buildDrawnixHotkeyPlugin(vi.fn());
+    plugin(board as any);
+
+    const event = new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true });
+    Object.defineProperty(event, 'target', {
+      value: document.createElement('div'),
+    });
+
+    board.globalKeyDown(event);
+
+    expect(saveInksightFile).toHaveBeenCalledWith({
+      board,
+      appContext: {
+        currentBook: {
+          name: 'Example.pdf',
+        },
+      },
+      name: 'Example',
+    });
   });
 });

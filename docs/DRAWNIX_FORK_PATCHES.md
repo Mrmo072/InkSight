@@ -15,19 +15,25 @@
 
 ## 1. 导入导出与 InkSight 持久化绑定
 
-- `path`: `src/drawnix/drawnix/src/data/json.ts`
 - `path`: `src/drawnix/drawnix/src/components/toolbar/app-toolbar/app-menu-items.tsx`
+- `path`: `src/drawnix/drawnix/src/plugins/with-hotkey.ts`
+- `path`: `src/core/document-history-helpers.js`
+- `path`: `src/core/document-history-manager.js`
+- `path`: `src/inksight-file/inksight-file-types.js`
+- `path`: `src/inksight-file/inksight-file-snapshot.js`
+- `path`: `src/inksight-file/inksight-file-restore.js`
+- `path`: `src/inksight-file/inksight-file-io.js`
 - `reason`: 导入导出需要携带 InkSight 的书籍身份、卡片、连接和高亮数据
 - `owner`: InkSight
-- `can_move_out`: 是
-- `risk`: 高
-- `test`: 建议补 `test/drawnix-persistence-contract.test.tsx`
+- `can_move_out`: 已部分完成
+- `risk`: 中
+- `test`: `test/inksight-file-adapter.test.ts`、`src/core/__tests__/document-history-manager.test.js`
 
 说明：
 
-- 当前 `.drawnix` 通用格式已扩展为 `.inksight`
-- 导出时附带 `bookMd5`、`bookName`、`bookId`
-- 导入时恢复 cards、connections、highlights，并尝试做书籍映射
+- `.inksight` 文件格式、读写、恢复逻辑已迁移到 `src/inksight-file/*`
+- 菜单、热键、自动保存、历史恢复已共用同一套 adapter 边界
+- `src/drawnix/drawnix/src/data/json.ts` 已回归通用 Drawnix JSON 职责
 
 ## 2. TTD 懒加载与 feature islands
 
@@ -126,7 +132,6 @@
 
 每次同步上游前，优先检查以下文件：
 
-- `src/drawnix/drawnix/src/data/json.ts`
 - `src/drawnix/drawnix/src/drawnix.tsx`
 - `src/drawnix/drawnix/src/components/toolbar/app-toolbar/app-menu-items.tsx`
 - `src/drawnix/drawnix/src/components/ttd-dialog/mermaid-to-drawnix.tsx`
@@ -134,17 +139,44 @@
 - `src/drawnix/drawnix/src/components/ttd-dialog/ttd-dialog.tsx`
 - `src/drawnix/drawnix/src/components/toolbar/popup-toolbar/popup-toolbar.tsx`
 - `src/drawnix/drawnix/src/styles/index.scss`
+- `src/inksight-file/inksight-file-restore.js`
+- `src/inksight-file/inksight-file-snapshot.js`
 
 ## 下一轮建议处理顺序
 
-1. 先把 `.inksight` 导入导出契约补成测试。
-2. 再评估 `data/json.ts` 是否可以外移。
-3. 然后处理 toolbar 注入与品牌外移。
-4. 最后再考虑把 arrow shape 裁剪改成配置式隐藏。
+1. 继续补 `.inksight` 契约测试，特别是菜单/热键/恢复闭环。
+2. 评估 toolbar 注入与品牌外移。
+3. 再考虑把 arrow shape 裁剪改成配置式隐藏。
+4. 持续控制 `src/inksight-file/*` 与 `src/drawnix/*` 的边界。
 
 ## 2026-03-19 已同步内容补记
 
 本节记录 2026-03-19 这轮实际吸收的上游 Drawnix 变化，便于后续维护时快速判断哪些 patch 是主动同步进来的，而不是历史遗留。
+
+### 额外落地：`.inksight` adapter 外移
+
+## 0. `.inksight` adapter 三阶段外移
+
+- `path`: `src/inksight-file/inksight-file-types.js`
+- `path`: `src/inksight-file/inksight-file-snapshot.js`
+- `path`: `src/inksight-file/inksight-file-restore.js`
+- `path`: `src/inksight-file/inksight-file-io.js`
+- `path`: `src/drawnix/drawnix/src/components/toolbar/app-toolbar/app-menu-items.tsx`
+- `path`: `src/drawnix/drawnix/src/plugins/with-hotkey.ts`
+- `path`: `src/core/document-history-helpers.js`
+- `path`: `src/core/document-history-manager.js`
+- `path`: `src/drawnix/drawnix/src/data/json.ts`
+- `reason`: 把 `.inksight` 文件格式、读写、恢复逻辑从 Drawnix 内部逐步外移到 InkSight adapter 层，降低后续同步成本
+- `owner`: InkSight
+- `can_move_out`: 已完成核心外移
+- `risk`: 中
+- `test`: `test/inksight-file-adapter.test.ts`、`src/core/__tests__/document-history-manager.test.js`、`test/drawnix-sync-updates.test.ts`
+
+说明：
+
+- 第一阶段完成了 adapter 层建立与菜单切换
+- 第二阶段完成了自动保存与历史恢复复用共享 restore / payload 逻辑
+- 第三阶段把 `json.ts` 收缩回通用 Drawnix JSON 职责，并把 `Ctrl+S` 热键切到 adapter
 
 ### A. 已吸收的上游同步项
 

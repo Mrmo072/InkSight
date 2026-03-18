@@ -1,3 +1,5 @@
+import { buildInksightFilePayload, buildInksightPersistenceSnapshot } from '../inksight-file/inksight-file-snapshot.js';
+
 export function sanitizeSaveFilename(filename) {
     return filename.replace(/[<>:"/\\|?*]/g, '_');
 }
@@ -36,38 +38,15 @@ export function resolveHistoryFilename(record) {
 }
 
 export function buildPersistenceSnapshot(appContext = {}) {
-    const snapshot = {};
-
-    if (appContext.currentBook?.md5) {
-        snapshot.bookMd5 = appContext.currentBook.md5;
-        snapshot.bookName = appContext.currentBook.name;
-        snapshot.bookId = appContext.currentBook.id;
-    }
-
-    if (appContext.cardSystem?.getPersistenceData) {
-        const persistenceData = appContext.cardSystem.getPersistenceData();
-        snapshot.cards = persistenceData.cards;
-        snapshot.connections = persistenceData.connections;
-    }
-
-    if (appContext.highlightManager?.getPersistenceData) {
-        const highlightData = appContext.highlightManager.getPersistenceData();
-        snapshot.highlights = highlightData.highlights;
-    }
-
-    return snapshot;
+    return buildInksightPersistenceSnapshot(appContext);
 }
 
 export function buildAutoSavePayload({ appContext, board, historyEntry }) {
-    return {
-        type: 'drawnix',
-        version: '0.0.1',
-        source: 'web',
-        elements: board.children,
-        viewport: board.viewport,
-        ...buildPersistenceSnapshot(appContext),
-        ...(historyEntry?.lastPage ? { lastPage: historyEntry.lastPage } : {})
-    };
+    return buildInksightFilePayload({
+        appContext,
+        board,
+        lastPage: historyEntry?.lastPage
+    });
 }
 
 export function applySaveResultToHistory({ history, md5, resultPath, saveFilename, timestamp = Date.now() }) {
