@@ -41,6 +41,7 @@ import { I18nProvider } from './i18n';
 import { Tutorial } from './components/tutorial';
 import { LASER_POINTER_CLASS_NAME } from './utils/laser-pointer';
 import { withArrowShapeSync } from './plugins/with-arrow-shape-sync';
+import { withArrowPreviewShape } from './plugins/with-arrow-preview-shape';
 
 const TTDDialog = lazy(() => import('./components/ttd-dialog/ttd-dialog').then((module) => ({
   default: module.TTDDialog,
@@ -113,6 +114,7 @@ export const Drawnix: React.FC<DrawnixProps> = ({
     buildPencilPlugin(updateAppState),
     buildTextLinkPlugin(updateAppState),
     withArrowShapeSync,
+    withArrowPreviewShape,
   ];
 
   const containerRef = useRef<HTMLDivElement>(null);
