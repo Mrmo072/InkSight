@@ -7,9 +7,45 @@ export class PDFHighlightRenderer {
         this.container = container;
         this.pages = pages;
         this.fileId = fileId;
+        this.selectedHighlightId = null;
 
         // Callback for highlight clicks
         this.onHighlightClick = null;
+    }
+
+    setSelectedHighlight(highlightId) {
+        this.selectedHighlightId = highlightId;
+
+        const allHighlights = this.container.querySelectorAll(
+            '.highlight-overlay, .area-highlight-border, .highlighter-hitbox'
+        );
+        allHighlights.forEach((el) => {
+            el.classList.toggle('highlight-selected', el.dataset.highlightId === highlightId);
+        });
+    }
+
+    attachHighlightInteraction(target, highlightId, cardId) {
+        if (!cardId) {
+            target.style.pointerEvents = 'none';
+            return;
+        }
+
+        const handleActivate = (e) => {
+            e.stopPropagation();
+            if (e.type === 'touchend' && e.cancelable) {
+                e.preventDefault();
+            }
+            this.setSelectedHighlight(highlightId);
+            if (this.onHighlightClick) {
+                this.onHighlightClick(e, highlightId, cardId);
+            }
+        };
+
+        target.style.cursor = 'pointer';
+        target.style.pointerEvents = 'auto';
+        target.addEventListener('click', handleActivate);
+        target.addEventListener('pointerup', handleActivate);
+        target.addEventListener('touchend', handleActivate, { passive: false });
     }
 
     setFileId(fileId) {
@@ -158,18 +194,7 @@ export class PDFHighlightRenderer {
             highlightDiv.style.zIndex = '100'; // Force high z-index
             highlightDiv.dataset.highlightId = highlight.id;
 
-            if (cardId) {
-                highlightDiv.style.cursor = 'pointer';
-                highlightDiv.style.pointerEvents = 'auto'; // Enable events
-                highlightDiv.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    if (this.onHighlightClick) {
-                        this.onHighlightClick(e, highlight.id, cardId);
-                    }
-                });
-            } else {
-                highlightDiv.style.pointerEvents = 'none';
-            }
+            this.attachHighlightInteraction(highlightDiv, highlight.id, cardId);
 
             pageInfo.wrapper.appendChild(highlightDiv);
         });
@@ -213,18 +238,7 @@ export class PDFHighlightRenderer {
         borderDiv.style.zIndex = '5';
         borderDiv.dataset.highlightId = highlight.id;
 
-        if (cardId) {
-            borderDiv.style.pointerEvents = 'auto';
-            borderDiv.style.cursor = 'pointer';
-            borderDiv.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (this.onHighlightClick) {
-                    this.onHighlightClick(e, highlight.id, cardId);
-                }
-            });
-        } else {
-            borderDiv.style.pointerEvents = 'none';
-        }
+        this.attachHighlightInteraction(borderDiv, highlight.id, cardId);
 
         pageInfo.wrapper.appendChild(borderDiv);
     }
@@ -289,16 +303,7 @@ export class PDFHighlightRenderer {
         hitbox.style.zIndex = '100';
         hitbox.dataset.highlightId = highlight.id;
 
-        if (cardId) {
-            hitbox.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (this.onHighlightClick) {
-                    this.onHighlightClick(e, highlight.id, cardId);
-                }
-            });
-        } else {
-            hitbox.style.pointerEvents = 'none';
-        }
+        this.attachHighlightInteraction(hitbox, highlight.id, cardId);
 
         pageInfo.wrapper.appendChild(hitbox);
     }
@@ -329,6 +334,8 @@ export class PDFHighlightRenderer {
                 el.classList.remove('flash-effect');
             }, 1000);
         });
+
+        this.setSelectedHighlight(highlightId);
     }
 
     removeHighlightOverlays(highlightId) {

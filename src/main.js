@@ -45,6 +45,7 @@ const state = {
 
 // DOM Elements
 const elements = {
+    appLayout: document.getElementById('app-layout'),
     fileInput: document.getElementById('file-input'),
     addFileBtn: document.getElementById('add-file-btn'),
     fileList: document.getElementById('file-list'),
@@ -52,7 +53,11 @@ const elements = {
     docTitle: document.getElementById('doc-title'),
     prevBtn: document.getElementById('prev-page'),
     nextBtn: document.getElementById('next-page'),
-    pageInfo: document.getElementById('page-info')
+    pageInfo: document.getElementById('page-info'),
+    toggleSidebarBtn: document.getElementById('toggle-sidebar'),
+    toggleNotesBtn: document.getElementById('toggle-notes'),
+    toggleOutlineBtn: document.getElementById('toggle-outline'),
+    panelBackdrop: document.getElementById('panel-backdrop')
 };
 
 let currentReader = null;
@@ -61,6 +66,7 @@ let drawnixView = null;
 let splitView = null;
 let outlineSidebar = null;
 let annotationList = null;
+let currentToolMode = 'pan';
 
 function destroyCurrentReader() {
     if (currentReader?.destroy) {
@@ -74,6 +80,43 @@ function resetReadingState() {
     state.currentPage = 1;
     state.totalPages = 0;
     updatePageInfo();
+}
+
+function isCompactLayout() {
+    return splitView?.isCompactLayout() ?? window.innerWidth <= 820;
+}
+
+function updatePanelControls() {
+    const sidebarOpen = splitView ? !splitView.isLeftCollapsed() : false;
+    const notesOpen = splitView ? !splitView.isRightCollapsed() : false;
+    const outlineOpen = outlineSidebar?.isOpen() ?? false;
+
+    elements.toggleSidebarBtn?.classList.toggle('active', sidebarOpen);
+    elements.toggleNotesBtn?.classList.toggle('active', notesOpen);
+    elements.toggleOutlineBtn?.classList.toggle('active', outlineOpen);
+
+    const showBackdrop = isCompactLayout() && (sidebarOpen || notesOpen || outlineOpen);
+    elements.panelBackdrop?.classList.toggle('visible', showBackdrop);
+    document.body.classList.toggle('has-overlay-panel', showBackdrop);
+}
+
+function closeCompactPanels() {
+    if (!isCompactLayout()) return;
+    splitView?.closeAll();
+    outlineSidebar?.close();
+    updatePanelControls();
+}
+
+function setupResponsiveLayout() {
+    elements.panelBackdrop?.addEventListener('click', () => {
+        closeCompactPanels();
+    });
+
+    window.addEventListener('layout-panel-toggled', updatePanelControls);
+    window.addEventListener('outline-visibility-changed', updatePanelControls);
+    window.addEventListener('resize', updatePanelControls);
+
+    updatePanelControls();
 }
 
 // Initialization
@@ -107,9 +150,11 @@ function init() {
 
         // Setup event listeners AFTER SplitView is initialized
         setupEventListeners();
+        window.inksight.syncToolMode?.(currentToolMode);
 
         // Setup Layout Toggles (incl. Annotations)
         setupLayoutToggles();
+        setupResponsiveLayout();
 
         // Listen for live page restore events (from History Manager recovery)
         window.addEventListener('restore-page-position', (e) => {
@@ -139,17 +184,14 @@ function setupLayoutToggles() {
     }
 
     // Sidebar Toggles (Existing)
-    const toggleSidebarBtn = document.getElementById('toggle-sidebar');
-    const toggleNotesBtn = document.getElementById('toggle-notes');
-
-    if (toggleSidebarBtn) {
-        toggleSidebarBtn.addEventListener('click', () => {
+    if (elements.toggleSidebarBtn) {
+        elements.toggleSidebarBtn.addEventListener('click', () => {
             if (splitView) splitView.toggleLeft();
         });
     }
 
-    if (toggleNotesBtn) {
-        toggleNotesBtn.addEventListener('click', () => {
+    if (elements.toggleNotesBtn) {
+        elements.toggleNotesBtn.addEventListener('click', () => {
             if (splitView) splitView.toggleRight();
         });
     }
@@ -168,6 +210,7 @@ function setupEventListeners() {
     window.addEventListener('jump-to-source', (e) => {
         const { sourceId, highlightId } = e.detail;
         handleJumpToSource(sourceId, highlightId);
+        closeCompactPanels();
     });
 
     // Mind Map Selection Change (Show Document Name)
@@ -285,11 +328,19 @@ function setupEventListeners() {
 
     window.addEventListener('annotation-selected', (e) => {
         handleSelectionSync(null, e.detail.cardId, 'annotation');
+        if (isCompactLayout()) {
+            splitView?.setRightCollapsed(true);
+            updatePanelControls();
+        }
     });
 
     // Highlight Click (from Reader)
     window.addEventListener('highlight-clicked', (e) => {
         handleSelectionSync(null, e.detail.highlightId, 'highlight');
+        if (isCompactLayout()) {
+            splitView?.setRightCollapsed(true);
+            updatePanelControls();
+        }
     });
 
     // Layout Toggles moved to setupLayoutToggles()
@@ -300,66 +351,94 @@ function setupEventListeners() {
     const rectModeBtn = document.getElementById('rect-mode');
     const ellipseModeBtn = document.getElementById('ellipse-mode');
     const highlighterModeBtn = document.getElementById('highlighter-mode');
+    const highlighterPanel = document.getElementById('highlighter-panel');
+    const isCoarsePointer = () => window.matchMedia('(pointer: coarse)').matches;
 
     const modeButtons = [panModeBtn, textModeBtn, rectModeBtn, ellipseModeBtn, highlighterModeBtn].filter(Boolean);
 
-    const setActiveMode = (mode, activeBtn) => {
+    const syncModeButtons = (mode) => {
+        currentToolMode = mode;
+        modeButtons.forEach(btn => btn.classList.remove('active'));
+        const modeMap = {
+            pan: panModeBtn,
+            text: textModeBtn,
+            rectangle: rectModeBtn,
+            rect: rectModeBtn,
+            ellipse: ellipseModeBtn,
+            highlighter: highlighterModeBtn
+        };
+        modeMap[mode]?.classList.add('active');
+    };
+
+    const positionHighlighterPanel = () => {
+        if (!highlighterModeBtn || !highlighterPanel) return;
+
+        highlighterPanel.classList.add('visible');
+        void highlighterPanel.offsetHeight;
+        const btnRect = highlighterModeBtn.getBoundingClientRect();
+        const offsetParent = highlighterPanel.offsetParent || document.body;
+        const containerRect = offsetParent.getBoundingClientRect();
+        const panelWidth = 220;
+        let left = (btnRect.left - containerRect.left) + (btnRect.width / 2) - (panelWidth / 2);
+        const containerWidth = containerRect.width;
+        if (left < 10) left = 10;
+        if (left + panelWidth > containerWidth - 10) left = containerWidth - panelWidth - 10;
+        const top = (btnRect.bottom - containerRect.top) + 12;
+        highlighterPanel.style.top = `${top}px`;
+        highlighterPanel.style.left = `${left}px`;
+        highlighterPanel.style.transform = 'translateX(0)';
+    };
+
+    const setActiveMode = (mode, options = {}) => {
         if (currentReader && currentReader.setSelectionMode) {
             currentReader.setSelectionMode(mode);
-            modeButtons.forEach(btn => btn.classList.remove('active'));
-            if (activeBtn) activeBtn.classList.add('active');
+            syncModeButtons(mode);
+
+            if (mode === 'highlighter' && options.showHighlighterPanel) {
+                positionHighlighterPanel();
+            } else if (mode !== 'highlighter') {
+                highlighterPanel?.classList.remove('visible');
+            }
         }
     };
 
+    window.inksight.setToolMode = (mode, options = {}) => setActiveMode(mode, options);
+    window.inksight.syncToolMode = (mode) => syncModeButtons(mode);
+
     if (panModeBtn) {
-        panModeBtn.addEventListener('click', () => setActiveMode('pan', panModeBtn));
+        panModeBtn.addEventListener('click', () => setActiveMode('pan'));
     }
 
     if (textModeBtn) {
-        textModeBtn.addEventListener('click', () => setActiveMode('text', textModeBtn));
+        textModeBtn.addEventListener('click', () => setActiveMode('text'));
     }
 
     if (rectModeBtn) {
-        rectModeBtn.addEventListener('click', () => setActiveMode('rectangle', rectModeBtn));
+        rectModeBtn.addEventListener('click', () => setActiveMode('rectangle'));
     }
 
     if (ellipseModeBtn) {
-        ellipseModeBtn.addEventListener('click', () => setActiveMode('ellipse', ellipseModeBtn));
+        ellipseModeBtn.addEventListener('click', () => setActiveMode('ellipse'));
     }
 
-    if (highlighterModeBtn) {
-        highlighterModeBtn.addEventListener('click', (e) => {
+    if (highlighterModeBtn && highlighterPanel) {
+        highlighterModeBtn.addEventListener('click', () => {
             // Toggle panel if already active (for mobile/tablet where no hover)
             if (highlighterModeBtn.classList.contains('active')) {
                 const isVisible = highlighterPanel.classList.contains('visible');
                 if (isVisible) {
                     highlighterPanel.classList.remove('visible');
                 } else {
-                    highlighterPanel.classList.add('visible');
-                    // Position logic (copied from mouseenter)
-                    void highlighterPanel.offsetHeight;
-                    const btnRect = highlighterModeBtn.getBoundingClientRect();
-                    const offsetParent = highlighterPanel.offsetParent || document.body;
-                    const containerRect = offsetParent.getBoundingClientRect();
-                    const panelWidth = 220;
-                    let left = (btnRect.left - containerRect.left) + (btnRect.width / 2) - (panelWidth / 2);
-                    const containerWidth = containerRect.width;
-                    if (left < 10) left = 10;
-                    if (left + panelWidth > containerWidth - 10) left = containerWidth - panelWidth - 10;
-                    const top = (btnRect.bottom - containerRect.top) + 12;
-                    highlighterPanel.style.top = `${top}px`;
-                    highlighterPanel.style.left = `${left}px`;
-                    highlighterPanel.style.transform = 'translateX(0)';
+                    positionHighlighterPanel();
                 }
             } else {
-                setActiveMode('highlighter', highlighterModeBtn);
+                setActiveMode('highlighter', { showHighlighterPanel: isCoarsePointer() });
             }
         });
     }
 
     // Highlighter Height Control Panel
     const heightSlider = document.getElementById('highlighter-height');
-    const highlighterPanel = document.getElementById('highlighter-panel');
 
     if (highlighterModeBtn && highlighterPanel) {
         let isDragging = false;
@@ -368,21 +447,8 @@ function setupEventListeners() {
         let clickThreshold = 5;
 
         highlighterModeBtn.addEventListener('mouseenter', () => {
-            if (highlighterModeBtn.classList.contains('active')) {
-                highlighterPanel.classList.add('visible');
-                void highlighterPanel.offsetHeight;
-                const btnRect = highlighterModeBtn.getBoundingClientRect();
-                const offsetParent = highlighterPanel.offsetParent || document.body;
-                const containerRect = offsetParent.getBoundingClientRect();
-                const panelWidth = 220;
-                let left = (btnRect.left - containerRect.left) + (btnRect.width / 2) - (panelWidth / 2);
-                const containerWidth = containerRect.width;
-                if (left < 10) left = 10;
-                if (left + panelWidth > containerWidth - 10) left = containerWidth - panelWidth - 10;
-                const top = (btnRect.bottom - containerRect.top) + 12;
-                highlighterPanel.style.top = `${top}px`;
-                highlighterPanel.style.left = `${left}px`;
-                highlighterPanel.style.transform = 'translateX(0)';
+            if (highlighterModeBtn.classList.contains('active') && !isCoarsePointer()) {
+                positionHighlighterPanel();
             }
         });
 
@@ -415,14 +481,6 @@ function setupEventListeners() {
             document.addEventListener('mouseup', onMouseUp);
         });
 
-        highlighterModeBtn.addEventListener('touchstart', (e) => {
-            // Prevent default to avoid scrolling while dragging slider
-            if (e.cancelable) e.preventDefault();
-            startDrag(e.touches[0].clientY);
-            document.addEventListener('touchmove', onTouchMove, { passive: false });
-            document.addEventListener('touchend', onTouchEnd);
-        }, { passive: false });
-
         const onMouseMove = (e) => {
             onMove(e.clientY);
         };
@@ -452,7 +510,8 @@ function setupEventListeners() {
         }
 
         document.addEventListener('click', (e) => {
-            if (!highlighterPanel.contains(e.target) && e.target !== highlighterModeBtn) {
+            const clickedInsideButton = highlighterModeBtn.contains(e.target);
+            if (!highlighterPanel.contains(e.target) && !clickedInsideButton) {
                 highlighterPanel.classList.remove('visible');
             }
         });
@@ -654,6 +713,7 @@ async function openFile(fileData) {
             }
 
             await currentReader.load(fileData, startPage);
+            window.inksight.setToolMode?.('pan');
             elements.prevBtn.disabled = false;
             elements.nextBtn.disabled = false;
 
@@ -696,6 +756,7 @@ async function openFile(fileData) {
 
         try {
             await currentReader.load(fileData);
+            window.inksight.setToolMode?.('text');
             elements.prevBtn.disabled = false;
             elements.nextBtn.disabled = false;
         } catch (e) {
@@ -720,6 +781,7 @@ async function openFile(fileData) {
 
         try {
             await currentReader.load(fileData);
+            window.inksight.setToolMode?.('text');
             elements.prevBtn.disabled = false;
             elements.nextBtn.disabled = false;
         } catch (e) {
@@ -754,8 +816,7 @@ function updateToolAvailability(fileType) {
 
     const currentModeBtn = document.querySelector('.mode-btn.active');
     if (currentModeBtn && currentModeBtn.disabled) {
-        const textModeBtn = document.getElementById('text-mode');
-        if (textModeBtn) textModeBtn.click();
+        window.inksight.setToolMode?.('pan');
     }
 }
 

@@ -101,6 +101,31 @@ export class AnnotationList {
         }
     }
 
+    buildTransferData(card, highlight) {
+        const dragData = {
+            id: card.id,
+            highlightId: card.highlightId,
+            text: card.content || highlight?.text || '',
+            type: 'text',
+            color: highlight?.color || card.color,
+            sourceId: card.sourceId,
+            sourceName: card.sourceName
+        };
+
+        if (card.imageData) {
+            dragData.type = 'image';
+            dragData.imageData = card.imageData;
+        }
+
+        return dragData;
+    }
+
+    addCardToMindMap(card, highlight) {
+        window.dispatchEvent(new CustomEvent('add-card-to-board', {
+            detail: this.buildTransferData(card, highlight)
+        }));
+    }
+
     createItemElement({ card, highlight, pageNum }) {
         const div = document.createElement('div');
         div.className = 'annotation-item';
@@ -111,20 +136,7 @@ export class AnnotationList {
         // Drag Start Handler
         div.addEventListener('dragstart', (e) => {
             // Transfer JSON data for MindMap to consume
-            const dragData = {
-                id: card.id,
-                highlightId: card.highlightId,
-                text: card.content || highlight?.text || '',
-                type: 'text', // Assuming text for now, could be image if card has imageData
-                color: highlight?.color || card.color,
-                sourceId: card.sourceId,
-                sourceName: card.sourceName
-            };
-
-            if (card.imageData) {
-                dragData.type = 'image';
-                dragData.imageData = card.imageData;
-            }
+            const dragData = this.buildTransferData(card, highlight);
 
             e.dataTransfer.setData('application/json', JSON.stringify(dragData));
             e.dataTransfer.setData('text/plain', dragData.text);
@@ -209,8 +221,9 @@ export class AnnotationList {
 
         const delBtn = document.createElement('button');
         delBtn.className = 'action-btn';
-        delBtn.innerHTML = '<span class="material-icons-round" style="font-size: 16px;">delete</span>';
+        delBtn.innerHTML = '<span class="material-icons-round">delete</span><span class="action-label">Delete</span>';
         delBtn.title = 'Delete';
+        delBtn.setAttribute('aria-label', 'Delete annotation');
         delBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             if (confirm('Delete this annotation?')) {
@@ -218,6 +231,17 @@ export class AnnotationList {
             }
         });
         actions.appendChild(delBtn);
+
+        const addToMapBtn = document.createElement('button');
+        addToMapBtn.className = 'action-btn add-to-map-btn';
+        addToMapBtn.innerHTML = '<span class="material-icons-round">account_tree</span><span class="action-label">To map</span>';
+        addToMapBtn.title = 'Add to mind map';
+        addToMapBtn.setAttribute('aria-label', 'Add annotation to mind map');
+        addToMapBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.addCardToMindMap(card, highlight);
+        });
+        actions.appendChild(addToMapBtn);
         div.appendChild(actions);
 
         // Click to jump

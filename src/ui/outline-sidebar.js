@@ -99,5 +99,17 @@ export class OutlineSidebar {
             this.sidebar.classList.add('collapsed');
             if (this.toggleBtn) this.toggleBtn.classList.remove('active');
         }
+
+        window.dispatchEvent(new CustomEvent('outline-visibility-changed', {
+            detail: { visible: this.isVisible }
+        }));
+    }
+
+    close() {
+        this.toggle(false);
+    }
+
+    isOpen() {
+        return this.isVisible;
     }
 }

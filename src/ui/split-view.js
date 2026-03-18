@@ -20,8 +20,13 @@ export class SplitView {
         }
 
         this.minWidth = 200;
+        this.compactBreakpoint = options.compactBreakpoint || 820;
+        this.isCompact = false;
+        this.handleViewportChange = () => this.applyResponsiveState();
 
         this.setupResizers();
+        window.addEventListener('resize', this.handleViewportChange);
+        this.applyResponsiveState();
         console.log('SplitView initialized successfully');
     }
 
@@ -134,11 +139,70 @@ export class SplitView {
         document.body.style.cursor = 'default';
     }
 
+    applyResponsiveState() {
+        const nextCompact = window.innerWidth <= this.compactBreakpoint;
+        const changed = this.isCompact !== nextCompact;
+        this.isCompact = nextCompact;
+        document.body.classList.toggle('compact-layout', this.isCompact);
+
+        if (!changed) return;
+
+        if (this.isCompact) {
+            this.setLeftCollapsed(true);
+            this.setRightCollapsed(true);
+        }
+    }
+
+    isCompactLayout() {
+        return this.isCompact;
+    }
+
+    isLeftCollapsed() {
+        return this.leftPanel.classList.contains('collapsed');
+    }
+
+    isRightCollapsed() {
+        return this.rightPanel.classList.contains('collapsed');
+    }
+
+    setLeftCollapsed(collapsed) {
+        this.leftPanel.classList.toggle('collapsed', collapsed);
+        this.emitPanelState('left', !collapsed);
+    }
+
+    setRightCollapsed(collapsed) {
+        this.rightPanel.classList.toggle('collapsed', collapsed);
+        this.emitPanelState('right', !collapsed);
+    }
+
+    emitPanelState(panel, open) {
+        window.dispatchEvent(new CustomEvent('layout-panel-toggled', {
+            detail: {
+                panel,
+                open,
+                compact: this.isCompact
+            }
+        }));
+    }
+
+    closeAll() {
+        this.setLeftCollapsed(true);
+        this.setRightCollapsed(true);
+    }
+
     toggleLeft() {
-        this.leftPanel.classList.toggle('collapsed');
+        const willOpen = this.isLeftCollapsed();
+        if (this.isCompact && willOpen) {
+            this.setRightCollapsed(true);
+        }
+        this.setLeftCollapsed(!willOpen);
     }
 
     toggleRight() {
-        this.rightPanel.classList.toggle('collapsed');
+        const willOpen = this.isRightCollapsed();
+        if (this.isCompact && willOpen) {
+            this.setLeftCollapsed(true);
+        }
+        this.setRightCollapsed(!willOpen);
     }
 }

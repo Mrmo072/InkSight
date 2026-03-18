@@ -16,6 +16,13 @@ export const DrawnixBoardComponent = () => {
     const processingCardIds = useRef(new Set()); // Track cards being processed to avoid loops
     const elkRef = useRef(new ELK()); // Reuse ELK instance
 
+    const createCenteredPoints = (cx, cy, w, h) => {
+        return [
+            [cx - w / 2, cy - h / 2],
+            [cx + w / 2, cy + h / 2]
+        ];
+    };
+
 
     // Initialize with existing cards once board is ready
     useEffect(() => {
@@ -74,142 +81,123 @@ export const DrawnixBoardComponent = () => {
         // Premature return removed to allow handler initialization
 
 
-        // Global Drop Listener for Annotation -> MindMap
+        const resolveViewportCenter = () => {
+            const currentBoard = boardRef.current || board;
+            const container = containerRef.current;
+            const zoom = currentBoard?.viewport?.zoom || 1;
+            const viewX = currentBoard?.viewport?.x || 0;
+            const viewY = currentBoard?.viewport?.y || 0;
+            const width = container?.clientWidth || 600;
+            const height = container?.clientHeight || 400;
+
+            return {
+                boardX: viewX + (width / 2) / zoom,
+                boardY: viewY + (height / 2) / zoom
+            };
+        };
+
+        const insertCardIntoBoard = (data, position = resolveViewportCenter()) => {
+            if (!data?.id) return;
+
+            const targetBoard = boardRef.current || board;
+            const { boardX, boardY } = position;
+            const existingNode = targetBoard.children.find(c => c.data?.cardId === data.id);
+
+            if (existingNode) {
+                const path = [targetBoard.children.indexOf(existingNode)];
+                const w = existingNode.width || Math.abs((existingNode.points?.[1]?.[0] || 0) - (existingNode.points?.[0]?.[0] || 0)) || 200;
+                const h = existingNode.height || Math.abs((existingNode.points?.[1]?.[1] || 0) - (existingNode.points?.[0]?.[1] || 0)) || 100;
+                Transforms.setNode(targetBoard, {
+                    points: createCenteredPoints(boardX, boardY, w, h)
+                }, path);
+                return;
+            }
+
+            const card = cardSystem.cards.get(data.id);
+            if (!card) return;
+
+            cardSystem.updateCard(card.id, { isOnBoard: true });
+
+            if (data.type === 'image' && data.imageData) {
+                const img = new Image();
+                img.onload = () => {
+                    let width = img.naturalWidth;
+                    let height = img.naturalHeight;
+                    const MAX_WIDTH = 300;
+                    if (width > MAX_WIDTH) {
+                        const scale = MAX_WIDTH / width;
+                        width = MAX_WIDTH;
+                        height = height * scale;
+                    }
+
+                    const imageNode = {
+                        id: uuidv4(),
+                        type: 'image',
+                        url: data.imageData,
+                        points: createCenteredPoints(boardX, boardY, width, height),
+                        data: { cardId: data.id, cardType: data.type, sourceName: data.sourceName },
+                        strokeColor: data.color || '#4f46e5',
+                        strokeWidth: 2
+                    };
+                    Transforms.insertNode(targetBoard, imageNode, [targetBoard.children.length]);
+                };
+                img.onerror = () => {
+                    const imageNode = {
+                        id: uuidv4(),
+                        type: 'image',
+                        url: data.imageData,
+                        points: createCenteredPoints(boardX, boardY, 200, 150),
+                        data: { cardId: data.id, cardType: data.type, sourceName: data.sourceName },
+                        strokeColor: data.color || '#4f46e5',
+                        strokeWidth: 2
+                    };
+                    Transforms.insertNode(targetBoard, imageNode, [targetBoard.children.length]);
+                };
+                img.src = data.imageData;
+                return;
+            }
+
+            const { width, height } = calculateNodeSize(data.text);
+            const node = {
+                id: uuidv4(),
+                type: 'geometry',
+                shape: 'rectangle',
+                points: createCenteredPoints(boardX, boardY, width, height),
+                text: { children: [{ text: data.text }] },
+                data: { cardId: data.id, cardType: data.type, sourceName: data.sourceName },
+                strokeColor: data.color || '#4f46e5',
+                strokeWidth: 2
+            };
+            Transforms.insertNode(targetBoard, node, [targetBoard.children.length]);
+        };
+
         const globalDropHandler = (e) => {
-            // Check if it's a file drop first (to avoid blocking other drops if intended, but here we want to catch our specific format)
             const dataStr = e.dataTransfer.getData('application/json');
             if (!dataStr) return;
 
             try {
                 const data = JSON.parse(dataStr);
-                // Simple validation to ensure it's our card data
                 e.preventDefault();
-                e.stopPropagation(); // Stop bubbling to Plait board handlers
-                e.stopImmediatePropagation(); // Ensure no other listeners on window see this
-                console.log('[DrawnixBoard] Processing drop:', data);
+                e.stopPropagation();
+                e.stopImmediatePropagation();
 
-                // Accurate Coordinate Resolution (DOM-Truth Mode)
                 const currentBoard = boardRef.current || board;
                 const host = PlaitBoard.getHost(currentBoard);
                 const hostRect = host.getBoundingClientRect();
 
-                // 1. Calculate Physical Offset within the element
-                let physicalX, physicalY;
-                if (e.target === host) {
-                    physicalX = e.offsetX;
-                    physicalY = e.offsetY;
-                } else {
-                    physicalX = e.clientX - hostRect.left;
-                    physicalY = e.clientY - hostRect.top;
-                }
-
-                // 2. Resolve Logical Coordinates from SVG ViewBox
-                let boardX, boardY;
-                const viewBoxAttr = host.getAttribute('viewBox');
-
-                if (viewBoxAttr) {
-                    const [minX, minY, width, height] = viewBoxAttr.split(' ').map(parseFloat);
-                    const scaleX = width / hostRect.width;
-                    const scaleY = height / hostRect.height;
-
-                    boardX = minX + (physicalX * scaleX);
-                    boardY = minY + (physicalY * scaleY);
-
-                    console.log('[DrawnixBoard] DOM-Resolve:', { minX, minY, scaleX, physicalX, boardX });
-                } else {
+                let boardX;
+                let boardY;
+                if (host) {
                     const hostPoint = toHostPoint(currentBoard, e.clientX, e.clientY);
                     const viewBoxPoint = toViewBoxPoint(currentBoard, hostPoint);
                     boardX = viewBoxPoint[0];
                     boardY = viewBoxPoint[1];
-                }
-
-                // 3. Center logic helper
-                const createCenteredPoints = (cx, cy, w, h) => {
-                    return [
-                        [cx - w / 2, cy - h / 2],
-                        [cx + w / 2, cy + h / 2]
-                    ];
-                };
-
-                // Validation
-                if (!data.id || !data.text) return;
-
-                const existingNode = board.children.find(c => c.data?.cardId === data.id);
-
-                if (existingNode) {
-                    const path = [board.children.indexOf(existingNode)];
-                    const w = existingNode.width || 200;
-                    const h = existingNode.height || 100;
-                    Transforms.setNode(board, {
-                        points: createCenteredPoints(boardX, boardY, w, h)
-                    }, path);
                 } else {
-                    const card = cardSystem.cards.get(data.id);
-                    if (card) {
-                        cardSystem.updateCard(card.id, { isOnBoard: true });
-
-                        if (data.type === 'image' && data.imageData) {
-                            const img = new Image();
-                            img.onload = () => {
-                                let width = img.naturalWidth;
-                                let height = img.naturalHeight;
-
-                                // Scale down if too large, maintaining aspect ratio
-                                const MAX_WIDTH = 300;
-                                if (width > MAX_WIDTH) {
-                                    const scale = MAX_WIDTH / width;
-                                    width = MAX_WIDTH;
-                                    height = height * scale;
-                                }
-
-                                const imageNode = {
-                                    id: uuidv4(),
-                                    type: 'image',
-                                    url: data.imageData,
-                                    points: createCenteredPoints(boardX, boardY, width, height),
-                                    data: { cardId: data.id, cardType: data.type, sourceName: data.sourceName },
-                                    strokeColor: data.color || '#4f46e5',
-                                    strokeWidth: 2
-                                };
-                                Transforms.insertNode(board, imageNode, [board.children.length]);
-                            };
-                            img.onerror = () => {
-                                // Fallback if image fails to load
-                                console.error('Failed to load image for dimensions');
-                                const width = 200;
-                                const height = 150;
-                                const imageNode = {
-                                    id: uuidv4(),
-                                    type: 'image',
-                                    url: data.imageData,
-                                    points: createCenteredPoints(boardX, boardY, width, height),
-                                    data: { cardId: data.id, cardType: data.type, sourceName: data.sourceName },
-                                    strokeColor: data.color || '#4f46e5',
-                                    strokeWidth: 2
-                                };
-                                Transforms.insertNode(board, imageNode, [board.children.length]);
-                            };
-                            img.src = data.imageData;
-                        } else {
-                            const { width, height } = calculateNodeSize(data.text);
-                            const node = {
-                                id: uuidv4(),
-                                type: 'geometry',
-                                shape: 'rectangle',
-                                points: createCenteredPoints(boardX, boardY, width, height),
-                                text: { children: [{ text: data.text }] },
-                                data: { cardId: data.id, cardType: data.type, sourceName: data.sourceName },
-                                strokeColor: data.color || '#4f46e5',
-                                strokeWidth: 2
-                            };
-                            Transforms.insertNode(board, node, [board.children.length]);
-                        }
-                    } else {
-                        // Fallback
-                    }
+                    ({ boardX, boardY } = resolveViewportCenter());
                 }
+
+                insertCardIntoBoard(data, { boardX, boardY, hostRect });
             } catch (err) {
-                // Not JSON or ours, ignore
                 console.error('[DrawnixBoard] Drop error:', err);
             }
         };
@@ -218,8 +206,13 @@ export const DrawnixBoardComponent = () => {
             e.preventDefault(); // Necessary to allow dropping
         };
 
+        const handleAddCardToBoard = (e) => {
+            insertCardIntoBoard(e.detail);
+        };
+
         window.addEventListener('drop', globalDropHandler, true);
         window.addEventListener('dragover', globalDragOverHandler, true);
+        window.addEventListener('add-card-to-board', handleAddCardToBoard);
 
         const handleCardSoftDeleted = (e) => {
             const { id } = e.detail;
@@ -253,9 +246,11 @@ export const DrawnixBoardComponent = () => {
         window.addEventListener('card-restored', handleCardRestored);
 
         return () => {
-            window.removeEventListener('card-added', handleCardAdded);
             window.removeEventListener('card-soft-deleted', handleCardSoftDeleted);
             window.removeEventListener('card-restored', handleCardRestored);
+            window.removeEventListener('drop', globalDropHandler, true);
+            window.removeEventListener('dragover', globalDragOverHandler, true);
+            window.removeEventListener('add-card-to-board', handleAddCardToBoard);
         };
     }, [board]);
 
@@ -683,122 +678,7 @@ export const DrawnixBoardComponent = () => {
 
     const handleBoardDrop = (e) => {
         e.preventDefault();
-        const dataStr = e.dataTransfer.getData('application/json');
-        if (!dataStr) return;
-
-        try {
-            const data = JSON.parse(dataStr);
-
-            // Check manual vs auto flow
-            const cardInSystem = cardSystem.cards.get(data.id);
-
-            // Calculate drop position relative to board
-            const container = containerRef.current;
-            const rect = container.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-
-            // Adjust for zoom and scroll
-            const currentZoom = board ? (board.viewport?.zoom || 1) : 1;
-            const viewX = board?.viewport?.x || 0;
-            const viewY = board?.viewport?.y || 0;
-
-            const boardX = x / currentZoom + viewX;
-            const boardY = y / currentZoom + viewY;
-
-            // Create card/node manual entry
-            // We reuse the existing card ID if it exists? 
-            // The requirement says "drag annotation to generate corresponding node".
-            // Since the annotation implies a card already exists (in CardSystem), we just need to ensure it's ON THE BOARD.
-            // Check if node exists for this card
-            const existingNode = board.children.find(c => c.data?.cardId === data.id);
-
-            if (existingNode) {
-                // Move existing node to new position? 
-                // Or just flash it?
-                // Let's move it to drop location for convenience
-                const path = [board.children.indexOf(existingNode)];
-                Transforms.setNode(board, {
-                    points: [[boardX, boardY], [boardX + (existingNode.width || 200), boardY + (existingNode.height || 100)]]
-                }, path);
-            } else {
-                // Create new node for this existing card
-                // The card data is in 'data' from drag event
-                // We should ensure cardSystem has it (it should if it came from annotation list)
-                const card = cardSystem.cards.get(data.id);
-                if (card) {
-                    // Mark as on board so it persists
-                    cardSystem.updateCard(card.id, { isOnBoard: true });
-
-                    // We do NOT call addCardNode here because updateCard will trigger a refresh or we rely on processBatch? 
-                    // Wait, processBatch only runs on re-render. 
-                    // DrawnixBoard useEffect [board] -> if Transforms changes board, it runs.
-                    // BUT Transforms methods usually mutate board structure.
-                    // If we want to guarantee single insertion:
-                    // Option 1: rely on cardSystem update -> main.js -> card-updated -> AnnotationList refresh.
-                    // Does NOT trigger board add.
-                    // Option 2: DrawnixBoard useEffect runs.
-                    // If we add manually via Transforms (below), useEffect sees it exists -> skips.
-                    // If we do NOT add manually, does useEffect see it? 
-                    // Logic: useEffect iterates ALL cards. If (!exists && isOnBoard), adds it.
-                    // So if we set isOnBoard=true, AND trigger a re-run of useEffect, it will add it.
-                    // Does cardSystem.updateCard trigger re-run? No.
-                    // So manual insertion IS needed (the code below 'if (data.type === 'image') ... else { Transforms.insertNode }').
-                    // The DUPLICATE was caused by calling `addCardNode(board, card, 0)` WHICH ADDS A NODE
-                    // AND THEN calling `Transforms.insertNode` (in the code below) WHICH ADDS ANOTHER NODE.
-                    // So I just remove `addCardNode(board, card, 0)`.
-
-                    // addCardNode(board, card, 0); // REMOVE THIS LINE
-
-                    // Since addCardNode uses grid layout index, we might need a custom adder or update it immediately
-                    // Actually addCardNode is simple. Let's just manually insert here or modify addCardNode to accept pos?
-                    // Refactoring addCardNode to accept optional position is better but let's just do manual insertion for now to be safe
-                    // Wait, `addCardNode` is locally defined. Let's modify it or just copy logic.
-                    // Copying logic for simplicity of this patch:
-
-                    let node;
-                    if (data.type === 'image' && data.imageData) {
-                        // ... Image logic ...
-                        // For simplicity, let's just re-use addCardNode logic but forcing position update after?
-                        // Or better: update card position in system FIRST?
-                        card.position = { x: boardX, y: boardY };
-                        // But addCardNode ignores card.position currently and uses grid. 
-                        // Let's just create node here directly.
-
-                        const width = 200;
-                        const height = 150; // Approximations or need image load
-
-                        const imageNode = {
-                            id: data.id,
-                            type: 'image',
-                            url: data.imageData,
-                            points: [[boardX, boardY], [boardX + width, boardY + height]],
-                            data: { cardId: data.id, cardType: data.type, sourceName: data.sourceName },
-                            strokeColor: data.color || '#4f46e5',
-                            strokeWidth: 2
-                        };
-                        Transforms.insertNode(board, imageNode, [board.children.length]);
-                    } else {
-                        // Text
-                        const { width, height } = calculateNodeSize(data.text);
-                        node = {
-                            id: data.id,
-                            type: 'geometry',
-                            shape: 'rectangle',
-                            points: [[boardX, boardY], [boardX + width, boardY + height]],
-                            text: { children: [{ text: data.text }] },
-                            data: { cardId: data.id, cardType: data.type, sourceName: data.sourceName },
-                            strokeColor: data.color || '#4f46e5',
-                            strokeWidth: 2
-                        };
-                        Transforms.insertNode(board, node, [board.children.length]);
-                    }
-                }
-            }
-
-        } catch (err) {
-            console.error('[DrawnixBoard] Error processing drop:', err);
-        }
+        e.stopPropagation();
     };
 
     // Auto-Restore Listener

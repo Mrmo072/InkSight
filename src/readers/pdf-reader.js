@@ -22,7 +22,7 @@ export class PDFReader {
     };
 
     // Static selection mode - persists across instances
-    static currentSelectionMode = 'text';
+    static currentSelectionMode = 'pan';
 
     constructor(container) {
         this.container = container;
@@ -324,12 +324,15 @@ export class PDFReader {
         if (mode === 'text') {
             this.container.classList.remove('disable-selection');
             this.container.style.cursor = 'text';
+            this.container.style.touchAction = 'pan-x pan-y pinch-zoom';
         } else if (mode === 'pan') {
             this.container.classList.add('disable-selection');
             this.container.style.cursor = 'grab';
+            this.container.style.touchAction = 'none';
         } else {
             this.container.classList.add('disable-selection');
             this.container.style.cursor = 'default';
+            this.container.style.touchAction = 'none';
         }
     }
 
@@ -620,9 +623,10 @@ export class PDFReader {
             wrapper.style.position = 'relative';
             wrapper.style.backgroundColor = 'white';
             wrapper.style.boxShadow = '0 2px 5px rgba(0,0,0,0.1)';
-            wrapper.style.overflow = 'visible';
+            wrapper.style.overflow = 'hidden';
             wrapper.style.margin = '20px auto'; // Center the page
             wrapper.style.flexShrink = '0'; // Prevent collapse in flex container
+            wrapper.style.isolation = 'isolate';
             wrapper.dataset.pageNum = num;
 
             const page = await this.pdfDoc.getPage(num);
@@ -794,6 +798,13 @@ export class PDFReader {
                             this.handleSelection(pageInfo.num);
                         }
                     });
+                    textLayerDiv.addEventListener('touchend', () => {
+                        if (this.selectionMode === 'text') {
+                            setTimeout(() => {
+                                this.handleSelection(pageInfo.num);
+                            }, 120);
+                        }
+                    }, { passive: true });
                 });
             });
         });

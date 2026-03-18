@@ -96,6 +96,9 @@ export class TextReader {
 
             // Selection listener
             this.content.addEventListener('mouseup', (e) => this.handleSelection(e));
+            this.content.addEventListener('touchend', (e) => {
+                setTimeout(() => this.handleSelection(e), 120);
+            }, { passive: true });
 
             // Global click to hide toolbar
             this.content.addEventListener('mousedown', (e) => {
@@ -358,8 +361,19 @@ export class TextReader {
         if (mode === 'text') {
             this.container.style.cursor = 'text';
             this.container.classList.remove('disable-selection');
+            this.container.style.touchAction = 'pan-x pan-y pinch-zoom';
+            if (this.content) {
+                this.content.style.userSelect = 'text';
+                this.content.style.webkitUserSelect = 'text';
+            }
         } else {
-            this.container.style.cursor = 'default';
+            this.container.style.cursor = 'grab';
+            this.container.classList.add('disable-selection');
+            this.container.style.touchAction = 'auto';
+            if (this.content) {
+                this.content.style.userSelect = 'none';
+                this.content.style.webkitUserSelect = 'none';
+            }
         }
     }
 

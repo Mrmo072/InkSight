@@ -13,6 +13,7 @@ export class PDFHighlightToolbar {
         this.root = null; // React root
         this.selectedHighlightId = null;
         this.selectedCardId = null;
+        this.closeHandler = null;
 
         // Callbacks
         this.onDeleteHighlight = options.onDeleteHighlight || (() => { });
@@ -87,18 +88,24 @@ export class PDFHighlightToolbar {
             />
         );
 
-        // Close toolbar when clicking elsewhere
-        const closeHandler = (e) => {
-            if (!toolbar.contains(e.target) && e.target.dataset.highlightId !== highlightId) {
-                console.log('[PDFHighlightToolbar] Closing toolbar (click outside)');
+        // Close toolbar when clicking/touching elsewhere
+        this.closeHandler = (e) => {
+            const clickedHighlight = e.target.closest?.(`[data-highlight-id="${highlightId}"]`);
+            if (!toolbar.contains(e.target) && !clickedHighlight) {
+                console.log('[PDFHighlightToolbar] Closing toolbar (interaction outside)');
                 this.hide();
-                document.removeEventListener('mousedown', closeHandler);
             }
         };
-        document.addEventListener('mousedown', closeHandler);
+        document.addEventListener('mousedown', this.closeHandler);
+        document.addEventListener('touchstart', this.closeHandler, { passive: true });
     }
 
     hide() {
+        if (this.closeHandler) {
+            document.removeEventListener('mousedown', this.closeHandler);
+            document.removeEventListener('touchstart', this.closeHandler);
+            this.closeHandler = null;
+        }
         if (this.root) {
             this.root.unmount();
             this.root = null;

@@ -413,10 +413,21 @@ export class EpubReader {
 
         // Similar to TextReader, we primarily support text selection for now.
         if (mode === 'text') {
-            // Enable text selection in epubjs iframe if possible
-            // this.rendition.getContents().forEach(c => c.content.style.userSelect = 'text');
+            this.container.style.touchAction = 'pan-x pan-y pinch-zoom';
+            this.rendition?.getContents().forEach((content) => {
+                if (content?.document?.body) {
+                    content.document.body.style.userSelect = 'text';
+                    content.document.body.style.webkitUserSelect = 'text';
+                }
+            });
         } else {
-            // Disable or warn
+            this.container.style.touchAction = 'auto';
+            this.rendition?.getContents().forEach((content) => {
+                if (content?.document?.body) {
+                    content.document.body.style.userSelect = 'none';
+                    content.document.body.style.webkitUserSelect = 'none';
+                }
+            });
         }
     }
 
