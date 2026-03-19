@@ -4,7 +4,6 @@ const boardToImage = vi.fn();
 const base64ToBlob = vi.fn(() => new Blob(['image']));
 const download = vi.fn();
 const getSelectedElements = vi.fn(() => []);
-const toSvgData = vi.fn(() => Promise.resolve('<svg />'));
 const getBackgroundColor = vi.fn(() => '#123456');
 const isWhite = vi.fn(() => false);
 const setFontSize = vi.fn();
@@ -29,7 +28,6 @@ vi.mock('../src/drawnix/drawnix/src/utils/color', () => ({
 vi.mock('@plait/core', () => ({
   DEFAULT_COLOR: '#000000',
   getSelectedElements,
-  toSvgData,
   ThemeColorMode: {
     default: 'default',
   },
@@ -45,6 +43,7 @@ vi.mock('@plait/core', () => ({
     getMovingPointInBoard: vi.fn(() => true),
     isMovingPointInBoard: vi.fn(() => false),
     hasBeenTextEditing: vi.fn(() => false),
+    getHost: vi.fn((board) => board.host),
   },
 }));
 
@@ -99,8 +98,6 @@ describe('Drawnix synced updates', () => {
     getBackgroundColor.mockReturnValue('#123456');
     isWhite.mockReset();
     isWhite.mockReturnValue(false);
-    toSvgData.mockReset();
-    toSvgData.mockResolvedValue('<svg />');
     setFontSize.mockReset();
     saveInksightFile.mockReset();
     getAppContext.mockClear();
@@ -152,19 +149,22 @@ describe('Drawnix synced updates', () => {
     );
   });
 
-  it('uses transparent fill for white SVG backgrounds', async () => {
+  it('exports svg from the current board host and keeps white backgrounds transparent', async () => {
     isWhite.mockReturnValue(true);
     const { saveAsSvg } = await import('../src/drawnix/drawnix/src/utils/image.ts');
+    const host = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    host.setAttribute('viewBox', '0 0 200 100');
+    host.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'g'));
 
-    await saveAsSvg({ theme: { themeColorMode: 'default' } } as any);
+    await saveAsSvg({
+      theme: { themeColorMode: 'default' },
+      host,
+    } as any);
 
-    expect(toSvgData).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        fillStyle: 'TRANSPARENT',
-      })
-    );
     expect(download).toHaveBeenCalled();
+    const [blob, filename] = download.mock.calls[0];
+    expect(filename).toMatch(/\.svg$/);
+    expect(blob).toBeInstanceOf(Blob);
   });
 
   it('applies text font size through text transforms', async () => {
