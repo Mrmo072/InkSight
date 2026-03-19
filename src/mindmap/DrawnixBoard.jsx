@@ -6,6 +6,7 @@ import { registerEventListeners } from '../app/event-listeners.js';
 import { cardSystem } from '../core/card-system.js';
 import { themeManager } from '../core/theme-manager.js';
 import { createLogger } from '../core/logger.js';
+import { openProjectFile } from '../inksight-file/inksight-project-actions.js';
 import {
     buildAutoLayoutPlan,
     calculateNodeSize,
@@ -332,6 +333,7 @@ export const DrawnixBoardComponent = () => {
         setBoard(b);
         boardRef.current = b; // Store ref for callbacks
         setAppService('board', b);
+        setAppService('openProjectFile', () => openProjectFile(b));
 
         // Signal that board is ready for restoring data
         logger.debug('Board initialized and ready');
@@ -409,6 +411,11 @@ export const DrawnixBoardComponent = () => {
                 setValue(data.elements);
                 if (data.viewport) {
                     setViewport(data.viewport);
+                }
+                if (data.theme && boardRef.current) {
+                    boardRef.current.theme = data.theme;
+                    boardRef.current.history.undos = [];
+                    boardRef.current.history.redos = [];
                 }
             }
         };

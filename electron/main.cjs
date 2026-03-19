@@ -52,6 +52,9 @@ app.on('window-all-closed', () => {
 
 // --- IPC Handlers for Auto-Save ---
 
+const RUNTIME_PROJECT_MANIFEST = 'project.json';
+const RUNTIME_PROJECT_META = 'meta.json';
+
 // Get the save directory path (Project Root/files/saves)
 const getSaveDir = () => {
     // In dev: process.cwd() is project root
@@ -60,6 +63,151 @@ const getSaveDir = () => {
     // But user specifically requested: "d:\Programs\Projects\InkSight\files\saves" style.
     // We try to use process.cwd() which usually maps to execution folder.
     return path.join(process.cwd(), 'files', 'saves');
+};
+
+const ensureDir = (dirPath) => {
+    if (!fs.existsSync(dirPath)) {
+        fs.mkdirSync(dirPath, { recursive: true });
+    }
+    return dirPath;
+};
+
+const getInstallRuntimeDir = () => {
+    const baseDir = app.isPackaged ? path.dirname(process.execPath) : process.cwd();
+    return path.join(baseDir, 'runtime-data');
+};
+
+const normalizeRuntimeSegment = (value, fallback) => {
+    const normalized = typeof value === 'string' ? value.trim() : '';
+    const sanitized = normalized.replace(/[^a-zA-Z0-9_-]/g, '-').replace(/-+/g, '-').slice(0, 80);
+    return sanitized || fallback;
+};
+
+const getRuntimeProjectDir = ({ userId, sessionId, projectId }) => {
+    return path.join(
+        getInstallRuntimeDir(),
+        'users',
+        normalizeRuntimeSegment(userId, 'anonymous'),
+        'sessions',
+        normalizeRuntimeSegment(sessionId, 'default'),
+        'projects',
+        normalizeRuntimeSegment(projectId, 'workspace')
+    );
+};
+
+const getRuntimeUserSessionsDir = (userId) => {
+    return path.join(
+        getInstallRuntimeDir(),
+        'users',
+        normalizeRuntimeSegment(userId, 'anonymous'),
+        'sessions'
+    );
+};
+
+const toBuffer = (value) => {
+    if (Buffer.isBuffer(value)) {
+        return value;
+    }
+
+    if (value instanceof Uint8Array) {
+        return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
+    }
+
+    if (value instanceof ArrayBuffer) {
+        return Buffer.from(new Uint8Array(value));
+    }
+
+    if (Array.isArray(value)) {
+        return Buffer.from(value);
+    }
+
+    throw new Error('Unsupported binary payload');
+};
+
+const writeRuntimeBinaryFile = (rootDir, relativePath, bytes) => {
+    const absolutePath = path.join(rootDir, relativePath);
+    ensureDir(path.dirname(absolutePath));
+    fs.writeFileSync(absolutePath, toBuffer(bytes));
+};
+
+const listRelativeFiles = (rootDir, currentDir = rootDir) => {
+    if (!fs.existsSync(currentDir)) {
+        return [];
+    }
+
+    const items = fs.readdirSync(currentDir, { withFileTypes: true });
+    const results = [];
+
+    for (const item of items) {
+        const absolutePath = path.join(currentDir, item.name);
+        if (item.isDirectory()) {
+            results.push(...listRelativeFiles(rootDir, absolutePath));
+        } else if (item.isFile()) {
+            results.push(path.relative(rootDir, absolutePath).replace(/\\/g, '/'));
+        }
+    }
+
+    return results;
+};
+
+const cleanupRuntimeSubdir = (projectDir, subdirName, expectedPaths) => {
+    const targetDir = path.join(projectDir, subdirName);
+    if (!fs.existsSync(targetDir)) {
+        return;
+    }
+
+    const expected = new Set(expectedPaths);
+    const existing = listRelativeFiles(projectDir, targetDir);
+    for (const relativePath of existing) {
+        if (expected.has(relativePath)) {
+            continue;
+        }
+
+        fs.rmSync(path.join(projectDir, relativePath), { force: true });
+    }
+};
+
+const resolveLatestRuntimeProjectDir = ({ userId, sessionId, projectId }) => {
+    const preferredDir = getRuntimeProjectDir({ userId, sessionId, projectId });
+    if (fs.existsSync(path.join(preferredDir, RUNTIME_PROJECT_MANIFEST))) {
+        return preferredDir;
+    }
+
+    const sessionsDir = getRuntimeUserSessionsDir(userId);
+    if (!fs.existsSync(sessionsDir)) {
+        return null;
+    }
+
+    const sessionEntries = fs.readdirSync(sessionsDir, { withFileTypes: true }).filter((entry) => entry.isDirectory());
+    let bestMatch = null;
+
+    for (const sessionEntry of sessionEntries) {
+        const candidateDir = getRuntimeProjectDir({
+            userId,
+            sessionId: sessionEntry.name,
+            projectId
+        });
+        const metaPath = path.join(candidateDir, RUNTIME_PROJECT_META);
+        const manifestPath = path.join(candidateDir, RUNTIME_PROJECT_MANIFEST);
+        if (!fs.existsSync(metaPath) || !fs.existsSync(manifestPath)) {
+            continue;
+        }
+
+        try {
+            const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
+            const savedAt = Date.parse(meta.savedAt || 0) || 0;
+            if (!bestMatch || savedAt > bestMatch.savedAt) {
+                bestMatch = {
+                    dir: candidateDir,
+                    savedAt
+                };
+            }
+        } catch {
+            // ignore malformed metadata
+        }
+    }
+
+    return bestMatch?.dir || null;
 };
 
 ipcMain.handle('ensure-save-dir', async () => {
@@ -128,5 +276,129 @@ ipcMain.handle('find-save-by-md5', async (event, targetMd5) => {
     } catch (e) {
         console.error('IPC find-save-by-md5 error:', e);
         return { success: false, error: e.message };
+    }
+});
+
+ipcMain.handle('get-runtime-storage-info', async () => {
+    const rootPath = ensureDir(getInstallRuntimeDir());
+    return {
+        rootPath,
+        mode: 'runtime-data'
+    };
+});
+
+ipcMain.handle('save-runtime-project', async (event, payload = {}) => {
+    try {
+        const {
+            userId,
+            sessionId,
+            projectId,
+            projectName,
+            manifest,
+            assetEntries = [],
+            documentEntries = []
+        } = payload;
+
+        const projectDir = ensureDir(getRuntimeProjectDir({ userId, sessionId, projectId }));
+        const manifestPath = path.join(projectDir, RUNTIME_PROJECT_MANIFEST);
+        const metaPath = path.join(projectDir, RUNTIME_PROJECT_META);
+
+        fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf-8');
+
+        for (const assetEntry of assetEntries) {
+            writeRuntimeBinaryFile(projectDir, assetEntry.path, assetEntry.bytes);
+        }
+
+        for (const documentEntry of documentEntries) {
+            writeRuntimeBinaryFile(projectDir, documentEntry.path, documentEntry.bytes);
+        }
+
+        cleanupRuntimeSubdir(projectDir, 'assets', assetEntries.map((entry) => entry.path));
+        cleanupRuntimeSubdir(projectDir, 'documents', documentEntries.map((entry) => entry.path));
+
+        const meta = {
+            userId,
+            sessionId,
+            projectId,
+            projectName,
+            savedAt: new Date().toISOString(),
+            manifest: RUNTIME_PROJECT_MANIFEST,
+            assetCount: assetEntries.length,
+            documentCount: documentEntries.length
+        };
+        fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), 'utf-8');
+
+        return {
+            success: true,
+            projectDir,
+            manifestPath,
+            metaPath,
+            savedAt: meta.savedAt,
+            mode: 'runtime-data'
+        };
+    } catch (error) {
+        console.error('IPC save-runtime-project error:', error);
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+});
+
+ipcMain.handle('load-runtime-project', async (event, payload = {}) => {
+    try {
+        const { userId, sessionId, projectId } = payload;
+        const projectDir = resolveLatestRuntimeProjectDir({ userId, sessionId, projectId });
+        if (!projectDir) {
+            return {
+                success: false,
+                error: 'Runtime project not found'
+            };
+        }
+
+        const manifestPath = path.join(projectDir, RUNTIME_PROJECT_MANIFEST);
+        const metaPath = path.join(projectDir, RUNTIME_PROJECT_META);
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+        const meta = fs.existsSync(metaPath)
+            ? JSON.parse(fs.readFileSync(metaPath, 'utf-8'))
+            : null;
+
+        const referencedPaths = new Set();
+        for (const asset of manifest.assets || []) {
+            if (asset?.path) {
+                referencedPaths.add(asset.path);
+            }
+        }
+        for (const document of manifest.documents || []) {
+            if (document?.path) {
+                referencedPaths.add(document.path);
+            }
+        }
+
+        const files = Array.from(referencedPaths).map((relativePath) => {
+            const absolutePath = path.join(projectDir, relativePath);
+            const bytes = fs.readFileSync(absolutePath);
+            return {
+                path: relativePath,
+                bytes: new Uint8Array(bytes),
+                mimeType: ''
+            };
+        });
+
+        return {
+            success: true,
+            manifest,
+            files,
+            projectDir,
+            projectId: meta?.projectId || projectId,
+            projectName: meta?.projectName || null,
+            savedAt: meta?.savedAt || null
+        };
+    } catch (error) {
+        console.error('IPC load-runtime-project error:', error);
+        return {
+            success: false,
+            error: error.message
+        };
     }
 });

@@ -9,7 +9,8 @@ function hasRestorePayload(payload) {
             payload.bookMd5 ||
             payload.cards ||
             payload.connections ||
-            payload.highlights
+            payload.highlights ||
+            payload.documents
         )
     );
 }
@@ -92,5 +93,11 @@ export function restoreInksightPersistence(payload, appContext = {}, options = {
         appContext.highlightManager.restorePersistenceData({
             highlights: payload.highlights
         }, newId);
+    }
+
+    if (appContext.documentManager?.restorePersistenceData) {
+        appContext.documentManager.restorePersistenceData({
+            documents: payload.documents
+        });
     }
 }

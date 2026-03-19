@@ -203,6 +203,12 @@ export class CardSystem {
             }
         }
 
+        this.connections = Array.isArray(data.connections)
+            ? data.connections.filter((connection) =>
+                this.cards.has(connection.sourceId) && this.cards.has(connection.targetId)
+            )
+            : [];
+
 
         // Notify UI
         window.dispatchEvent(new CustomEvent('cards-restored', {

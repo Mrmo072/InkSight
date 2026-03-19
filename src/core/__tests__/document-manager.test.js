@@ -67,6 +67,25 @@ describe('DocumentManager', () => {
         }));
     });
 
+    it('finds matching unloaded documents for source relinking', () => {
+        documentManager.restorePersistenceData({
+            documents: [
+                ['doc-1', { id: 'doc-1', name: 'Book.pdf', type: 'application/pdf', loaded: true }],
+                ['doc-2', { id: 'doc-2', name: 'Notes.md', type: 'text/markdown', loaded: true }]
+            ]
+        });
+
+        expect(documentManager.findRestorableMatch({
+            name: 'book.pdf',
+            type: 'application/pdf'
+        })).toEqual(expect.objectContaining({ id: 'doc-1' }));
+        expect(documentManager.findRestorableMatch({
+            name: 'Notes.md',
+            type: 'text/plain'
+        })).toBeNull();
+        expect(documentManager.getMissingDocuments()).toHaveLength(2);
+    });
+
     it('clears all document registrations and exposes persistence payloads', () => {
         const listener = listenOnce('documents-cleared');
         documentManager.registerDocument('doc-1', 'Book.pdf', 'application/pdf');

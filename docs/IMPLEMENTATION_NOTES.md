@@ -112,6 +112,57 @@ Rules:
   - action-lazy
 - Prefer action-lazy for features with large third-party dependency trees.
 
+## Recovery Workflow
+
+Primary files:
+- `src/inksight-file/inksight-file-snapshot.js`
+- `src/inksight-file/inksight-file-restore.js`
+- `src/app/document-relink.js`
+- `src/app/recovery-panel-actions.js`
+- `src/app/source-navigation.js`
+- `src/ui/app-notifications.js`
+
+Current recovery behavior:
+- `.inksight` exports now include document references in addition to board elements, cards, highlights, and connections.
+- Restoring a project rebuilds missing document references as unloaded placeholders instead of silently dropping them.
+- The library panel shows unresolved source documents and provides relink, bulk import, auto-match, and validation entry points.
+- Auto-match attempts to reuse already loaded documents when names and types are compatible.
+- Source navigation uses a dedicated helper so jump-back behavior can be tested without the full app boot path.
+- Recovery feedback is delivered through in-app notifications instead of blocking alerts.
+
+Rules:
+- Keep project-file concerns inside the InkSight adapter and relink helpers, not inside Drawnix internals.
+- Keep relink matching logic pure when possible so it stays easy to test.
+- Navigation failures should surface through app notifications, not silent logs alone.
+- New recovery actions should be wired through the recovery-panel action helper instead of adding more DOM-specific branching in `main.js`.
+
+## Recovery Tests
+
+Relevant tests:
+- `test/inksight-persistence-contract.test.ts`
+- `test/inksight-file-adapter.test.ts`
+- `src/app/__tests__/document-relink.test.js`
+- `src/app/__tests__/source-navigation.test.js`
+- `src/app/__tests__/recovery-panel-actions.test.js`
+- `src/ui/__tests__/app-notifications.test.js`
+
+What they currently protect:
+- `.inksight` payload contract and restore behavior
+- relink target selection and diagnostics
+- linked-source navigation fallback behavior
+- recovery panel action routing
+- notification rendering and action callbacks
+
+## Bundle Follow-Up
+
+Current build status:
+- The app builds successfully, but `elk-vendor` and `mermaid-vendor` are still far above the chunk warning threshold.
+
+Recommended next bundle work:
+- Measure whether Mermaid and ELK chunks are ever pulled into the initial route unexpectedly.
+- Consider splitting the Mermaid-related vendor chunk more aggressively if preview/insert paths still share a too-large dependency group.
+- If startup performance becomes a user-facing issue, profile the recovery-heavy path separately from a clean reading-only startup.
+
 ## Tests Added To Protect These Rules
 
 Relevant tests:

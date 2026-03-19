@@ -8,12 +8,6 @@ import {
 } from '../../icons';
 import { useBoard, useListRender } from '@plait-board/react-board';
 import {
-  BoardTransforms,
-  PlaitBoard,
-  PlaitElement,
-  PlaitTheme,
-  ThemeColorMode,
-  Viewport,
   getSelectedElements,
 } from '@plait/core';
 import { MindElement } from '@plait/mind';
@@ -27,34 +21,20 @@ import { useContext } from 'react';
 import { MenuContentPropsContext } from '../../menu/common';
 import { EVENT } from '../../../constants';
 import { getShortcutKey } from '../../../utils/common';
-import { createLogger } from '../../../../../../core/logger.js';
-import { getAppContext } from '../../../../../../app/app-context.js';
-import { loadInksightFile, saveInksightFile } from '../../../../../../inksight-file/inksight-file-io.js';
-import { restoreInksightPersistence } from '../../../../../../inksight-file/inksight-file-restore.js';
-import { getBaseBookName } from '../../../../../../core/document-history-helpers.js';
-
-const logger = createLogger('DrawnixMenu');
+import { saveCurrentProject, openProjectFile } from '../../../../../../inksight-file/inksight-project-actions.js';
 
 export const SaveToFile = () => {
   const board = useBoard();
-  const { t } = useI18n();
   return (
     <MenuItem
       data-testid="save-button"
       onSelect={() => {
-        const appContext = getAppContext();
-        const fileName = getBaseBookName(appContext.currentBook?.name) || undefined;
-        logger.debug('Exporting with filename', { original: appContext.currentBook?.name, stripped: fileName });
-        saveInksightFile({
-          board,
-          appContext,
-          name: fileName
-        });
+        void saveCurrentProject(board);
       }}
       icon={SaveFileIcon}
-      aria-label={t('menu.saveFile')}
+      aria-label="Save Project Folder"
       shortcut={getShortcutKey('CtrlOrCmd+S')}
-    >{t('menu.saveFile')}</MenuItem>
+    >Save Project Folder</MenuItem>
   );
 };
 SaveToFile.displayName = 'SaveToFile';
@@ -62,44 +42,15 @@ SaveToFile.displayName = 'SaveToFile';
 export const OpenFile = () => {
   const board = useBoard();
   const listRender = useListRender();
-  const { t } = useI18n();
-  const clearAndLoad = (
-    value: PlaitElement[],
-    viewport?: Viewport,
-    theme?: PlaitTheme
-  ) => {
-    board.children = value;
-    board.viewport = viewport || { zoom: 1 };
-    board.theme = theme || { themeColorMode: ThemeColorMode.default };
-    listRender.update(board.children, {
-      board: board,
-      parent: board,
-      parentG: PlaitBoard.getElementHost(board),
-    });
-    BoardTransforms.fitViewport(board);
-
-    // Clear edit history to prevent undo back to pre-import state
-    board.history.undos = [];
-    board.history.redos = [];
-    logger.debug('Import edit history cleared');
-  };
   return (
     <MenuItem
       data-testid="open-button"
       onSelect={() => {
-        loadInksightFile(board).then((data: any) => {
-          clearAndLoad(data.elements, data.viewport, data.theme);
-
-          restoreInksightPersistence(data, getAppContext(), {
-            onBookMismatch: ({ bookName }) => {
-              alert(`Warning: This mind map was saved for a different book (${bookName}).\nNodes might not link correctly.`);
-            }
-          });
-        });
+        void openProjectFile(board, listRender);
       }}
       icon={OpenFileIcon}
-      aria-label={t('menu.open')}
-    >{t('menu.open')}</MenuItem>
+      aria-label="Open Project Folder"
+    >Open Project Folder</MenuItem>
   );
 };
 OpenFile.displayName = 'OpenFile';

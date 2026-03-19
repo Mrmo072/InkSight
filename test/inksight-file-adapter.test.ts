@@ -20,6 +20,11 @@ describe('InkSight file adapter', () => {
           name: 'Example.pdf',
           id: 'book-id',
         },
+        documentManager: {
+          getPersistenceData: () => ({
+            documents: [['doc-1', { id: 'doc-1', name: 'Example.pdf', type: 'application/pdf', loaded: true }]],
+          }),
+        },
         cardSystem: {
           getPersistenceData: () => ({
             cards: [{ id: 'card-1' }],
@@ -44,6 +49,7 @@ describe('InkSight file adapter', () => {
       bookMd5: 'book-md5',
       bookName: 'Example.pdf',
       bookId: 'book-id',
+      documents: [['doc-1', { id: 'doc-1', name: 'Example.pdf', type: 'application/pdf', loaded: true }]],
       cards: [{ id: 'card-1' }],
       connections: [{ id: 'conn-1' }],
       highlights: [{ id: 'hl-1' }],
@@ -87,6 +93,7 @@ describe('InkSight file adapter', () => {
     const restoreHighlights = vi.fn();
     const clearAllHighlights = vi.fn();
     const onBookMismatch = vi.fn();
+    const restoreDocuments = vi.fn();
     const appContext = {
       currentBook: {
         md5: null,
@@ -99,6 +106,9 @@ describe('InkSight file adapter', () => {
       highlightManager: {
         restorePersistenceData: restoreHighlights,
       },
+      documentManager: {
+        restorePersistenceData: restoreDocuments,
+      },
       pdfReader: {
         clearAllHighlights,
       },
@@ -108,6 +118,7 @@ describe('InkSight file adapter', () => {
       bookMd5: 'saved-md5',
       bookId: 'old-book-id',
       bookName: 'Saved.pdf',
+      documents: [['doc-1', { id: 'doc-1', name: 'Saved.pdf', type: 'application/pdf', loaded: true }]],
       cards: [{ id: 'card-1' }],
       connections: [{ id: 'conn-1' }],
       highlights: [{ id: 'hl-1' }],
@@ -125,6 +136,9 @@ describe('InkSight file adapter', () => {
     expect(restoreHighlights).toHaveBeenCalledWith({
       highlights: [{ id: 'hl-1' }],
     }, null);
+    expect(restoreDocuments).toHaveBeenCalledWith({
+      documents: [['doc-1', { id: 'doc-1', name: 'Saved.pdf', type: 'application/pdf', loaded: true }]],
+    });
     expect(onBookMismatch).not.toHaveBeenCalled();
   });
 

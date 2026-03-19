@@ -21,6 +21,11 @@ export function buildInksightPersistenceSnapshot(appContext = {}) {
         snapshot.highlights = highlightData.highlights;
     }
 
+    if (appContext.documentManager?.getPersistenceData) {
+        const documentData = appContext.documentManager.getPersistenceData();
+        snapshot.documents = documentData.documents;
+    }
+
     return snapshot;
 }
 

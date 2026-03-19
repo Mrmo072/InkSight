@@ -106,11 +106,17 @@ describe('CardSystem', () => {
                 ['c-1', { id: 'c-1', sourceId: 'old-doc' }],
                 ['c-2', { id: 'c-2', sourceId: 'old-doc' }]
             ],
-            connections: []
+            connections: [
+                { id: 'link-ok', sourceId: 'c-1', targetId: 'c-2' },
+                { id: 'link-stale', sourceId: 'c-1', targetId: 'missing' }
+            ]
         }, 'new-doc');
 
         expect(cardSystem.cards.get('c-1').sourceId).toBe('new-doc');
         expect(cardSystem.cards.get('c-2').sourceId).toBe('new-doc');
+        expect(cardSystem.connections).toEqual([
+            { id: 'link-ok', sourceId: 'c-1', targetId: 'c-2' }
+        ]);
         expect(restoredListener).toHaveBeenCalled();
 
         window.removeEventListener('cards-restored', restoredListener);

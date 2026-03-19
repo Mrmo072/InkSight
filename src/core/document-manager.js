@@ -11,6 +11,18 @@ export class DocumentManager {
         this.documents = new Map(); // id -> {id, name, type, loaded}
     }
 
+    normalizeDocumentName(name) {
+        return typeof name === 'string' ? name.trim().toLowerCase() : '';
+    }
+
+    isTypeCompatible(candidateType, targetType) {
+        if (!candidateType || !targetType) {
+            return true;
+        }
+
+        return candidateType === targetType;
+    }
+
     /**
      * Register a document in the system
      * @param {string} id - Unique document identifier
@@ -75,6 +87,35 @@ export class DocumentManager {
      */
     getAllDocuments() {
         return Array.from(this.documents.values());
+    }
+
+    getMissingDocuments() {
+        return this.getAllDocuments().filter((doc) => !doc.loaded);
+    }
+
+    findRestorableMatch({ name, type } = {}) {
+        const normalizedName = this.normalizeDocumentName(name);
+        if (!normalizedName) {
+            return null;
+        }
+
+        for (const doc of this.documents.values()) {
+            if (doc.loaded) {
+                continue;
+            }
+
+            if (this.normalizeDocumentName(doc.name) !== normalizedName) {
+                continue;
+            }
+
+            if (!this.isTypeCompatible(doc.type, type)) {
+                continue;
+            }
+
+            return doc;
+        }
+
+        return null;
     }
 
     /**

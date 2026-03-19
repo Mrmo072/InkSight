@@ -7,12 +7,13 @@ const getSelectedElements = vi.fn(() => []);
 const getBackgroundColor = vi.fn(() => '#123456');
 const isWhite = vi.fn(() => false);
 const setFontSize = vi.fn();
-const saveInksightFile = vi.fn();
+const saveCurrentProject = vi.fn();
 const getAppContext = vi.fn(() => ({
   currentBook: {
     name: 'Example.pdf',
   },
 }));
+const setAppService = vi.fn();
 
 vi.mock('../src/drawnix/drawnix/src/utils/common', () => ({
   boardToImage,
@@ -54,12 +55,13 @@ vi.mock('@plait/text-plugins', () => ({
   },
 }));
 
-vi.mock('../src/inksight-file/inksight-file-io.js', () => ({
-  saveInksightFile,
+vi.mock('../src/inksight-file/inksight-project-actions.js', () => ({
+  saveCurrentProject,
 }));
 
 vi.mock('../src/app/app-context.js', () => ({
   getAppContext,
+  setAppService,
 }));
 
 vi.mock('@plait/common', () => ({
@@ -99,8 +101,9 @@ describe('Drawnix synced updates', () => {
     isWhite.mockReset();
     isWhite.mockReturnValue(false);
     setFontSize.mockReset();
-    saveInksightFile.mockReset();
+    saveCurrentProject.mockReset();
     getAppContext.mockClear();
+    setAppService.mockReset();
   });
 
   it('serializes generic board data including theme', async () => {
@@ -191,15 +194,8 @@ describe('Drawnix synced updates', () => {
     });
 
     board.globalKeyDown(event);
+    await Promise.resolve();
 
-    expect(saveInksightFile).toHaveBeenCalledWith({
-      board,
-      appContext: {
-        currentBook: {
-          name: 'Example.pdf',
-        },
-      },
-      name: 'Example',
-    });
+    expect(saveCurrentProject).toHaveBeenCalledWith(board);
   });
 });

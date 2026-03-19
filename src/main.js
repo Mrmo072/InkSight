@@ -3,12 +3,33 @@ import { highlightManager } from './core/highlight-manager.js';
 import { SplitView } from './ui/split-view.js';
 import { OutlineSidebar } from './ui/outline-sidebar.js';
 import { AnnotationList } from './ui/annotation-list.js';
+import { emitAppNotification, mountAppNotifications } from './ui/app-notifications.js';
 import { suppressResizeObserverLoop } from './drawnix/react-board/src/utils/resizeObserverFix.js';
 import { documentHistoryManager } from './core/document-history-manager.js'; // Import History Manager
 import { getAppContext, initAppContext, setAppService, updateCurrentBook } from './app/app-context.js';
 import { createReaderLoader } from './app/reader-loader.js';
 import { registerEventListeners } from './app/event-listeners.js';
 import { setupSelectionSync } from './app/selection-sync.js';
+import { buildRecoveryDiagnostics, chooseDocumentTarget, findLoadedDocumentMatch } from './app/document-relink.js';
+import { buildDocumentRemovalPrompt, reorderFilesById } from './app/file-list-helpers.js';
+import {
+    formatAutosaveTime,
+    loadProjectSnapshotMeta,
+    loadProjectAutosavePrefs,
+    PROJECT_AUTOSAVE_SNAPSHOT_KEY,
+    saveProjectAutosavePrefs
+} from './app/project-status-helpers.js';
+import {
+    ensureRuntimeProjectId,
+    ensureRuntimeSessionId,
+    ensureRuntimeUserId,
+    setRuntimeProjectId
+} from './app/runtime-project-identity.js';
+import { handleRecoveryPanelClick } from './app/recovery-panel-actions.js';
+import { navigateToLinkedSource } from './app/source-navigation.js';
+import { saveCurrentProject } from './inksight-file/inksight-project-actions.js';
+import { restoreInksightPersistence } from './inksight-file/inksight-file-restore.js';
+import { getRuntimeStorageInfo, loadRuntimeProjectSnapshot, saveRuntimeProjectSnapshot } from './inksight-file/inksight-runtime-project-io.js';
 import { createLogger } from './core/logger.js';
 
 const logger = createLogger('Main');
@@ -40,7 +61,6 @@ const elements = {
     readerContainer: document.getElementById('reader-container'),
     readerContentWrapper: document.getElementById('reader-content-wrapper'),
     fileInput: document.getElementById('file-input'),
-    addFileBtn: document.getElementById('add-file-btn'),
     fileList: document.getElementById('file-list'),
     viewer: document.getElementById('viewer'),
     docTitle: document.getElementById('doc-title'),
@@ -48,10 +68,16 @@ const elements = {
     nextBtn: document.getElementById('next-page'),
     mobilePrevBtn: document.getElementById('mobile-prev-page'),
     mobileNextBtn: document.getElementById('mobile-next-page'),
+    mobileImportDocumentsBtn: document.getElementById('mobile-import-documents'),
+    mobileOpenProjectBtn: document.getElementById('mobile-open-project'),
+    mobileSaveProjectBtn: document.getElementById('mobile-save-project'),
     pageInfo: document.getElementById('page-info'),
     mobileContextPageInfo: document.getElementById('mobile-context-page-info'),
     mobileDocSummary: document.getElementById('mobile-doc-summary'),
     mobilePageInfo: document.getElementById('mobile-page-info'),
+    toolbarImportDocumentsBtn: document.getElementById('toolbar-import-documents'),
+    toolbarOpenProjectBtn: document.getElementById('toolbar-open-project'),
+    toolbarSaveProjectBtn: document.getElementById('toolbar-save-project'),
     toggleSidebarBtn: document.getElementById('toggle-sidebar'),
     toggleNotesBtn: document.getElementById('toggle-notes'),
     toggleOutlineBtn: document.getElementById('toggle-outline'),
@@ -72,7 +98,11 @@ const elements = {
     readerToolbar: document.getElementById('reader-toolbar'),
     panelBackdrop: document.getElementById('panel-backdrop'),
     selectionModeFloating: document.getElementById('selection-mode-floating'),
-    selectionModeDragHandle: document.getElementById('selection-mode-drag-handle')
+    selectionModeDragHandle: document.getElementById('selection-mode-drag-handle'),
+    saveStatusIndicator: document.getElementById('save-status-indicator'),
+    appNotifications: document.getElementById('app-notifications'),
+    emptyImportDocumentBtn: document.getElementById('empty-import-document'),
+    emptyOpenProjectBtn: document.getElementById('empty-open-project')
 };
 
 let currentReader = null;
@@ -89,6 +119,26 @@ const selectionToolbarPositions = {
     desktop: null,
     mobile: null
 };
+let draggedFileId = null;
+let projectAutosaveIntervalId = null;
+let isProjectAutosaveRunning = false;
+const projectStatusState = {
+    ...loadProjectAutosavePrefs(localStorage),
+    lastSavedAt: loadProjectSnapshotMeta(localStorage).savedAt,
+    lastMode: 'Server workspace'
+};
+
+function ensureProjectIdentity() {
+    const userId = ensureRuntimeUserId(localStorage);
+    const sessionId = ensureRuntimeSessionId(sessionStorage);
+    const projectId = ensureRuntimeProjectId(localStorage);
+
+    setAppService('runtimeUserId', userId);
+    setAppService('runtimeSessionId', sessionId);
+    setAppService('currentProjectId', projectId);
+
+    return { userId, sessionId, projectId };
+}
 
 async function createDrawnixView(container) {
     const { DrawnixView } = await import('./mindmap/drawnix-view.js');
@@ -106,6 +156,489 @@ function getCardsCollection() {
     }
 
     return Object.values(cards || {});
+}
+
+function getVisibleDocuments() {
+    const registeredDocuments = getAppContext().documentManager?.getAllDocuments?.() ?? [];
+    const importedFileIds = new Set(state.files.map((file) => file.id));
+    const visibleDocuments = state.files.map((file) => ({
+        id: file.id,
+        name: file.name,
+        type: file.type,
+        loaded: true,
+        fileData: file
+    }));
+
+    registeredDocuments.forEach((doc) => {
+        if (importedFileIds.has(doc.id)) {
+            return;
+        }
+
+        visibleDocuments.push({
+            ...doc,
+            fileData: null
+        });
+    });
+
+    return visibleDocuments;
+}
+
+function getMissingDocuments() {
+    return getAppContext().documentManager?.getMissingDocuments?.() ?? [];
+}
+
+function describeDocumentStatus(file, index) {
+    if (file.loaded) {
+        return `Document ${index + 1}`;
+    }
+
+    return 'Source file missing - re-import to relink';
+}
+
+function getDocumentReferenceDetails(documentId) {
+    const cardCount = getCardsCollection().filter((card) => card.sourceId === documentId).length;
+    const highlightCount = getAppContext().highlightManager?.highlights?.filter((highlight) => highlight.sourceId === documentId).length ?? 0;
+    return {
+        cardCount,
+        highlightCount,
+        referenceCount: cardCount + highlightCount
+    };
+}
+
+function getProjectStatus() {
+    const appContext = getAppContext();
+    const linkedToDirectory = Boolean(appContext.currentProjectDirectoryHandle);
+    const documentCount = state.files.length;
+    const projectDirectoryName = appContext.currentProjectDirectoryHandle?.name || null;
+    const runtimeRoot = appContext.runtimeStorageInfo?.rootPath || null;
+
+    return {
+        linkedToDirectory,
+        title: linkedToDirectory ? 'Project Folder Linked' : 'Workspace Not Saved As A Project Yet',
+        description: linkedToDirectory
+            ? 'This workspace is linked to a project folder. Saving will update the board state, bundled source documents, and extracted assets in that folder.'
+            : 'Autosave writes to the server workspace under runtime-data. Use Save Project Folder only when you want to export a full local copy.',
+        summary: `${documentCount} loaded ${documentCount === 1 ? 'document' : 'documents'}`,
+        projectDirectoryName,
+        runtimeRoot
+    };
+}
+
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+}
+
+function promptRelinkDocument(documentId) {
+    const targetDocument = getAppContext().documentManager?.getDocumentInfo?.(documentId);
+    if (!targetDocument || targetDocument.loaded) {
+        return;
+    }
+
+    setAppService('pendingDocumentImport', {
+        id: targetDocument.id,
+        name: targetDocument.name,
+        type: targetDocument.type
+    });
+    elements.fileInput.value = '';
+    elements.fileInput.click();
+}
+
+function promptBulkRelink() {
+    setAppService('pendingDocumentImport', {
+        mode: 'bulk'
+    });
+    elements.fileInput.value = '';
+    elements.fileInput.click();
+}
+
+function promptImportDocument() {
+    setAppService('pendingDocumentImport', null);
+    elements.fileInput.value = '';
+    elements.fileInput.click();
+}
+
+async function promptOpenProject() {
+    const openProject = getAppContext().openProjectFile;
+    if (typeof openProject === 'function') {
+        try {
+            await openProject();
+            const projectId = getAppContext().currentProjectId || ensureRuntimeProjectId(localStorage);
+            setAppService('currentProjectId', projectId);
+            setRuntimeProjectId(projectId, localStorage);
+            projectStatusState.lastMode = 'Server workspace';
+            void performProjectAutosave({ notify: false });
+        } catch (error) {
+            logger.warn('Open project folder failed', error);
+        }
+        return;
+    }
+
+    emitAppNotification({
+        title: 'Project Folder',
+        message: 'Project loading is not ready yet. Please wait for the workspace board to finish initializing.',
+        level: 'warning'
+    });
+}
+
+async function promptSaveProject() {
+    const board = getAppContext().board;
+    if (board) {
+        try {
+            await saveCurrentProject(board);
+            projectStatusState.lastSavedAt = Date.now();
+            projectStatusState.lastMode = 'Local project export';
+            showSaveStatus('success', 'Project exported to local folder.');
+        } catch (error) {
+            logger.warn('Save project folder failed', error);
+        }
+        return;
+    }
+
+    emitAppNotification({
+        title: 'Project Folder',
+        message: 'Project saving is not ready yet. Please wait for the workspace board to finish initializing.',
+        level: 'warning'
+    });
+}
+
+let saveStatusHideTimeout = null;
+
+function showSaveStatus(state, message, duration = 1800) {
+    if (!elements.saveStatusIndicator) {
+        return;
+    }
+
+    if (saveStatusHideTimeout) {
+        clearTimeout(saveStatusHideTimeout);
+        saveStatusHideTimeout = null;
+    }
+
+    elements.saveStatusIndicator.textContent = message;
+    elements.saveStatusIndicator.className = `save-status-indicator visible ${state}`.trim();
+
+    if (duration > 0) {
+        saveStatusHideTimeout = setTimeout(() => {
+            elements.saveStatusIndicator?.classList.remove('visible', 'success', 'error', 'saving');
+        }, duration);
+    }
+}
+
+function restartProjectAutosave() {
+    if (projectAutosaveIntervalId) {
+        clearInterval(projectAutosaveIntervalId);
+        projectAutosaveIntervalId = null;
+    }
+
+    if (!projectStatusState.enabled) {
+        return;
+    }
+
+    projectAutosaveIntervalId = setInterval(() => {
+        void performProjectAutosave({ notify: false });
+    }, Math.max(1, projectStatusState.intervalMinutes) * 60 * 1000);
+}
+
+async function persistRuntimeProjectSnapshot() {
+    const appContext = getAppContext();
+    const board = appContext.board;
+    if (!board) {
+        return false;
+    }
+
+    const runtimeIdentity = ensureProjectIdentity();
+    const result = await saveRuntimeProjectSnapshot({
+        board,
+        appContext,
+        projectFiles: appContext.getProjectFiles?.() ?? [],
+        runtimeIdentity,
+        projectName: appContext.currentBook?.name || 'workspace'
+    });
+
+    if (!result?.success) {
+        return false;
+    }
+
+    localStorage.setItem(PROJECT_AUTOSAVE_SNAPSHOT_KEY, JSON.stringify({
+        savedAt: Date.now()
+    }));
+    setAppService('runtimeStorageInfo', {
+        ...(appContext.runtimeStorageInfo || {}),
+        rootPath: result.projectDir || appContext.runtimeStorageInfo?.rootPath || null
+    });
+    return true;
+}
+
+async function restoreRuntimeWorkspace() {
+    const appContext = getAppContext();
+    const runtimeIdentity = ensureProjectIdentity();
+    const result = await loadRuntimeProjectSnapshot({
+        runtimeIdentity
+    }).catch(() => null);
+
+    if (!result?.payload) {
+        return false;
+    }
+
+    appContext.currentProjectCleanup?.();
+    setAppService('currentProjectCleanup', result.cleanup || null);
+    setAppService('currentProjectDirectoryHandle', null);
+    setAppService('currentProjectId', result.projectId || runtimeIdentity.projectId);
+
+    window.dispatchEvent(new CustomEvent('restore-board-state', {
+        detail: {
+            elements: result.payload.elements,
+            viewport: result.payload.viewport,
+            theme: result.payload.theme
+        }
+    }));
+
+    restoreInksightPersistence(result.payload, appContext, {
+        onBookMismatch: ({ bookName }) => {
+            emitAppNotification({
+                title: 'Book Mismatch',
+                message: `This mind map was saved for a different book (${bookName}). Nodes might not link correctly until the original source files are relinked.`,
+                level: 'warning'
+            });
+        }
+    });
+
+    if (result.projectFiles?.length) {
+        await appContext.hydrateProjectFiles?.(result.projectFiles, {
+            openCurrentBookId: result.payload.bookId || null
+        });
+    } else {
+        renderFileList();
+    }
+
+    projectStatusState.lastSavedAt = result.savedAt ? Date.parse(result.savedAt) : projectStatusState.lastSavedAt;
+    projectStatusState.lastMode = 'Server workspace';
+    showSaveStatus('success', `Recovered server workspace${result.projectName ? `: ${result.projectName}` : ''}.`, 2200);
+    return true;
+}
+
+async function performProjectAutosave({ notify = false, forceExport = false } = {}) {
+    if (isProjectAutosaveRunning) {
+        return false;
+    }
+
+    isProjectAutosaveRunning = true;
+
+    try {
+        const appContext = getAppContext();
+        const board = appContext.board;
+        if (!board) {
+            return false;
+        }
+
+        if (forceExport) {
+            showSaveStatus('saving', 'Exporting project to local folder...', 0);
+            let payload = null;
+            try {
+                payload = await saveCurrentProject(board, {
+                    notify,
+                    forcePrompt: forceExport
+                });
+            } catch (error) {
+                showSaveStatus('error', 'Project export was cancelled.', 1800);
+                return false;
+            }
+            if (!payload) {
+                showSaveStatus('error', 'Project export was cancelled.', 1800);
+                return false;
+            }
+
+            projectStatusState.lastSavedAt = Date.now();
+            projectStatusState.lastMode = 'Local project export';
+            showSaveStatus('success', 'Project exported to local folder.');
+            return true;
+        }
+
+        showSaveStatus('saving', 'Saving workspace to server...', 0);
+        const saved = await persistRuntimeProjectSnapshot();
+        if (saved) {
+            projectStatusState.lastSavedAt = Date.now();
+            projectStatusState.lastMode = 'Server workspace';
+            showSaveStatus('success', `Saved to server workspace at ${formatAutosaveTime(projectStatusState.lastSavedAt)}.`);
+
+            if (notify) {
+                emitAppNotification({
+                    title: 'Server Workspace Saved',
+                    message: 'Saved the current workspace state into the server runtime-data area. Use Save Project Folder when you want a local export for the terminal user.',
+                    level: 'success'
+                });
+            }
+        }
+
+        return saved;
+    } finally {
+        isProjectAutosaveRunning = false;
+    }
+}
+
+function applyProjectAutosavePrefs(partialPrefs) {
+    Object.assign(projectStatusState, partialPrefs);
+    saveProjectAutosavePrefs(projectStatusState, localStorage);
+    restartProjectAutosave();
+}
+
+function attemptAutoRelinkRecoveredDocuments({ notify = false } = {}) {
+    const appContext = getAppContext();
+    const missingDocuments = appContext.documentManager?.getMissingDocuments?.() ?? [];
+    const loadedDocuments = (appContext.documentManager?.getAllDocuments?.() ?? []).filter((doc) => doc.loaded);
+    let matchedCount = 0;
+
+    missingDocuments.forEach((document) => {
+        const loadedMatch = findLoadedDocumentMatch({
+            document,
+            loadedDocuments,
+            documentManager: appContext.documentManager
+        });
+
+        if (!loadedMatch) {
+            return;
+        }
+
+        appContext.highlightManager?.remapSourceIds?.(loadedMatch.id, document.id);
+        appContext.cardSystem?.remapSourceIds?.(loadedMatch.id, document.id);
+        appContext.cardSystem?.updateSourceNames?.(loadedMatch.id, loadedMatch.name);
+        appContext.highlightManager?.updateSourceNames?.(loadedMatch.id, loadedMatch.name);
+        appContext.documentManager?.unregisterDocument?.(document.id);
+        matchedCount += 1;
+    });
+
+    if (matchedCount > 0) {
+        renderFileList();
+        appContext.annotationList?.refresh?.();
+    }
+
+    if (notify) {
+        if (matchedCount > 0) {
+            emitAppNotification({
+                title: 'Auto Match Complete',
+                message: `Automatically relinked ${matchedCount} restored source ${matchedCount === 1 ? 'file' : 'files'} using documents already loaded in the workspace.`,
+                level: 'success',
+                actions: [
+                    { label: 'Validate', onClick: () => showRecoveryValidation() }
+                ]
+            });
+        } else {
+            emitAppNotification({
+                title: 'Auto Match',
+                message: 'No automatic relink candidates were found among the documents already loaded in this workspace.',
+                level: 'warning',
+                actions: [
+                    { label: 'Import Sources', onClick: () => promptBulkRelink() }
+                ]
+            });
+        }
+    }
+
+    return matchedCount;
+}
+
+function showRecoveryValidation() {
+    const diagnostics = buildRecoveryDiagnostics(getAppContext());
+    const unresolvedDocumentCount = diagnostics.missingDocuments.length;
+
+    if (unresolvedDocumentCount === 0) {
+    emitAppNotification({
+        title: 'Links Ready',
+        message: `All saved source documents are linked. ${diagnostics.readyCards} of ${diagnostics.totalCards} cards and ${diagnostics.readyHighlights} of ${diagnostics.totalHighlights} highlights are ready for source navigation.`,
+        level: 'success',
+        duration: 5200,
+        actions: [
+            { label: 'Validate Again', onClick: () => showRecoveryValidation() }
+        ]
+    });
+        return;
+    }
+
+    emitAppNotification({
+        title: 'Links Incomplete',
+        message: `${unresolvedDocumentCount} source ${unresolvedDocumentCount === 1 ? 'file is' : 'files are'} still missing. ${diagnostics.readyCards} of ${diagnostics.totalCards} cards and ${diagnostics.readyHighlights} of ${diagnostics.totalHighlights} highlights are navigation-ready. Use the relink actions in the library to restore linked navigation.`,
+        level: 'warning',
+        duration: 6200,
+        actions: [
+            { label: 'Auto Match', onClick: () => attemptAutoRelinkRecoveredDocuments({ notify: true }) },
+            { label: 'Import Sources', onClick: () => promptBulkRelink() }
+        ]
+    });
+}
+
+async function moveFileByOffset(fileId, offset) {
+    const currentIndex = state.files.findIndex((file) => file.id === fileId);
+    if (currentIndex < 0) {
+        return;
+    }
+
+    const targetIndex = currentIndex + offset;
+    if (targetIndex < 0 || targetIndex >= state.files.length) {
+        return;
+    }
+
+    const [file] = state.files.splice(currentIndex, 1);
+    state.files.splice(targetIndex, 0, file);
+    renderFileList();
+}
+
+function moveFileToIndex(fileId, targetIndex) {
+    state.files = reorderFilesById(state.files, fileId, targetIndex);
+    renderFileList();
+}
+
+async function removeFileFromWorkspace(fileId) {
+    const fileIndex = state.files.findIndex((file) => file.id === fileId);
+    if (fileIndex < 0) {
+        return;
+    }
+
+    const fileToRemove = state.files[fileIndex];
+    const appContext = getAppContext();
+    const { cardCount, highlightCount, referenceCount } = getDocumentReferenceDetails(fileId);
+    const isCurrentDocument = appContext.currentBook?.id === fileId;
+    const confirmed = window.confirm(buildDocumentRemovalPrompt({
+        name: fileToRemove.name,
+        cardCount,
+        highlightCount,
+        isCurrentDocument
+    }));
+
+    if (!confirmed) {
+        return;
+    }
+
+    const [removedFile] = state.files.splice(fileIndex, 1);
+
+    if (referenceCount > 0 || isCurrentDocument) {
+        appContext.documentManager?.markDocumentLoaded?.(fileId, false);
+    } else {
+        appContext.documentManager?.unregisterDocument?.(fileId);
+    }
+
+    if (state.currentFile?.id === fileId) {
+        const fallbackFile = state.files[fileIndex] || state.files[fileIndex - 1] || null;
+        if (fallbackFile) {
+            await openFile(fallbackFile);
+        } else {
+            clearLoadedFiles();
+            renderFileList();
+        }
+    } else {
+        renderFileList();
+    }
+
+    emitAppNotification({
+        title: 'Document Removed',
+        message: referenceCount > 0
+            ? `"${removedFile.name}" was removed from the active library list. Linked cards and highlights were preserved and now need relinking before source navigation works again.`
+            : `"${removedFile.name}" was removed from the active library list.`,
+        level: 'success'
+    });
 }
 
 function findCardByHighlightId(highlightId) {
@@ -447,6 +980,12 @@ function setupResponsiveLayout() {
 async function init() {
 
     try {
+        ensureProjectIdentity();
+        const runtimeStorageInfo = await getRuntimeStorageInfo().catch(() => null);
+        if (runtimeStorageInfo) {
+            setAppService('runtimeStorageInfo', runtimeStorageInfo);
+        }
+
         loadFilesFromStorage();
         updateToolbarSummary();
 
@@ -481,7 +1020,10 @@ async function init() {
         setupLayoutToggles();
         setupResponsiveLayout();
         setupFloatingSelectionToolbar();
+        registerCleanup(mountAppNotifications(elements.appNotifications));
+        restartProjectAutosave();
         setWorkspaceMode('reading', { force: true });
+        await restoreRuntimeWorkspace();
 
         // Listen for live page restore events (from History Manager recovery)
         registerCleanup(registerEventListeners([
@@ -734,6 +1276,14 @@ function setupEventListeners() {
     // File Import
     registerCleanup(registerEventListeners([
         { target: elements.fileInput, event: 'change', handler: handleFileSelect },
+        { target: elements.toolbarImportDocumentsBtn, event: 'click', handler: promptImportDocument },
+        { target: elements.toolbarOpenProjectBtn, event: 'click', handler: () => void promptOpenProject() },
+        { target: elements.toolbarSaveProjectBtn, event: 'click', handler: () => void promptSaveProject() },
+        { target: elements.mobileImportDocumentsBtn, event: 'click', handler: promptImportDocument },
+        { target: elements.mobileOpenProjectBtn, event: 'click', handler: () => void promptOpenProject() },
+        { target: elements.mobileSaveProjectBtn, event: 'click', handler: () => void promptSaveProject() },
+        { target: elements.emptyImportDocumentBtn, event: 'click', handler: promptImportDocument },
+        { target: elements.emptyOpenProjectBtn, event: 'click', handler: () => void promptOpenProject() },
         { target: elements.prevBtn, event: 'click', handler: () => currentReader?.onPrevPage() },
         { target: elements.nextBtn, event: 'click', handler: () => currentReader?.onNextPage() },
         { target: elements.mobilePrevBtn, event: 'click', handler: () => currentReader?.onPrevPage() },
@@ -742,6 +1292,198 @@ function setupEventListeners() {
             target: window,
             event: 'add-card-to-board',
             handler: () => setWorkspaceMode('map')
+        },
+        {
+            target: window,
+            event: 'document-registered',
+            handler: () => {
+                attemptAutoRelinkRecoveredDocuments();
+                renderFileList();
+            }
+        },
+        {
+            target: window,
+            event: 'document-loaded-changed',
+            handler: () => {
+                attemptAutoRelinkRecoveredDocuments();
+                renderFileList();
+            }
+        },
+        {
+            target: window,
+            event: 'documents-restored',
+            handler: () => {
+                attemptAutoRelinkRecoveredDocuments();
+                renderFileList();
+            }
+        },
+        {
+            target: window,
+            event: 'recovery-validate-requested',
+            handler: () => {
+                showRecoveryValidation();
+            }
+        },
+        {
+            target: window,
+            event: 'project-save-completed',
+            handler: (event) => {
+                projectStatusState.lastSavedAt = event.detail?.savedAt || Date.now();
+                projectStatusState.lastMode = event.detail?.mode || projectStatusState.lastMode;
+                if (getAppContext().currentProjectId) {
+                    setRuntimeProjectId(getAppContext().currentProjectId, localStorage);
+                }
+                showSaveStatus('success', `Saved at ${formatAutosaveTime(projectStatusState.lastSavedAt)}.`);
+            }
+        },
+        {
+            target: window,
+            event: 'project-opened',
+            handler: (event) => {
+                projectStatusState.lastMode = event.detail?.mode || projectStatusState.lastMode;
+                if (getAppContext().currentProjectId) {
+                    setRuntimeProjectId(getAppContext().currentProjectId, localStorage);
+                }
+                showSaveStatus('success', 'Project opened and synced to the current workspace.', 1800);
+            }
+        },
+        {
+            target: elements.fileList,
+            event: 'click',
+            handler: (event) => {
+                const handled = handleRecoveryPanelClick(event, {
+                    onRelinkDocument: (documentId) => promptRelinkDocument(documentId),
+                    onRecoveryAction: (action) => {
+                        if (action === 'auto') {
+                            attemptAutoRelinkRecoveredDocuments({ notify: true });
+                        }
+                        if (action === 'bulk') {
+                            promptBulkRelink();
+                        }
+                        if (action === 'validate') {
+                            showRecoveryValidation();
+                        }
+                    }
+                });
+                if (handled) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    return;
+                }
+
+                const actionButton = event.target.closest('[data-file-action]');
+                if (actionButton) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const fileId = actionButton.getAttribute('data-file-id');
+                    const action = actionButton.getAttribute('data-file-action');
+
+                    if (!fileId || !action) {
+                        return;
+                    }
+
+                    if (action === 'move-up') {
+                        void moveFileByOffset(fileId, -1);
+                    } else if (action === 'move-down') {
+                        void moveFileByOffset(fileId, 1);
+                    } else if (action === 'remove') {
+                        void removeFileFromWorkspace(fileId);
+                    }
+                    return;
+                }
+
+                const projectActionButton = event.target.closest('[data-project-action]');
+                if (projectActionButton) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const action = projectActionButton.getAttribute('data-project-action');
+
+                    if (action === 'open') {
+                        void promptOpenProject();
+                    } else if (action === 'save') {
+                        void promptSaveProject();
+                    } else if (action === 'import') {
+                        promptImportDocument();
+                    }
+                    return;
+                }
+
+                const fileItem = event.target.closest('[data-open-file-id]');
+                if (fileItem) {
+                    const fileId = fileItem.getAttribute('data-open-file-id');
+                    if (fileId) {
+                        window.openFileById(fileId);
+                    }
+                }
+            }
+        },
+        {
+            target: elements.fileList,
+            event: 'dragstart',
+            handler: (event) => {
+                const item = event.target.closest('[data-open-file-id]');
+                if (!item || item.classList.contains('disabled')) {
+                    return;
+                }
+
+                draggedFileId = item.getAttribute('data-open-file-id');
+                item.classList.add('dragging');
+                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.setData('text/plain', draggedFileId || '');
+            }
+        },
+        {
+            target: elements.fileList,
+            event: 'dragover',
+            handler: (event) => {
+                const targetItem = event.target.closest('[data-open-file-id]');
+                if (!draggedFileId || !targetItem) {
+                    return;
+                }
+
+                event.preventDefault();
+                const targetFileId = targetItem.getAttribute('data-open-file-id');
+                if (!targetFileId || targetFileId === draggedFileId) {
+                    return;
+                }
+
+                elements.fileList.querySelectorAll('.file-item.drop-target').forEach((item) => {
+                    item.classList.remove('drop-target');
+                });
+                targetItem.classList.add('drop-target');
+                event.dataTransfer.dropEffect = 'move';
+            }
+        },
+        {
+            target: elements.fileList,
+            event: 'drop',
+            handler: (event) => {
+                const targetItem = event.target.closest('[data-open-file-id]');
+                if (!draggedFileId || !targetItem) {
+                    return;
+                }
+
+                event.preventDefault();
+                const targetFileId = targetItem.getAttribute('data-open-file-id');
+                if (!targetFileId || targetFileId === draggedFileId) {
+                    return;
+                }
+
+                const targetIndex = state.files.findIndex((file) => file.id === targetFileId);
+                if (targetIndex >= 0) {
+                    moveFileToIndex(draggedFileId, targetIndex);
+                }
+            }
+        },
+        {
+            target: elements.fileList,
+            event: 'dragend',
+            handler: () => {
+                draggedFileId = null;
+                elements.fileList.querySelectorAll('.file-item.dragging, .file-item.drop-target').forEach((item) => {
+                    item.classList.remove('dragging', 'drop-target');
+                });
+            }
         },
         {
             target: window,
@@ -995,30 +1737,100 @@ function setupEventListeners() {
 }
 
 // File Handling
-async function handleFileSelect(e) {
-    const file = e.target.files[0];
-    if (!file) return;
+async function importFiles(files, { openImportedFile = true } = {}) {
+    const appContext = getAppContext();
+    if (!appContext.currentProjectId) {
+        const { projectId } = ensureProjectIdentity();
+        setRuntimeProjectId(projectId, localStorage);
+    }
+    const pendingDocumentImport = appContext.pendingDocumentImport;
+    const reservedIds = new Set();
+    const importedFileData = [];
 
-    const fileSignature = `${file.name}-${file.size}-${file.lastModified}`;
-    const fileId = await generateHash(fileSignature);
+    for (const file of files) {
+        const targetDocument = chooseDocumentTarget({
+            file,
+            pendingDocumentImport: pendingDocumentImport?.id ? pendingDocumentImport : null,
+            documentManager: appContext.documentManager,
+            reservedIds
+        });
 
-    const fileData = {
-        id: fileId,
-        name: file.name,
-        type: file.type,
-        lastModified: file.lastModified,
-        fileObj: file
-    };
+        if (pendingDocumentImport?.id && !targetDocument) {
+            emitAppNotification({
+                title: 'Relink Skipped',
+                message: `"${file.name}" does not match the expected file type for "${pendingDocumentImport.name}". Please choose a compatible source file.`,
+                level: 'warning'
+            });
+            break;
+        }
 
-    const existingIndex = state.files.findIndex(f => f.id === fileId);
-    if (existingIndex >= 0) {
-        state.files[existingIndex] = fileData;
-    } else {
-        state.files.push(fileData);
+        const fileSignature = `${file.name}-${file.size}-${file.lastModified}`;
+        const fileId = targetDocument?.id || await generateHash(fileSignature);
+
+        if (targetDocument?.id) {
+            reservedIds.add(targetDocument.id);
+        }
+
+        const fileData = {
+            id: fileId,
+            name: file.name,
+            type: file.type,
+            lastModified: file.lastModified,
+            fileObj: file,
+            restoredDocumentId: targetDocument?.id || null
+        };
+
+        const existingIndex = state.files.findIndex((item) => item.id === fileId);
+        if (existingIndex >= 0) {
+            state.files[existingIndex] = fileData;
+        } else {
+            state.files.push(fileData);
+        }
+
+        if (appContext.documentManager) {
+            appContext.documentManager.registerDocument(
+                fileId,
+                file.name,
+                file.type,
+                true
+            );
+        }
+
+        appContext.cardSystem?.updateSourceNames?.(fileId, file.name);
+        appContext.highlightManager?.updateSourceNames?.(fileId, file.name);
+        importedFileData.push(fileData);
+
+        if (pendingDocumentImport?.id) {
+            break;
+        }
     }
 
+    setAppService('pendingDocumentImport', null);
     renderFileList();
-    openFile(fileData);
+
+    if (!importedFileData.length) {
+        return [];
+    }
+
+    if (openImportedFile) {
+        await openFile(importedFileData[0]);
+    }
+
+    void performProjectAutosave({ notify: false });
+
+    return importedFileData;
+}
+
+async function handleFileSelect(e) {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) {
+        return;
+    }
+
+    const pendingDocumentImport = getAppContext().pendingDocumentImport;
+    const openImportedFile = !(pendingDocumentImport?.mode === 'bulk' || files.length > 1);
+    await importFiles(files, { openImportedFile });
+    elements.fileInput.value = '';
 }
 
 // Simple hash function for deterministic IDs
@@ -1050,68 +1862,147 @@ async function generateHash(message) {
 }
 
 function renderFileList() {
-    if (!state.files.length) {
+    const visibleDocuments = getVisibleDocuments();
+    const diagnostics = buildRecoveryDiagnostics(getAppContext());
+    const missingDocuments = diagnostics.missingDocuments;
+    const projectStatus = getProjectStatus();
+
+    const projectPanelMarkup = `
+        <section class="library-project-panel" aria-label="Project actions">
+          <div class="library-project-header">
+            <span class="material-icons-round">folder_managed</span>
+            <div class="library-project-copy">
+              <strong>${projectStatus.title}</strong>
+              <p>${projectStatus.description}</p>
+            </div>
+          </div>
+          <div class="library-project-meta">
+            <span>${projectStatus.summary}</span>
+            <span>${projectStatus.linkedToDirectory ? 'Local export linked' : 'Server workspace autosave'}</span>
+            ${projectStatus.projectDirectoryName ? `<span title="${escapeHtml(projectStatus.projectDirectoryName)}">${escapeHtml(projectStatus.projectDirectoryName)}</span>` : ''}
+            ${projectStatus.runtimeRoot ? `<span title="${escapeHtml(projectStatus.runtimeRoot)}">runtime-data</span>` : ''}
+          </div>
+          <div class="library-project-actions">
+            <button type="button" class="library-project-btn primary" data-project-action="open">Open Project Folder</button>
+            <button type="button" class="library-project-btn" data-project-action="save">Save Project Folder</button>
+            <button type="button" class="library-project-btn" data-project-action="import">Import Documents</button>
+          </div>
+        </section>
+    `;
+
+    if (!visibleDocuments.length) {
         elements.fileList.innerHTML = `
+            ${projectPanelMarkup}
             <div class="library-empty-state">
               <span class="material-icons-round">upload_file</span>
               <h3>Your library is empty</h3>
-              <p>Import a PDF, EPUB, TXT, or Markdown file to start reading.</p>
+              <p>Import reading sources or open a saved project folder to get started.</p>
             </div>
         `;
         return;
     }
 
-    elements.fileList.innerHTML = state.files.map((file, index) => `
-        <div class="file-item ${state.currentFile?.id === file.id ? 'active' : ''}" 
-             onclick="window.openFileById('${file.id}')">
+    const recoveryMarkup = missingDocuments.length ? `
+        <section class="library-recovery-panel" aria-label="Missing source files">
+          <div class="library-recovery-header">
+            <span class="material-icons-round">link_off</span>
+            <div class="library-recovery-copy">
+              <strong>${missingDocuments.length} source ${missingDocuments.length === 1 ? 'file is' : 'files are'} waiting to be relinked</strong>
+              <p>Re-import the original documents to restore jump-back navigation from the mind map.</p>
+            </div>
+          </div>
+          <div class="library-recovery-stats">
+            <span>${diagnostics.unresolvedCards.length} cards</span>
+            <span>${diagnostics.unresolvedHighlights.length} highlights</span>
+            <span>${diagnostics.totalDocuments} saved docs</span>
+          </div>
+          <div class="library-recovery-actions">
+            <button type="button" class="library-recovery-secondary-btn" data-recovery-action="auto">Auto match</button>
+            <button type="button" class="library-recovery-secondary-btn" data-recovery-action="bulk">Import sources</button>
+            <button type="button" class="library-recovery-secondary-btn" data-recovery-action="validate">Validate links</button>
+          </div>
+          <div class="library-recovery-list">
+            ${missingDocuments.map((doc) => `
+              <div class="library-recovery-item">
+                <div class="library-recovery-item-copy">
+                  <span class="library-recovery-name">${escapeHtml(doc.name)}</span>
+                  <span class="library-recovery-meta">${escapeHtml(doc.type || 'Unknown file type')}</span>
+                </div>
+                <button type="button" class="library-recovery-btn" data-relink-document-id="${escapeHtml(doc.id)}">Relink</button>
+              </div>
+            `).join('')}
+          </div>
+        </section>
+    ` : '';
+
+    elements.fileList.innerHTML = `
+        ${projectPanelMarkup}
+        ${recoveryMarkup}
+        ${visibleDocuments.map((file, index) => `
+        <div class="file-item ${state.currentFile?.id === file.id ? 'active' : ''} ${file.loaded ? '' : 'disabled'}" 
+             data-open-file-id="${escapeHtml(file.id)}"
+             data-file-index="${index}"
+             draggable="${file.loaded ? 'true' : 'false'}"
+             title="${escapeHtml(file.loaded ? file.name : `${file.name} - re-import this source file to relink annotations`)}">
           <span class="material-icons-round file-item-icon">description</span>
           <span class="file-item-body">
-            <span class="text-truncate file-item-name">${file.name}</span>
-            <span class="file-item-meta">Document ${index + 1}</span>
+            <span class="text-truncate file-item-name">${escapeHtml(file.name)}</span>
+            <span class="file-item-meta">${describeDocumentStatus(file, index)}</span>
           </span>
+          ${file.loaded ? `
+          <span class="file-item-actions">
+            <button type="button" class="file-item-action-btn" data-file-action="move-up" data-file-id="${escapeHtml(file.id)}" title="Move Up" ${index === 0 ? 'disabled' : ''}>
+              <span class="material-icons-round">keyboard_arrow_up</span>
+            </button>
+            <button type="button" class="file-item-action-btn" data-file-action="move-down" data-file-id="${escapeHtml(file.id)}" title="Move Down" ${index === state.files.length - 1 ? 'disabled' : ''}>
+              <span class="material-icons-round">keyboard_arrow_down</span>
+            </button>
+            <button type="button" class="file-item-action-btn danger" data-file-action="remove" data-file-id="${escapeHtml(file.id)}" title="Remove From Library">
+              <span class="material-icons-round">delete</span>
+            </button>
+          </span>
+          ` : ''}
         </div>
-    `).join('');
+    `).join('')}
+    `;
 }
 
 // Global handler for list items
 window.openFileById = (id) => {
     const file = state.files.find(f => f.id === id);
-    if (file) openFile(file);
+    if (file) {
+        openFile(file);
+        return;
+    }
+
+    const missingDocument = getAppContext().documentManager?.getDocumentInfo?.(id);
+    if (missingDocument && !missingDocument.loaded) {
+        promptRelinkDocument(id);
+    }
 };
 
 async function handleJumpToSource(sourceId, highlightId) {
-    const highlight = findHighlightById(highlightId);
+    const result = await navigateToLinkedSource({
+        sourceId,
+        highlightId,
+        findHighlightById,
+        findFileById: (id) => state.files.find((file) => file.id === id) ?? null,
+        openFile,
+        getCurrentFile: () => state.currentFile,
+        getCurrentReader: () => currentReader,
+        notify: ({ message, level }) => emitAppNotification({
+            title: level === 'warning' ? 'Source Navigation' : 'Navigation',
+            message,
+            level
+        })
+    });
 
-    const effectiveSourceId = highlight ? highlight.sourceId : sourceId;
-    const file = state.files.find(f => f.id === effectiveSourceId);
-    if (!file) {
-        logger.warn('Source file not found', { effectiveSourceId, sourceId });
-        return;
+    if (result.status === 'missing-file') {
+        logger.warn('Source file not found', { effectiveSourceId: result.effectiveSourceId, sourceId });
     }
 
-    if (!highlight) {
+    if (result.status === 'missing-highlight') {
         logger.warn('Highlight not found', highlightId);
-        return;
-    }
-
-    if (!state.currentFile || state.currentFile.id !== effectiveSourceId) {
-        await openFile(file);
-    }
-
-    if (currentReader) {
-        if (currentReader.scrollToHighlight) {
-            await currentReader.scrollToHighlight(highlightId);
-        } else {
-            const pageInfo = currentReader.pages ? currentReader.pages[highlight.location.page - 1] : null;
-            if (pageInfo && pageInfo.wrapper) {
-                pageInfo.wrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                if (currentReader.flashHighlight) {
-                    setTimeout(() => {
-                        currentReader.flashHighlight(highlightId);
-                    }, 500);
-                }
-            }
-        }
     }
 }
 
@@ -1158,6 +2049,7 @@ async function openFile(fileData) {
 
     updateToolAvailability(fileData.type);
     setWorkspaceMode('reading', { force: true });
+    renderFileList();
 }
 
 function updateToolAvailability(fileType) {
@@ -1209,6 +2101,52 @@ function updatePageInfo() {
 function loadFilesFromStorage() {
     return [];
 }
+
+function clearLoadedFiles() {
+    destroyCurrentReader();
+    resetReadingState();
+    documentHistoryManager.stopAutoSave();
+    state.files = [];
+    state.currentFile = null;
+    elements.viewer.innerHTML = '';
+    updateCurrentBook({
+        md5: null,
+        id: null,
+        name: null
+    });
+    updateToolbarSummary();
+}
+
+async function hydrateProjectFiles(projectFiles = [], { openCurrentBookId = null } = {}) {
+    clearLoadedFiles();
+
+    if (!Array.isArray(projectFiles) || !projectFiles.length) {
+        renderFileList();
+        return [];
+    }
+
+    const appContext = getAppContext();
+    state.files = projectFiles.map((file) => ({
+        ...file,
+        restoredDocumentId: file.id
+    }));
+
+    state.files.forEach((file) => {
+        appContext.documentManager?.registerDocument(file.id, file.name, file.type, true);
+    });
+
+    renderFileList();
+
+    const initialFile = state.files.find((file) => file.id === openCurrentBookId) || state.files[0];
+    if (initialFile) {
+        await openFile(initialFile);
+    }
+
+    return state.files;
+}
+
+setAppService('getProjectFiles', () => state.files);
+setAppService('hydrateProjectFiles', hydrateProjectFiles);
 
 // Start app
 readerLoader = createReaderLoader({

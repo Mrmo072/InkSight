@@ -43,15 +43,12 @@
           <button id="sidebar-width-preset" class="icon-btn panel-width-btn" title="Cycle File List Width">
             <span class="material-icons-round">width_normal</span>
           </button>
-          <label for="file-input" id="add-file-btn" class="icon-btn import-btn" title="Import File">
-            <span class="material-icons-round">add</span>
-            <input type="file" id="file-input" accept=".pdf,.epub,.txt,.md" class="hidden-input" />
-          </label>
           <button id="close-sidebar-panel" class="icon-btn close-sidebar-btn" title="Close Library Panel">
             <span class="material-icons-round">close</span>
           </button>
         </div>
       </div>
+      <input type="file" id="file-input" accept=".pdf,.epub,.txt,.md" class="hidden-input" multiple />
       <div id="file-list" class="file-list"></div>
     </aside>
 
@@ -79,6 +76,17 @@
         <div class="toolbar-section toolbar-section-center">
           <div class="toolbar-doc-block">
             <span id="doc-title">No document open</span>
+            <div class="toolbar-doc-actions">
+              <button id="toolbar-import-documents" class="icon-btn small" title="Import Documents">
+                <span class="material-icons-round">library_add</span>
+              </button>
+              <button id="toolbar-open-project" class="icon-btn small" title="Open Project Folder">
+                <span class="material-icons-round">folder_open</span>
+              </button>
+              <button id="toolbar-save-project" class="icon-btn small" title="Save Project Folder">
+                <span class="material-icons-round">save</span>
+              </button>
+            </div>
           </div>
           <div class="workspace-mode-group" role="tablist" aria-label="Workspace mode">
             <button id="workspace-mode-reading" class="workspace-mode-btn active" type="button" role="tab" aria-selected="true">
@@ -131,6 +139,11 @@
             </button>
           </div>
         </div>
+        <div class="mobile-context-row mobile-project-actions" aria-label="Mobile project actions">
+          <button id="mobile-import-documents" class="mobile-project-btn primary" type="button">Import</button>
+          <button id="mobile-open-project" class="mobile-project-btn" type="button">Open</button>
+          <button id="mobile-save-project" class="mobile-project-btn" type="button">Save</button>
+        </div>
       </div>
 
       <div id="reader-content-wrapper" class="reader-content-wrapper">
@@ -150,6 +163,10 @@
           <div class="empty-state">
             <span class="material-icons-round" style="font-size: 48px; color: var(--text-secondary);">library_books</span>
             <p>Select or import a document to start reading</p>
+            <div class="empty-state-actions">
+              <button id="empty-import-document" class="empty-state-btn primary" type="button">Import Documents</button>
+              <button id="empty-open-project" class="empty-state-btn" type="button">Open Project Folder</button>
+            </div>
           </div>
         </div>
 
@@ -250,6 +267,8 @@
   </div>
 
   <div id="panel-backdrop" class="panel-backdrop" aria-hidden="true"></div>
+  <div id="save-status-indicator" class="save-status-indicator" aria-live="polite" aria-atomic="true"></div>
+  <div id="app-notifications" class="app-notifications" aria-live="polite" aria-atomic="true"></div>
   <script type="module" src="/src/main.js"></script>
 </body>
 

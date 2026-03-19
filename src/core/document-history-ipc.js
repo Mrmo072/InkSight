@@ -11,7 +11,10 @@ export function createWrappedIpcRenderer(rawIpc) {
         saveFile: (filename, content) => rawIpc.invoke('save-file', filename, content),
         loadFile: (filename) => rawIpc.invoke('load-file', filename),
         ensureSaveDir: () => rawIpc.invoke('ensure-save-dir'),
-        findSaveByMd5: (md5) => rawIpc.invoke('find-save-by-md5', md5)
+        findSaveByMd5: (md5) => rawIpc.invoke('find-save-by-md5', md5),
+        getRuntimeStorageInfo: () => rawIpc.invoke('get-runtime-storage-info'),
+        saveRuntimeProject: (payload) => rawIpc.invoke('save-runtime-project', payload),
+        loadRuntimeProject: (payload) => rawIpc.invoke('load-runtime-project', payload)
     };
 }
 

@@ -42,6 +42,11 @@ describe('.inksight persistence contract', () => {
           name: 'Example.pdf',
           id: 'book-id',
         },
+        documentManager: {
+          getPersistenceData: () => ({
+            documents: [['doc-1', { id: 'doc-1', name: 'Example.pdf', type: 'application/pdf', loaded: true }]],
+          }),
+        },
         cardSystem: {
           getPersistenceData: () => ({
             cards: [{ id: 'card-1' }],
@@ -76,6 +81,7 @@ describe('.inksight persistence contract', () => {
       bookMd5: 'book-md5',
       bookName: 'Example.pdf',
       bookId: 'book-id',
+      documents: [['doc-1', { id: 'doc-1', name: 'Example.pdf', type: 'application/pdf', loaded: true }]],
       cards: [{ id: 'card-1' }],
       connections: [{ id: 'conn-1' }],
       highlights: [{ id: 'hl-1' }],

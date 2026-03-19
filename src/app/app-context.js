@@ -11,7 +11,17 @@ const DEFAULT_CONTEXT = {
     outlineSidebar: null,
     annotationList: null,
     board: null,
-    pendingRestore: null
+    pendingRestore: null,
+    pendingDocumentImport: null,
+    openProjectFile: null,
+    getProjectFiles: null,
+    hydrateProjectFiles: null,
+    currentProjectId: null,
+    runtimeUserId: null,
+    runtimeSessionId: null,
+    runtimeStorageInfo: null,
+    currentProjectDirectoryHandle: null,
+    currentProjectCleanup: null
 };
 
 export function initAppContext() {
