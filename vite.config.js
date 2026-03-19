@@ -86,7 +86,7 @@ export default defineConfig({
     }
   },
   build: {
-    target: 'es2022',
+    target: 'es2020',
     rollupOptions: {
       output: {
         manualChunks
@@ -94,11 +94,11 @@ export default defineConfig({
     }
   },
   esbuild: {
-    target: 'es2022'
+    target: 'es2020'
   },
   optimizeDeps: {
     esbuildOptions: {
-      target: 'es2022'
+      target: 'es2020'
     }
   },
   css: {
