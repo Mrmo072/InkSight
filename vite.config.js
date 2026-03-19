@@ -83,6 +83,7 @@ export default defineConfig({
       '@drawnix/drawnix': resolve(__dirname, './src/drawnix/drawnix/src'),
       '@plait-board/react-board': resolve(__dirname, './src/drawnix/react-board/src'),
       '@plait-board/react-text': resolve(__dirname, './src/drawnix/react-text/src'),
+      'is-hotkey': resolve(__dirname, './src/vendor/is-hotkey-compat.js'),
     }
   },
   build: {
