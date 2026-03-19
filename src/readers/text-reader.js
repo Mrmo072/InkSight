@@ -4,6 +4,7 @@ import { getAppContext } from '../app/app-context.js';
 import {
     applyReaderSelectionMode,
     clearSelectedHighlightState,
+    createTouchSelectionScheduler,
     createReaderHighlightToolbar,
     handleReaderHighlightClick,
     findCardIdByHighlightId,
@@ -20,6 +21,19 @@ export class TextReader {
         this.defaultColor = '#FFE234'; // Default yellow
         this.selectedHighlightId = null;
         this.cleanupListeners = null;
+        this.touchSelectionScheduler = createTouchSelectionScheduler(
+            () => this.handleSelection(),
+            {
+                readSelection: () => window.getSelection(),
+                getSignature: (selection) => {
+                    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+                        return '';
+                    }
+
+                    return selection.toString().trim();
+                }
+            }
+        );
 
         registerBasicReaderListeners(this, {
             onCardDeleted: (highlightId) => {
@@ -76,7 +90,7 @@ export class TextReader {
             // Selection listener
             this.content.addEventListener('mouseup', (e) => this.handleSelection(e));
             this.content.addEventListener('touchend', (e) => {
-                setTimeout(() => this.handleSelection(e), 120);
+                this.touchSelectionScheduler.schedule(e);
             }, { passive: true });
 
             // Global click to hide toolbar
@@ -331,7 +345,21 @@ export class TextReader {
         });
     }
 
+    centerContentHorizontally() {
+        const overflowX = this.container.scrollWidth - this.container.clientWidth;
+        this.container.scrollLeft = overflowX > 0 ? overflowX / 2 : 0;
+    }
+
+    onLayoutChange() {
+        if (this.content) {
+            this.content.style.marginLeft = 'auto';
+            this.content.style.marginRight = 'auto';
+        }
+        window.requestAnimationFrame(() => this.centerContentHorizontally());
+    }
+
     destroy() {
+        this.touchSelectionScheduler?.cancel?.();
         this.cleanupListeners?.();
         this.cleanupListeners = null;
         if (this.toolbar) this.toolbar.hide();

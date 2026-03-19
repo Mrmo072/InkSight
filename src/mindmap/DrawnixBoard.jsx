@@ -84,7 +84,9 @@ export const DrawnixBoardComponent = () => {
     const [value, setValue] = useState([]);
     const [viewport, setViewport] = useState(null);
     const [flashOverlay, setFlashOverlay] = useState(null);
+    const [zoomIndicator, setZoomIndicator] = useState(null);
     const containerRef = useRef(null);
+    const zoomIndicatorTimeoutRef = useRef(null);
     const processingCardIds = useRef(new Set()); // Track cards being processed to avoid loops
 
     // Initialize with existing cards once board is ready
@@ -419,8 +421,28 @@ export const DrawnixBoardComponent = () => {
     useEffect(() => {
         return () => {
             boardRef.current?.__inksightCleanup?.();
+            if (zoomIndicatorTimeoutRef.current) {
+                clearTimeout(zoomIndicatorTimeoutRef.current);
+            }
         };
     }, []);
+
+    const handleViewportChange = (nextViewport) => {
+        setViewport(nextViewport);
+
+        const zoom = nextViewport?.zoom;
+        if (typeof zoom !== 'number') {
+            return;
+        }
+
+        setZoomIndicator(`${Math.round(zoom * 100)}%`);
+        if (zoomIndicatorTimeoutRef.current) {
+            clearTimeout(zoomIndicatorTimeoutRef.current);
+        }
+        zoomIndicatorTimeoutRef.current = setTimeout(() => {
+            setZoomIndicator(null);
+        }, 800);
+    };
 
     return (
         <div
@@ -431,7 +453,7 @@ export const DrawnixBoardComponent = () => {
             <Drawnix
                 value={value}
                 viewport={viewport}
-                onViewportChange={setViewport}
+                onViewportChange={handleViewportChange}
                 onSelectionChange={(selection) => {
                     const currentBoard = boardRef.current;
                     if (selection && selection.anchor && selection.focus && currentBoard) {
@@ -478,6 +500,9 @@ export const DrawnixBoardComponent = () => {
                     animation: 'pulse 0.8s ease-out'
                 }} />
             )}
+            <div className={`mindmap-zoom-feedback${zoomIndicator ? ' visible' : ''}`}>
+                {zoomIndicator || ''}
+            </div>
             <style>{`
                 @keyframes pulse {
                     0% { opacity: 1; transform: scale(1); }

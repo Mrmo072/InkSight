@@ -5,22 +5,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>InkSight</title>
-  <!-- PDF.js CSS - CRITICAL for textLayer rendering -->
   <link rel="stylesheet" href="https://unpkg.com/pdfjs-dist@4.10.38/web/pdf_viewer.css" />
   <link rel="stylesheet" href="./src/styles/styles.css" />
   <link rel="stylesheet" href="./src/styles/styles-enhanced.css" />
   <link rel="stylesheet" href="./src/styles/themes.css" />
   <link rel="stylesheet" href="./src/styles/themes-override.css" />
   <link rel="stylesheet" href="./src/styles/styles-premium.css" />
-  <!-- Material Icons -->
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
-  <!-- Google Fonts -->
   <link
-    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Noto+Serif+SC:wght@400;700&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@500;600;700&family=Noto+Serif+SC:wght@400;700&display=swap"
     rel="stylesheet">
   <script>
     window.onerror = function (msg, url, line, col, error) {
-      alert('Error: ' + msg + '\\nurl: ' + url + '\\nline: ' + line);
+      alert('Error: ' + msg + '\nurl: ' + url + '\nline: ' + line);
       console.error('Global Error:', error);
       return false;
     };
@@ -34,88 +31,105 @@
 
 <body>
   <div id="app-layout" class="app-layout">
-    <!-- Left Sidebar: Library & Navigation -->
     <aside id="sidebar" class="sidebar">
       <div class="sidebar-header">
         <div class="brand">
-          <img src="/logo.svg" alt="InkSight Logo" class="logo">
-          <h2>InkSight</h2>
+          <div class="brand-copy">
+            <span class="brand-title brand-wordmark">InkSight</span>
+            <span class="brand-subtitle">Workspace</span>
+          </div>
         </div>
-        <label for="file-input" id="add-file-btn" class="icon-btn import-btn" title="Import File">
-          <span class="material-icons-round">add</span>
-          <input type="file" id="file-input" accept=".pdf,.epub,.txt,.md" class="hidden-input" />
-        </label>
+        <div class="sidebar-header-actions">
+          <button id="sidebar-width-preset" class="icon-btn panel-width-btn" title="Cycle File List Width">
+            <span class="material-icons-round">width_normal</span>
+          </button>
+          <label for="file-input" id="add-file-btn" class="icon-btn import-btn" title="Import File">
+            <span class="material-icons-round">add</span>
+            <input type="file" id="file-input" accept=".pdf,.epub,.txt,.md" class="hidden-input" />
+          </label>
+          <button id="close-sidebar-panel" class="icon-btn close-sidebar-btn" title="Close Library Panel">
+            <span class="material-icons-round">close</span>
+          </button>
+        </div>
       </div>
-      <div id="file-list" class="file-list">
-        <!-- File items will be injected here -->
-      </div>
+      <div id="file-list" class="file-list"></div>
     </aside>
 
-    <!-- Resizer Left -->
     <div id="resizer-left" class="resizer"></div>
 
-    <!-- Main Content: Reader View -->
     <main id="reader-container" class="reader-container">
       <div id="reader-toolbar" class="toolbar">
         <div class="toolbar-section toolbar-section-leading">
-        <button id="toggle-sidebar" class="icon-btn" title="Toggle File List">
-          <span class="material-icons-round">menu_open</span>
-        </button>
-        <button id="toggle-outline" class="icon-btn" title="Toggle Outline">
-          <span class="material-icons-round">toc</span>
-        </button>
-        </div>
-        <div class="toolbar-section toolbar-section-center">
-        <span id="doc-title">No document open</span>
-        <div class="page-nav-group">
-        <button id="prev-page" class="icon-btn" disabled>
-          <span class="material-icons-round">chevron_left</span>
-        </button>
-        <span id="page-info">-- / --</span>
-        <button id="next-page" class="icon-btn" disabled>
-          <span class="material-icons-round">chevron_right</span>
-        </button>
-        </div>
-        </div>
-        <div class="toolbar-section toolbar-section-modes">
-        <!-- Selection Mode Controls -->
-        <div class="selection-mode-group">
-          <button id="pan-mode" class="icon-btn mode-btn" title="拖动浏览">
-            <span class="material-icons-round">pan_tool</span>
+          <button id="toggle-sidebar" class="icon-btn" title="Toggle File List">
+            <span class="material-icons-round">menu_open</span>
           </button>
-          <button id="text-mode" class="icon-btn mode-btn active" title="文本选择">
-            <span class="material-icons-round">text_fields</span>
+          <button id="toolbar-sidebar-width-preset" class="icon-btn panel-width-btn" title="Cycle File List Width">
+            <span class="material-icons-round">width_normal</span>
           </button>
-          <button id="rect-mode" class="icon-btn mode-btn" title="矩形选择">
-            <span class="material-icons-round">crop_square</span>
+          <button id="toggle-outline" class="icon-btn" title="Toggle Outline">
+            <span class="material-icons-round">toc</span>
           </button>
-          <button id="ellipse-mode" class="icon-btn mode-btn" title="椭圆选择">
-            <span class="material-icons-round">circle</span>
-          </button>
-          <button id="highlighter-mode" class="icon-btn mode-btn" data-mode="highlighter" title="荧光笔">
-            <span class="material-icons-round">edit</span>
-          </button>
-        </div>
         </div>
 
-        <!-- Highlighter Settings Panel -->
-        <div id="highlighter-panel" class="highlighter-panel">
-          <div class="panel-title">荧光笔粗细</div>
-          <div class="slider-container">
-            <div class="slider-track-visual"></div>
-            <input type="range" id="highlighter-height" min="8" max="48" value="16" step="4">
+        <div class="toolbar-mobile-summary" aria-live="polite">
+          <span id="mobile-doc-summary" class="toolbar-mobile-title">No document open</span>
+          <span id="mobile-page-info" class="toolbar-mobile-meta">-- / --</span>
+        </div>
+
+        <div class="toolbar-section toolbar-section-center">
+          <div class="toolbar-doc-block">
+            <span id="doc-title">No document open</span>
           </div>
-          <div class="height-labels">
-            <span>细</span>
-            <span>中</span>
-            <span>粗</span>
+          <div class="workspace-mode-group" role="tablist" aria-label="Workspace mode">
+            <button id="workspace-mode-reading" class="workspace-mode-btn active" type="button" role="tab" aria-selected="true">
+              Read
+            </button>
+            <button id="workspace-mode-capture" class="workspace-mode-btn" type="button" role="tab" aria-selected="false">
+              Capture
+            </button>
+            <button id="workspace-mode-map" class="workspace-mode-btn" type="button" role="tab" aria-selected="false">
+              Map
+            </button>
           </div>
         </div>
 
         <div class="toolbar-section toolbar-section-trailing">
-        <button id="toggle-notes" class="icon-btn" title="Toggle Notes">
-          <span class="material-icons-round">vertical_split</span>
-        </button>
+          <button id="toggle-mobile-tools" class="icon-btn" title="Toggle Reader Tools" aria-expanded="false">
+            <span class="material-icons-round">more_horiz</span>
+          </button>
+          <button id="toolbar-notes-width-preset" class="icon-btn panel-width-btn" title="Cycle Notes Width">
+            <span class="material-icons-round">width_wide</span>
+          </button>
+          <button id="toggle-notes" class="icon-btn" title="Toggle Notes">
+            <span class="material-icons-round">vertical_split</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="mobile-context-bar" class="mobile-context-bar" aria-label="Mobile reading controls">
+        <div class="mobile-context-row page-nav-row">
+          <div class="mobile-page-nav-group">
+            <button id="mobile-prev-page" class="icon-btn" disabled>
+              <span class="material-icons-round">chevron_left</span>
+            </button>
+            <span id="mobile-context-page-info">-- / --</span>
+            <button id="mobile-next-page" class="icon-btn" disabled>
+              <span class="material-icons-round">chevron_right</span>
+            </button>
+          </div>
+        </div>
+        <div class="mobile-context-row">
+          <div class="mobile-workspace-mode-group" role="tablist" aria-label="Mobile workspace mode">
+            <button id="mobile-workspace-mode-reading" class="workspace-mode-btn active" type="button" role="tab" aria-selected="true">
+              Read
+            </button>
+            <button id="mobile-workspace-mode-capture" class="workspace-mode-btn" type="button" role="tab" aria-selected="false">
+              Capture
+            </button>
+            <button id="mobile-workspace-mode-map" class="workspace-mode-btn" type="button" role="tab" aria-selected="false">
+              Map
+            </button>
+          </div>
         </div>
       </div>
 
@@ -123,25 +137,70 @@
         <div id="outline-sidebar" class="outline-sidebar collapsed">
           <div class="outline-header">
             <span>Outline</span>
+            <button id="close-outline-panel" class="icon-btn close-outline-btn" title="Close Outline">
+              <span class="material-icons-round">close</span>
+            </button>
           </div>
           <div id="outline-content" class="outline-content">
             <div class="outline-empty">No outline available</div>
           </div>
         </div>
+
         <div id="viewer" class="viewer">
           <div class="empty-state">
-            <span class="material-icons-round"
-              style="font-size: 48px; color: var(--text-secondary);">library_books</span>
+            <span class="material-icons-round" style="font-size: 48px; color: var(--text-secondary);">library_books</span>
             <p>Select or import a document to start reading</p>
+          </div>
+        </div>
+
+        <div class="page-nav-group page-nav-floating">
+          <button id="prev-page" class="icon-btn" disabled>
+            <span class="material-icons-round">chevron_left</span>
+          </button>
+          <span id="page-info">-- / --</span>
+          <button id="next-page" class="icon-btn" disabled>
+            <span class="material-icons-round">chevron_right</span>
+          </button>
+        </div>
+
+        <div id="selection-mode-floating" class="selection-mode-group selection-mode-floating">
+          <button id="selection-mode-drag-handle" class="icon-btn selection-mode-drag-handle" type="button" title="Drag Toolbar" aria-label="Drag toolbar">
+            <span class="material-icons-round">drag_indicator</span>
+          </button>
+          <button id="pan-mode" class="icon-btn mode-btn" title="Pan">
+            <span class="material-icons-round">pan_tool</span>
+          </button>
+          <button id="text-mode" class="icon-btn mode-btn active" title="Text Selection">
+            <span class="material-icons-round">text_fields</span>
+          </button>
+          <button id="rect-mode" class="icon-btn mode-btn" title="Rectangle Selection">
+            <span class="material-icons-round">crop_square</span>
+          </button>
+          <button id="ellipse-mode" class="icon-btn mode-btn" title="Ellipse Selection">
+            <span class="material-icons-round">circle</span>
+          </button>
+          <button id="highlighter-mode" class="icon-btn mode-btn" data-mode="highlighter" title="Highlighter">
+            <span class="material-icons-round">edit</span>
+          </button>
+        </div>
+
+        <div id="highlighter-panel" class="highlighter-panel">
+          <div class="panel-title">Highlighter Size</div>
+          <div class="slider-container">
+            <div class="slider-track-visual"></div>
+            <input type="range" id="highlighter-height" min="8" max="48" value="16" step="4">
+          </div>
+          <div class="height-labels">
+            <span>Thin</span>
+            <span>Mid</span>
+            <span>Bold</span>
           </div>
         </div>
       </div>
     </main>
 
-    <!-- Resizer Right -->
     <div id="resizer-right" class="resizer"></div>
 
-    <!-- Right Panel: Mind Map & Notes -->
     <aside id="notes-panel" class="notes-panel">
       <div class="panel-header notes-header">
         <div class="panel-title-group">
@@ -159,8 +218,14 @@
               Map
             </button>
           </div>
+          <button id="notes-width-preset" class="icon-btn small panel-width-btn" title="Cycle Notes Width">
+            <span class="material-icons-round">width_wide</span>
+          </button>
           <button id="layout-btn" class="icon-btn small" title="Auto Layout">
             <span class="material-icons-round">auto_fix_high</span>
+          </button>
+          <button id="close-notes-panel" class="icon-btn small close-notes-btn" title="Close Notes Panel">
+            <span class="material-icons-round">close</span>
           </button>
         </div>
       </div>
@@ -174,7 +239,6 @@
         </div>
 
         <div id="mindmap-container" class="mindmap-container">
-          <!-- Mind Map will be rendered here -->
           <div class="mindmap-placeholder">
             <span class="material-icons-round">psychology</span>
             <p>Select text to create nodes</p>
@@ -184,6 +248,7 @@
       </div>
     </aside>
   </div>
+
   <div id="panel-backdrop" class="panel-backdrop" aria-hidden="true"></div>
   <script type="module" src="/src/main.js"></script>
 </body>

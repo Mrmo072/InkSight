@@ -40,6 +40,10 @@ export class PDFHighlighterTool {
         this.color = color;
     }
 
+    isExistingHighlightTarget(target) {
+        return target?.closest?.('.highlight-overlay, .area-highlight-border, .highlighter-hitbox') ?? null;
+    }
+
     /**
      * 为指定页面设置绘制监听器
      */
@@ -277,6 +281,10 @@ export class PDFHighlighterTool {
         hitbox.style.backgroundColor = 'transparent';
         hitbox.style.zIndex = '100';
         hitbox.dataset.highlightId = highlightId;
+
+        hitbox.addEventListener('pointerdown', (e) => e.stopPropagation());
+        hitbox.addEventListener('mousedown', (e) => e.stopPropagation());
+        hitbox.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
 
         pageWrapper.appendChild(hitbox);
 

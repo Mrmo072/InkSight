@@ -176,3 +176,50 @@ export function applyReaderSelectionMode({
         element.style.webkitUserSelect = isTextMode ? 'text' : 'none';
     });
 }
+
+export function createTouchSelectionScheduler(commitSelection, options = {}) {
+    const initialDelay = options.initialDelay ?? 180;
+    const settleDelay = options.settleDelay ?? 90;
+    let timer = null;
+    let token = 0;
+
+    const cancel = () => {
+        if (timer) {
+            clearTimeout(timer);
+            timer = null;
+        }
+        token += 1;
+    };
+
+    const schedule = (...args) => {
+        cancel();
+        const currentToken = token;
+
+        const runCommit = () => {
+            const currentSelection = options.readSelection?.(...args);
+            const currentSignature = options.getSignature?.(currentSelection, ...args);
+            if (!currentSignature) {
+                return;
+            }
+
+            timer = setTimeout(() => {
+                if (currentToken !== token) {
+                    return;
+                }
+
+                const nextSelection = options.readSelection?.(...args);
+                const nextSignature = options.getSignature?.(nextSelection, ...args);
+                if (!nextSignature || nextSignature !== currentSignature) {
+                    schedule(...args);
+                    return;
+                }
+
+                commitSelection(...args);
+            }, settleDelay);
+        };
+
+        timer = setTimeout(runCommit, initialDelay);
+    };
+
+    return { schedule, cancel };
+}

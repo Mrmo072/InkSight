@@ -43,6 +43,9 @@ export class PDFHighlightRenderer {
 
         target.style.cursor = 'pointer';
         target.style.pointerEvents = 'auto';
+        target.addEventListener('pointerdown', (e) => e.stopPropagation());
+        target.addEventListener('mousedown', (e) => e.stopPropagation());
+        target.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
         target.addEventListener('click', handleActivate);
         target.addEventListener('pointerup', handleActivate);
         target.addEventListener('touchend', handleActivate, { passive: false });

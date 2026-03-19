@@ -5,6 +5,7 @@ import { getAppContext } from '../app/app-context.js';
 import {
     applyReaderSelectionMode,
     clearSelectedHighlightState,
+    createTouchSelectionScheduler,
     createReaderHighlightToolbar,
     deleteSelectedReaderHighlight,
     findCardIdByHighlightId,
@@ -27,6 +28,21 @@ export class EpubReader {
         this.deletedHighlightIds = new Set(); // Track deleted highlight IDs
         this.deletedCFIs = new Set(); // Track deleted CFIs to prevent re-creation with new IDs
         this.cleanupListeners = null;
+        this.pendingSelection = null;
+        this.touchSelectionScheduler = createTouchSelectionScheduler(
+            () => {
+                if (!this.pendingSelection) {
+                    return;
+                }
+
+                const { cfiRange, contents } = this.pendingSelection;
+                this.commitSelection(cfiRange, contents);
+            },
+            {
+                readSelection: () => this.pendingSelection,
+                getSignature: (selection) => selection?.cfiRange || ''
+            }
+        );
 
         this.toolbar = createReaderHighlightToolbar(container, {
             onDeleteHighlight: (highlightId, cardId) => {
@@ -142,32 +158,8 @@ export class EpubReader {
 
             // Selection handling
             this.rendition.on('selected', (cfiRange, contents) => {
-
-
-                if (this.isDeleting) {
-
-                    contents.window.getSelection().removeAllRanges();
-                    return;
-                }
-
-                if (this.deletedCFIs.has(cfiRange)) {
-                    console.warn('[EpubReader] Ignoring selection for recently deleted CFI:', cfiRange);
-                    contents.window.getSelection().removeAllRanges();
-                    return;
-                }
-
-                this.book.getRange(cfiRange).then(range => {
-                    const text = range.toString();
-
-                    const highlight = highlightManager.createHighlight(text, {
-                        cfi: cfiRange
-                    }, this.fileId, 'epub', this.defaultColor);
-
-                    this.addAnnotation(highlight.id, cfiRange, highlight.color);
-
-                    // Clear selection
-                    contents.window.getSelection().removeAllRanges();
-                });
+                this.pendingSelection = { cfiRange, contents };
+                this.touchSelectionScheduler.schedule();
             });
 
 
@@ -380,7 +372,57 @@ export class EpubReader {
         });
     }
 
+    centerContentHorizontally() {
+        const overflowX = this.container.scrollWidth - this.container.clientWidth;
+        this.container.scrollLeft = overflowX > 0 ? overflowX / 2 : 0;
+    }
+
+    onLayoutChange() {
+        if (!this.rendition) {
+            return;
+        }
+
+        const currentCfi = this.rendition.currentLocation?.()?.start?.cfi || this.cfi;
+
+        if (typeof this.rendition.resize === 'function') {
+            this.rendition.resize(this.container.clientWidth, this.container.clientHeight);
+        }
+
+        if (currentCfi) {
+            this.rendition.display(currentCfi);
+        }
+
+        window.requestAnimationFrame(() => this.centerContentHorizontally());
+    }
+
+    commitSelection(cfiRange, contents) {
+        if (this.isDeleting) {
+            contents.window.getSelection().removeAllRanges();
+            return;
+        }
+
+        if (this.deletedCFIs.has(cfiRange)) {
+            console.warn('[EpubReader] Ignoring selection for recently deleted CFI:', cfiRange);
+            contents.window.getSelection().removeAllRanges();
+            return;
+        }
+
+        this.book.getRange(cfiRange).then(range => {
+            const text = range.toString();
+
+            const highlight = highlightManager.createHighlight(text, {
+                cfi: cfiRange
+            }, this.fileId, 'epub', this.defaultColor);
+
+            this.addAnnotation(highlight.id, cfiRange, highlight.color);
+            contents.window.getSelection().removeAllRanges();
+            this.pendingSelection = null;
+        });
+    }
+
     destroy() {
+        this.touchSelectionScheduler?.cancel?.();
+        this.pendingSelection = null;
         this.cleanupListeners?.();
         this.cleanupListeners = null;
         if (this.toolbar) {

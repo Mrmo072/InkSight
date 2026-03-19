@@ -30,12 +30,15 @@ const state = {
     files: [],
     zoom: 1.0,
     currentPage: 1,
-    totalPages: 0
+    totalPages: 0,
+    workspaceMode: 'reading'
 };
 
 // DOM Elements
 const elements = {
     appLayout: document.getElementById('app-layout'),
+    readerContainer: document.getElementById('reader-container'),
+    readerContentWrapper: document.getElementById('reader-content-wrapper'),
     fileInput: document.getElementById('file-input'),
     addFileBtn: document.getElementById('add-file-btn'),
     fileList: document.getElementById('file-list'),
@@ -43,11 +46,33 @@ const elements = {
     docTitle: document.getElementById('doc-title'),
     prevBtn: document.getElementById('prev-page'),
     nextBtn: document.getElementById('next-page'),
+    mobilePrevBtn: document.getElementById('mobile-prev-page'),
+    mobileNextBtn: document.getElementById('mobile-next-page'),
     pageInfo: document.getElementById('page-info'),
+    mobileContextPageInfo: document.getElementById('mobile-context-page-info'),
+    mobileDocSummary: document.getElementById('mobile-doc-summary'),
+    mobilePageInfo: document.getElementById('mobile-page-info'),
     toggleSidebarBtn: document.getElementById('toggle-sidebar'),
     toggleNotesBtn: document.getElementById('toggle-notes'),
     toggleOutlineBtn: document.getElementById('toggle-outline'),
-    panelBackdrop: document.getElementById('panel-backdrop')
+    toggleMobileToolsBtn: document.getElementById('toggle-mobile-tools'),
+    workspaceModeReadingBtn: document.getElementById('workspace-mode-reading'),
+    workspaceModeCaptureBtn: document.getElementById('workspace-mode-capture'),
+    workspaceModeMapBtn: document.getElementById('workspace-mode-map'),
+    mobileWorkspaceModeReadingBtn: document.getElementById('mobile-workspace-mode-reading'),
+    mobileWorkspaceModeCaptureBtn: document.getElementById('mobile-workspace-mode-capture'),
+    mobileWorkspaceModeMapBtn: document.getElementById('mobile-workspace-mode-map'),
+    toolbarSidebarWidthPresetBtn: document.getElementById('toolbar-sidebar-width-preset'),
+    toolbarNotesWidthPresetBtn: document.getElementById('toolbar-notes-width-preset'),
+    sidebarWidthPresetBtn: document.getElementById('sidebar-width-preset'),
+    closeSidebarPanelBtn: document.getElementById('close-sidebar-panel'),
+    notesWidthPresetBtn: document.getElementById('notes-width-preset'),
+    closeNotesPanelBtn: document.getElementById('close-notes-panel'),
+    closeOutlinePanelBtn: document.getElementById('close-outline-panel'),
+    readerToolbar: document.getElementById('reader-toolbar'),
+    panelBackdrop: document.getElementById('panel-backdrop'),
+    selectionModeFloating: document.getElementById('selection-mode-floating'),
+    selectionModeDragHandle: document.getElementById('selection-mode-drag-handle')
 };
 
 let currentReader = null;
@@ -56,6 +81,14 @@ let outlineSidebar = null;
 let annotationList = null;
 let currentToolMode = 'pan';
 let readerLoader = null;
+let setMobileNotesView = () => {};
+const CAPTURE_NOTES_FOCUS_WIDTH = 356;
+const getMapNotesFocusWidth = () => Math.round(window.innerWidth * 0.58);
+let readerLayoutSyncTimeout = null;
+const selectionToolbarPositions = {
+    desktop: null,
+    mobile: null
+};
 
 async function createDrawnixView(container) {
     const { DrawnixView } = await import('./mindmap/drawnix-view.js');
@@ -110,6 +143,245 @@ function resetReadingState() {
     updatePageInfo();
 }
 
+function updateToolbarSummary() {
+    const title = state.currentFile?.name || 'No document open';
+    elements.mobileDocSummary && (elements.mobileDocSummary.textContent = title);
+    elements.docTitle && (elements.docTitle.textContent = title);
+}
+
+function setMobileToolbarExpanded(expanded) {
+    elements.readerToolbar?.classList.toggle('mobile-tools-open', expanded);
+    elements.readerContainer?.classList.toggle('mobile-tools-open', expanded);
+    elements.toggleMobileToolsBtn?.classList.toggle('active', expanded);
+    elements.toggleMobileToolsBtn?.setAttribute('aria-expanded', String(expanded));
+}
+
+function syncWorkspaceModeButtons(mode) {
+    const modeMap = {
+        reading: elements.workspaceModeReadingBtn,
+        capture: elements.workspaceModeCaptureBtn,
+        map: elements.workspaceModeMapBtn,
+        mobileReading: elements.mobileWorkspaceModeReadingBtn,
+        mobileCapture: elements.mobileWorkspaceModeCaptureBtn,
+        mobileMap: elements.mobileWorkspaceModeMapBtn
+    };
+
+    Object.entries(modeMap).forEach(([key, button]) => {
+        if (!button) return;
+        const normalizedKey = key.replace(/^mobile/, '').toLowerCase();
+        const active = normalizedKey === mode;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-selected', String(active));
+    });
+}
+
+function syncReaderLayoutAfterModeChange() {
+    if (!currentReader) {
+        return;
+    }
+
+    const relayout = () => {
+        currentReader?.onLayoutChange?.({
+            page: state.currentPage,
+            totalPages: state.totalPages,
+            workspaceMode: state.workspaceMode
+        });
+    };
+
+    window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(relayout);
+    });
+
+    if (readerLayoutSyncTimeout) {
+        clearTimeout(readerLayoutSyncTimeout);
+    }
+
+    readerLayoutSyncTimeout = window.setTimeout(() => {
+        relayout();
+    }, 260);
+}
+
+function setupFloatingSelectionToolbar() {
+    const toolbar = elements.selectionModeFloating;
+    const dragHandle = elements.selectionModeDragHandle;
+    const wrapper = elements.readerContentWrapper;
+
+    if (!toolbar || !dragHandle || !wrapper) {
+        return;
+    }
+
+    const getLayoutKey = () => (document.body.classList.contains('mobile-layout') ? 'mobile' : 'desktop');
+
+    const clearToolbarInlinePosition = () => {
+        toolbar.style.left = '';
+        toolbar.style.top = '';
+        toolbar.style.right = '';
+        toolbar.style.bottom = '';
+        toolbar.style.transform = '';
+    };
+
+    const clampToolbarPosition = (x, y) => {
+        const wrapperRect = wrapper.getBoundingClientRect();
+        const toolbarRect = toolbar.getBoundingClientRect();
+        const maxX = Math.max(12, wrapperRect.width - toolbarRect.width - 12);
+        const maxY = Math.max(12, wrapperRect.height - toolbarRect.height - 12);
+
+        return {
+            x: Math.min(Math.max(12, x), maxX),
+            y: Math.min(Math.max(12, y), maxY)
+        };
+    };
+
+    const applyStoredToolbarPosition = () => {
+        const layoutKey = getLayoutKey();
+        const storedPosition = selectionToolbarPositions[layoutKey];
+
+        if (!storedPosition) {
+            clearToolbarInlinePosition();
+            return;
+        }
+
+        const nextPosition = clampToolbarPosition(storedPosition.x, storedPosition.y);
+        toolbar.style.left = `${nextPosition.x}px`;
+        toolbar.style.top = `${nextPosition.y}px`;
+        toolbar.style.right = 'auto';
+        toolbar.style.bottom = 'auto';
+        toolbar.style.transform = 'none';
+        selectionToolbarPositions[layoutKey] = nextPosition;
+    };
+
+    let dragSession = null;
+
+    const stopDrag = () => {
+        if (!dragSession) {
+            return;
+        }
+
+        toolbar.classList.remove('dragging');
+        dragSession = null;
+        window.removeEventListener('pointermove', handlePointerMove);
+        window.removeEventListener('pointerup', stopDrag);
+        window.removeEventListener('pointercancel', stopDrag);
+    };
+
+    function handlePointerMove(event) {
+        if (!dragSession) {
+            return;
+        }
+
+        const proposedX = event.clientX - dragSession.wrapperLeft - dragSession.offsetX;
+        const proposedY = event.clientY - dragSession.wrapperTop - dragSession.offsetY;
+        const nextPosition = clampToolbarPosition(proposedX, proposedY);
+
+        toolbar.style.left = `${nextPosition.x}px`;
+        toolbar.style.top = `${nextPosition.y}px`;
+        toolbar.style.right = 'auto';
+        toolbar.style.bottom = 'auto';
+        toolbar.style.transform = 'none';
+        selectionToolbarPositions[dragSession.layoutKey] = nextPosition;
+    }
+
+    const startDrag = (event) => {
+        event.preventDefault();
+
+        const wrapperRect = wrapper.getBoundingClientRect();
+        const toolbarRect = toolbar.getBoundingClientRect();
+        dragSession = {
+            layoutKey: getLayoutKey(),
+            offsetX: event.clientX - toolbarRect.left,
+            offsetY: event.clientY - toolbarRect.top,
+            wrapperLeft: wrapperRect.left,
+            wrapperTop: wrapperRect.top
+        };
+
+        toolbar.classList.add('dragging');
+        dragHandle.setPointerCapture?.(event.pointerId);
+        window.addEventListener('pointermove', handlePointerMove);
+        window.addEventListener('pointerup', stopDrag);
+        window.addEventListener('pointercancel', stopDrag);
+    };
+
+    dragHandle.addEventListener('pointerdown', startDrag);
+
+    registerCleanup(() => {
+        dragHandle.removeEventListener('pointerdown', startDrag);
+        stopDrag();
+    });
+
+    registerCleanup(registerEventListeners([
+        {
+            target: window,
+            event: 'resize',
+            handler: () => window.requestAnimationFrame(applyStoredToolbarPosition)
+        }
+    ]));
+
+    window.requestAnimationFrame(applyStoredToolbarPosition);
+    setAppService('refreshFloatingToolbarPosition', () => window.requestAnimationFrame(applyStoredToolbarPosition));
+}
+
+function applyWorkspaceLayout(mode) {
+    document.body.dataset.workspaceMode = mode;
+    state.workspaceMode = mode;
+    syncWorkspaceModeButtons(mode);
+
+    if (!splitView) {
+        return;
+    }
+
+    const isMobile = document.body.classList.contains('mobile-layout');
+    const isCompact = splitView.isCompactLayout();
+
+    if (mode === 'reading') {
+        outlineSidebar?.close();
+        if (isMobile || isCompact) {
+            splitView.closeAll();
+        } else {
+            splitView.setLeftCollapsed(false);
+            splitView.setRightCollapsed(true);
+            splitView.setPanelWidth('left', 292);
+        }
+        setMobileNotesView('annotations');
+    }
+
+    if (mode === 'capture') {
+        if (isMobile || isCompact) {
+            splitView.setRightCollapsed(true);
+            splitView.setLeftCollapsed(true);
+            setMobileNotesView('annotations');
+        } else {
+            splitView.setLeftCollapsed(true);
+            splitView.setRightCollapsed(false);
+            splitView.setPanelWidth('right', CAPTURE_NOTES_FOCUS_WIDTH);
+        }
+    }
+
+    if (mode === 'map') {
+        if (isMobile || isCompact) {
+            splitView.setRightCollapsed(false);
+            splitView.setLeftCollapsed(true);
+            setMobileNotesView('mindmap');
+        } else {
+            splitView.setLeftCollapsed(true);
+            splitView.setRightCollapsed(false);
+            splitView.setPanelWidth('right', getMapNotesFocusWidth());
+        }
+    }
+
+    updatePanelControls();
+    syncReaderLayoutAfterModeChange();
+    getAppContext().refreshFloatingToolbarPosition?.();
+}
+
+function setWorkspaceMode(mode, options = {}) {
+    const nextMode = ['reading', 'capture', 'map'].includes(mode) ? mode : 'reading';
+    if (state.workspaceMode === nextMode && !options.force) {
+        return;
+    }
+
+    applyWorkspaceLayout(nextMode);
+}
+
 function isCompactLayout() {
     return splitView?.isCompactLayout() ?? window.innerWidth <= 820;
 }
@@ -118,14 +390,19 @@ function updatePanelControls() {
     const sidebarOpen = splitView ? !splitView.isLeftCollapsed() : false;
     const notesOpen = splitView ? !splitView.isRightCollapsed() : false;
     const outlineOpen = outlineSidebar?.isOpen() ?? false;
+    const isTablet = document.body.classList.contains('tablet-layout');
 
     elements.toggleSidebarBtn?.classList.toggle('active', sidebarOpen);
     elements.toggleNotesBtn?.classList.toggle('active', notesOpen);
     elements.toggleOutlineBtn?.classList.toggle('active', outlineOpen);
+    elements.sidebarWidthPresetBtn?.classList.toggle('hidden', !isTablet);
+    elements.notesWidthPresetBtn?.classList.toggle('hidden', !isTablet);
+    elements.toolbarSidebarWidthPresetBtn?.classList.toggle('hidden', !isTablet);
+    elements.toolbarNotesWidthPresetBtn?.classList.toggle('hidden', !isTablet);
 
-    const showBackdrop = isCompactLayout() && (sidebarOpen || notesOpen || outlineOpen);
-    elements.panelBackdrop?.classList.toggle('visible', showBackdrop);
-    document.body.classList.toggle('has-overlay-panel', showBackdrop);
+    const backdropVisible = isCompactLayout() && (sidebarOpen || notesOpen);
+    elements.panelBackdrop?.classList.toggle('visible', backdropVisible);
+    document.body.classList.toggle('has-overlay-panel', backdropVisible);
 }
 
 function closeCompactPanels() {
@@ -151,7 +428,16 @@ function setupResponsiveLayout() {
         },
         { target: window, event: 'layout-panel-toggled', handler: updatePanelControls },
         { target: window, event: 'outline-visibility-changed', handler: updatePanelControls },
-        { target: window, event: 'resize', handler: updatePanelControls }
+        {
+            target: window,
+            event: 'resize',
+            handler: () => {
+                if (!document.body.classList.contains('mobile-layout')) {
+                    setMobileToolbarExpanded(false);
+                }
+                updatePanelControls();
+            }
+        }
     ].filter(({ target }) => target)));
 
     updatePanelControls();
@@ -162,6 +448,7 @@ async function init() {
 
     try {
         loadFilesFromStorage();
+        updateToolbarSummary();
 
         // Init Mindmap or Drawnix
         const mindmapContainer = document.getElementById('mindmap-container');
@@ -193,6 +480,8 @@ async function init() {
         // Setup Layout Toggles (incl. Annotations)
         setupLayoutToggles();
         setupResponsiveLayout();
+        setupFloatingSelectionToolbar();
+        setWorkspaceMode('reading', { force: true });
 
         // Listen for live page restore events (from History Manager recovery)
         registerCleanup(registerEventListeners([
@@ -222,7 +511,7 @@ function setupLayoutToggles() {
     const showAnnotationsBtn = document.getElementById('show-annotations');
     const showMindmapBtn = document.getElementById('show-mindmap');
 
-    const setMobileNotesView = (view) => {
+    setMobileNotesView = (view) => {
         const nextView = view === 'mindmap' ? 'mindmap' : 'annotations';
         document.body.dataset.notesView = nextView;
         showAnnotationsBtn?.classList.toggle('active', nextView === 'annotations');
@@ -268,12 +557,18 @@ function setupLayoutToggles() {
         {
             target: showAnnotationsBtn,
             event: 'click',
-            handler: () => setMobileNotesView('annotations')
+            handler: () => {
+                setMobileNotesView('annotations');
+                setWorkspaceMode('capture');
+            }
         },
         {
             target: showMindmapBtn,
             event: 'click',
-            handler: () => setMobileNotesView('mindmap')
+            handler: () => {
+                setMobileNotesView('mindmap');
+                setWorkspaceMode('map');
+            }
         },
         {
             target: window,
@@ -292,6 +587,20 @@ function setupLayoutToggles() {
                 event: 'click',
                 handler: () => {
                     if (splitView) splitView.toggleLeft();
+                    setWorkspaceMode('reading');
+                }
+            }
+        ]));
+    }
+
+    if (elements.closeSidebarPanelBtn) {
+        registerCleanup(registerEventListeners([
+            {
+                target: elements.closeSidebarPanelBtn,
+                event: 'click',
+                handler: () => {
+                    splitView?.setLeftCollapsed(true);
+                    updatePanelControls();
                 }
             }
         ]));
@@ -304,10 +613,120 @@ function setupLayoutToggles() {
                 event: 'click',
                 handler: () => {
                     if (splitView) splitView.toggleRight();
+                    setWorkspaceMode('capture');
                 }
             }
         ]));
     }
+
+    if (elements.closeNotesPanelBtn) {
+        registerCleanup(registerEventListeners([
+            {
+                target: elements.closeNotesPanelBtn,
+                event: 'click',
+                handler: () => {
+                    splitView?.setRightCollapsed(true);
+                    setMobileToolbarExpanded(false);
+                    updatePanelControls();
+                }
+            }
+        ]));
+    }
+
+    if (elements.closeOutlinePanelBtn) {
+        registerCleanup(registerEventListeners([
+            {
+                target: elements.closeOutlinePanelBtn,
+                event: 'click',
+                handler: () => {
+                    outlineSidebar?.close();
+                    updatePanelControls();
+                }
+            }
+        ]));
+    }
+
+    registerCleanup(registerEventListeners([
+        elements.sidebarWidthPresetBtn && {
+            target: elements.sidebarWidthPresetBtn,
+            event: 'click',
+            handler: () => splitView?.cyclePanelPreset('left')
+        },
+        elements.toolbarSidebarWidthPresetBtn && {
+            target: elements.toolbarSidebarWidthPresetBtn,
+            event: 'click',
+            handler: () => splitView?.cyclePanelPreset('left')
+        },
+        elements.notesWidthPresetBtn && {
+            target: elements.notesWidthPresetBtn,
+            event: 'click',
+            handler: () => splitView?.cyclePanelPreset('right')
+        },
+        elements.toolbarNotesWidthPresetBtn && {
+            target: elements.toolbarNotesWidthPresetBtn,
+            event: 'click',
+            handler: () => splitView?.cyclePanelPreset('right')
+        }
+    ].filter(Boolean)));
+
+    if (elements.toggleMobileToolsBtn) {
+        registerCleanup(registerEventListeners([
+            {
+                target: elements.toggleMobileToolsBtn,
+                event: 'click',
+                handler: () => {
+                    const nextExpanded = !elements.readerToolbar?.classList.contains('mobile-tools-open');
+                    setMobileToolbarExpanded(nextExpanded);
+                }
+            },
+            {
+                target: document,
+                event: 'click',
+                handler: (e) => {
+                    if (!document.body.classList.contains('mobile-layout')) {
+                        return;
+                    }
+
+                    if (!elements.readerToolbar?.contains(e.target)) {
+                        setMobileToolbarExpanded(false);
+                    }
+                }
+            }
+        ]));
+    }
+
+    registerCleanup(registerEventListeners([
+        elements.workspaceModeReadingBtn && {
+            target: elements.workspaceModeReadingBtn,
+            event: 'click',
+            handler: () => setWorkspaceMode('reading')
+        },
+        elements.workspaceModeCaptureBtn && {
+            target: elements.workspaceModeCaptureBtn,
+            event: 'click',
+            handler: () => setWorkspaceMode('capture')
+        },
+        elements.workspaceModeMapBtn && {
+            target: elements.workspaceModeMapBtn,
+            event: 'click',
+            handler: () => setWorkspaceMode('map')
+        },
+        elements.mobileWorkspaceModeReadingBtn && {
+            target: elements.mobileWorkspaceModeReadingBtn,
+            event: 'click',
+            handler: () => setWorkspaceMode('reading')
+        },
+        elements.mobileWorkspaceModeCaptureBtn && {
+            target: elements.mobileWorkspaceModeCaptureBtn,
+            event: 'click',
+            handler: () => setWorkspaceMode('capture')
+        },
+        elements.mobileWorkspaceModeMapBtn && {
+            target: elements.mobileWorkspaceModeMapBtn,
+            event: 'click',
+            handler: () => setWorkspaceMode('map')
+        }
+    ].filter(Boolean)));
 }
 
 
@@ -317,6 +736,13 @@ function setupEventListeners() {
         { target: elements.fileInput, event: 'change', handler: handleFileSelect },
         { target: elements.prevBtn, event: 'click', handler: () => currentReader?.onPrevPage() },
         { target: elements.nextBtn, event: 'click', handler: () => currentReader?.onNextPage() },
+        { target: elements.mobilePrevBtn, event: 'click', handler: () => currentReader?.onPrevPage() },
+        { target: elements.mobileNextBtn, event: 'click', handler: () => currentReader?.onNextPage() },
+        {
+            target: window,
+            event: 'add-card-to-board',
+            handler: () => setWorkspaceMode('map')
+        },
         {
             target: window,
             event: 'jump-to-source',
@@ -393,6 +819,10 @@ function setupEventListeners() {
                 positionHighlighterPanel();
             } else if (mode !== 'highlighter') {
                 highlighterPanel?.classList.remove('visible');
+            }
+
+            if (document.body.classList.contains('mobile-layout') && mode !== 'highlighter') {
+                setMobileToolbarExpanded(false);
             }
         }
     };
@@ -535,18 +965,30 @@ function setupEventListeners() {
 
     // Auto-layout button
     const layoutBtn = document.getElementById('layout-btn');
+    const mindmapContainer = document.getElementById('mindmap-container');
     if (layoutBtn) {
         registerCleanup(registerEventListeners([
             {
                 target: layoutBtn,
                 event: 'click',
                 handler: () => {
+                    setWorkspaceMode('map');
                     if (window.applyAutoLayout) {
                         window.applyAutoLayout();
                     } else {
                         logger.warn('Auto-layout function not available yet');
                     }
                 }
+            }
+        ]));
+    }
+
+    if (mindmapContainer) {
+        registerCleanup(registerEventListeners([
+            {
+                target: mindmapContainer,
+                event: 'pointerdown',
+                handler: () => setWorkspaceMode('map')
             }
         ]));
     }
@@ -679,7 +1121,7 @@ async function openFile(fileData) {
     documentHistoryManager.stopAutoSave();
 
     state.currentFile = fileData;
-    elements.docTitle.textContent = fileData.name;
+    updateToolbarSummary();
 
     // Update Global State for Persistence
     updateCurrentBook({
@@ -715,6 +1157,7 @@ async function openFile(fileData) {
     currentReader = await readerLoader.loadReaderForFile(fileData);
 
     updateToolAvailability(fileData.type);
+    setWorkspaceMode('reading', { force: true });
 }
 
 function updateToolAvailability(fileType) {
@@ -743,13 +1186,23 @@ function updateToolAvailability(fileType) {
     if (currentModeBtn && currentModeBtn.disabled) {
         getAppContext().setToolMode?.('pan');
     }
+
+    [elements.prevBtn, elements.nextBtn, elements.mobilePrevBtn, elements.mobileNextBtn]
+        .filter(Boolean)
+        .forEach((button) => {
+            button.disabled = !state.currentFile;
+        });
 }
 
 function updatePageInfo() {
     if (state.totalPages > 0) {
         elements.pageInfo.textContent = `${state.currentPage} / ${state.totalPages}`;
+        elements.mobilePageInfo && (elements.mobilePageInfo.textContent = `${state.currentPage} / ${state.totalPages}`);
+        elements.mobileContextPageInfo && (elements.mobileContextPageInfo.textContent = `${state.currentPage} / ${state.totalPages}`);
     } else {
         elements.pageInfo.textContent = '-- / --';
+        elements.mobilePageInfo && (elements.mobilePageInfo.textContent = '-- / --');
+        elements.mobileContextPageInfo && (elements.mobileContextPageInfo.textContent = '-- / --');
     }
 }
 

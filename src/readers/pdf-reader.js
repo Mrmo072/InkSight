@@ -12,6 +12,7 @@ import {
 import {
     applyReaderSelectionMode,
     clearSelectedHighlightState,
+    createTouchSelectionScheduler,
     createReaderHighlightToolbar,
     handleReaderHighlightClick,
     registerHighlightToolbarDeletionHandler,
@@ -64,9 +65,29 @@ export class PDFReader {
         this.observer = null;
         this.selectionMode = PDFReader.currentSelectionMode; // Initialize from static state
         this.fileId = null;
+        this.zoomFeedbackTimeout = null;
         this.initialScrollTimeout = null;
         this.cleanupCallbacks = [];
         this.boundDetectCurrentPage = this.detectCurrentPage.bind(this);
+        this.touchSelectionScheduler = createTouchSelectionScheduler(
+            (pageNum) => this.handleSelection(pageNum),
+            {
+                readSelection: () => window.getSelection(),
+                getSignature: (selection) => {
+                    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+                        return '';
+                    }
+
+                    const text = selection.toString().trim().replace(/\s+/g, ' ');
+                    if (!text) {
+                        return '';
+                    }
+
+                    const range = selection.getRangeAt(0);
+                    return `${text}|${range.startOffset}|${range.endOffset}`;
+                }
+            }
+        );
         this.handleScrollTick = () => {
             if (!this.scrollTicking) {
                 window.requestAnimationFrame(() => {
@@ -129,6 +150,25 @@ export class PDFReader {
             this.container,
             () => this.selectionMode
         ));
+    }
+
+    showZoomFeedback(scale = this.scale) {
+        if (!this.zoomFeedbackEl) {
+            this.zoomFeedbackEl = document.createElement('div');
+            this.zoomFeedbackEl.className = 'reader-zoom-feedback';
+            this.container.appendChild(this.zoomFeedbackEl);
+        }
+
+        this.zoomFeedbackEl.textContent = `${Math.round(scale * 100)}%`;
+        this.zoomFeedbackEl.classList.add('visible');
+
+        if (this.zoomFeedbackTimeout) {
+            clearTimeout(this.zoomFeedbackTimeout);
+        }
+
+        this.zoomFeedbackTimeout = window.setTimeout(() => {
+            this.zoomFeedbackEl?.classList.remove('visible');
+        }, 900);
     }
 
     initEventHandlers() {
@@ -225,6 +265,7 @@ export class PDFReader {
         this.restoreScaleAnchor(scaleAnchor, resolvedViewportFocusPoint);
         await this.renderVisiblePages();
         this.finishPageStackTransition(previousStack);
+        this.showZoomFeedback(newScale);
     }
 
     captureScaleAnchor(contentFocusX, contentFocusY) {
@@ -776,9 +817,7 @@ export class PDFReader {
                     });
                     textLayerDiv.addEventListener('touchend', () => {
                         if (this.selectionMode === 'text') {
-                            setTimeout(() => {
-                                this.handleSelection(pageInfo.num);
-                            }, 120);
+                            this.touchSelectionScheduler.schedule(pageInfo.num);
                         }
                     }, { passive: true });
                 });
@@ -971,10 +1010,41 @@ export class PDFReader {
         }
     }
 
+    centerContentHorizontally() {
+        const overflowX = this.container.scrollWidth - this.container.clientWidth;
+        this.container.scrollLeft = overflowX > 0 ? overflowX / 2 : 0;
+    }
+
+    onLayoutChange({ page } = {}) {
+        if (!this.pdfDoc || !this.pages.length) {
+            return;
+        }
+
+        const targetPage = Math.max(
+            1,
+            Math.min(page || this._lastReportedPage || getNearestPageNumber(this.pages, this.container.scrollTop), this.pdfDoc.numPages)
+        );
+
+        this.scrollToPage(targetPage);
+        window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
+                this.centerContentHorizontally();
+            });
+        });
+    }
+
     /**
      * Clean up all event listeners and resources
      */
     destroy() {
+
+        if (this.zoomFeedbackTimeout) {
+            clearTimeout(this.zoomFeedbackTimeout);
+            this.zoomFeedbackTimeout = null;
+        }
+
+        this.touchSelectionScheduler?.cancel?.();
+        this.zoomFeedbackEl?.remove();
 
 
         if (this.initialScrollTimeout) {

@@ -31,6 +31,14 @@ export class SplitView {
         this.isCompact = false;
         this.viewportMode = 'desktop';
         this.handleViewportChange = () => this.applyResponsiveState();
+        this.panelPresets = options.panelPresets || {
+            left: ['30vw', '36vw', '42vw'],
+            right: ['32vw', '40vw', '48vw']
+        };
+        this.panelPresetIndex = {
+            left: 1,
+            right: 1
+        };
 
         this.setupResizers();
         window.addEventListener('resize', this.handleViewportChange);
@@ -101,6 +109,7 @@ export class SplitView {
         if (newWidth > this.minWidth && newWidth < maxLeftWidth) {
             this.leftPanel.style.width = `${newWidth}px`;
             this.leftPanel.style.flex = 'none';
+            this.syncPresetIndexFromWidth('left', newWidth);
         }
     }
 
@@ -139,7 +148,104 @@ export class SplitView {
         if (newWidth > this.minWidth && newWidth < maxRightWidth) {
             this.rightPanel.style.width = `${newWidth}px`;
             this.rightPanel.style.flex = 'none';
+            this.syncPresetIndexFromWidth('right', newWidth);
         }
+    }
+
+    resolvePresetWidth(panel, preset) {
+        const value = typeof preset === 'function' ? preset(window.innerWidth) : preset;
+        if (typeof value === 'number') {
+            return value;
+        }
+
+        if (typeof value === 'string') {
+            if (value.endsWith('vw')) {
+                return (window.innerWidth * parseFloat(value)) / 100;
+            }
+
+            if (value.endsWith('px')) {
+                return parseFloat(value);
+            }
+
+            const parsed = parseFloat(value);
+            if (Number.isFinite(parsed)) {
+                return parsed;
+            }
+        }
+
+        return panel === 'left' ? 320 : 360;
+    }
+
+    getPanelResizeBounds(panel) {
+        const leftPanelWidth = this.leftPanel.getBoundingClientRect().width;
+        const rightPanelWidth = this.rightPanel.getBoundingClientRect().width;
+
+        if (panel === 'left') {
+            return {
+                min: this.minWidth,
+                max: window.innerWidth - rightPanelWidth - 300
+            };
+        }
+
+        return {
+            min: this.minWidth,
+            max: window.innerWidth - leftPanelWidth - 300
+        };
+    }
+
+    setPanelWidth(panel, width) {
+        const targetPanel = panel === 'left' ? this.leftPanel : this.rightPanel;
+        const { min, max } = this.getPanelResizeBounds(panel);
+        const nextWidth = Math.max(min, Math.min(width, max));
+        targetPanel.style.width = `${nextWidth}px`;
+        targetPanel.style.flex = 'none';
+        this.syncPresetIndexFromWidth(panel, nextWidth);
+        return nextWidth;
+    }
+
+    syncPresetIndexFromWidth(panel, width) {
+        const presets = this.panelPresets[panel] || [];
+        if (presets.length === 0) {
+            return;
+        }
+
+        let bestIndex = 0;
+        let bestDiff = Infinity;
+        presets.forEach((preset, index) => {
+            const presetWidth = this.resolvePresetWidth(panel, preset);
+            const diff = Math.abs(presetWidth - width);
+            if (diff < bestDiff) {
+                bestDiff = diff;
+                bestIndex = index;
+            }
+        });
+        this.panelPresetIndex[panel] = bestIndex;
+    }
+
+    cyclePanelPreset(panel) {
+        if (this.viewportMode !== 'tablet') {
+            return null;
+        }
+
+        const presets = this.panelPresets[panel] || [];
+        if (presets.length === 0) {
+            return null;
+        }
+
+        const nextIndex = (this.panelPresetIndex[panel] + 1) % presets.length;
+        this.panelPresetIndex[panel] = nextIndex;
+        const width = this.resolvePresetWidth(panel, presets[nextIndex]);
+        const appliedWidth = this.setPanelWidth(panel, width);
+
+        window.dispatchEvent(new CustomEvent('layout-panel-preset-changed', {
+            detail: {
+                panel,
+                index: nextIndex,
+                width: appliedWidth
+            }
+        }));
+
+        return appliedWidth;
     }
 
     stopResizeRight = () => {
@@ -177,6 +283,9 @@ export class SplitView {
         if (this.isCompact) {
             this.setLeftCollapsed(true);
             this.setRightCollapsed(true);
+        } else if (this.viewportMode === 'tablet') {
+            this.setPanelWidth('left', this.resolvePresetWidth('left', this.panelPresets.left?.[this.panelPresetIndex.left] ?? '36vw'));
+            this.setPanelWidth('right', this.resolvePresetWidth('right', this.panelPresets.right?.[this.panelPresetIndex.right] ?? '40vw'));
         }
     }
 

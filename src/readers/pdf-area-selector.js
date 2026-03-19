@@ -72,9 +72,14 @@ export class PDFAreaSelector {
         this.attachedWrappers.add(wrapper);
     }
 
+    isExistingHighlightTarget(target) {
+        return target?.closest?.('.highlight-overlay, .area-highlight-border, .highlighter-hitbox') ?? null;
+    }
+
     onSelectionStart(e, wrapper, pageNum) {
         if (this.selectionMode !== 'rect' && this.selectionMode !== 'rectangle' && this.selectionMode !== 'ellipse') return;
         if (this.isDrawing) return; // Prevent re-entry if already drawing
+        if (this.isExistingHighlightTarget(e.target)) return;
 
         e.preventDefault(); // Prevent default selection
 
@@ -229,6 +234,10 @@ export class PDFAreaSelector {
                 borderDiv.style.zIndex = '5';
                 borderDiv.style.borderRadius = this.selectionMode === 'ellipse' ? '50%' : '4px';
                 borderDiv.dataset.highlightId = card.highlightId;
+
+                borderDiv.addEventListener('pointerdown', (e) => e.stopPropagation());
+                borderDiv.addEventListener('mousedown', (e) => e.stopPropagation());
+                borderDiv.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
 
                 // Add click listener for interaction
                 borderDiv.addEventListener('click', (e) => {
