@@ -11,6 +11,17 @@ function isAbortError(error) {
     return error?.name === 'AbortError';
 }
 
+function sanitizeDirectoryPickerIdSegment(value, fallback = 'workspace') {
+    const normalized = typeof value === 'string' ? value.trim() : '';
+    const sanitized = normalized
+        .replace(/[^a-zA-Z0-9_-]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^[-_]+|[-_]+$/g, '')
+        .slice(0, 80);
+
+    return sanitized || fallback;
+}
+
 function ensureDirectoryApi() {
     if (typeof window?.showDirectoryPicker !== 'function') {
         throw new Error('Directory project storage is not supported in this browser.');
@@ -89,8 +100,9 @@ export async function saveInksightProjectDirectory({
     ensureDirectoryApi();
 
     const payload = buildInksightFilePayload({ appContext, board, lastPage });
+    const pickerId = `inksight-project-${sanitizeDirectoryPickerIdSegment(name)}`;
     const targetDirectoryHandle = directoryHandle
-        || await window.showDirectoryPicker({ id: `inksight-project-${name || 'workspace'}`, mode: 'readwrite' });
+        || await window.showDirectoryPicker({ id: pickerId, mode: 'readwrite' });
     const { manifest, assetEntries, documentEntries } = await bundleProjectData({
         payload,
         projectFiles

@@ -30,3 +30,7 @@ dist/
 build/
 .cache/
 files/
+
+# Local runtime data
+.runtime/
+runtime-data/
