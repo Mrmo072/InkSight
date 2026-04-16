@@ -15,8 +15,17 @@ export function createReaderLoader({
     const resolveOutlineSidebar = () => getOutlineSidebar?.() ?? null;
 
     const setPageInfo = (page, totalPages = state.totalPages) => {
-        state.currentPage = page;
-        state.totalPages = totalPages;
+        const normalizedTotalPages = Number.isFinite(totalPages) && totalPages > 0
+            ? totalPages
+            : 0;
+        const normalizedPage = Number.isFinite(page) && page > 0
+            ? page
+            : normalizedTotalPages > 0
+                ? Math.min(Math.max(state.currentPage || 1, 1), normalizedTotalPages)
+                : (state.currentPage > 0 ? state.currentPage : 1);
+
+        state.currentPage = normalizedPage;
+        state.totalPages = normalizedTotalPages;
         updatePageInfo?.();
     };
 
@@ -86,7 +95,7 @@ export function createReaderLoader({
                     setPageInfo(state.currentPage, count);
                 });
                 reader.setPageChangeCallback((location) => {
-                    setPageInfo(location.start.location);
+                    setPageInfo(location?.start?.location);
                 });
             },
             load: async (reader, fileData) => {

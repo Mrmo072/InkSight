@@ -55,9 +55,10 @@ vi.mock('epubjs', () => ({
                 epubMockState.renditionHandlers[event] = handler;
             }),
             display: vi.fn(async () => {}),
+            resize: vi.fn(),
             getContents: vi.fn(() => contents),
             currentLocation: vi.fn(() => ({
-                start: { cfi: 'epubcfi(/6/2)' }
+                start: { cfi: 'epubcfi(/6/2)', location: 0, percentage: 0 }
             })),
             prev: vi.fn(),
             next: vi.fn()
@@ -68,7 +69,10 @@ vi.mock('epubjs', () => ({
             renderTo: vi.fn(() => rendition),
             locations: {
                 generate: vi.fn(async () => {}),
-                length: vi.fn(() => 12)
+                length: vi.fn(() => 12),
+                locationFromCfi: vi.fn(() => 0),
+                percentageFromCfi: vi.fn(() => 0),
+                percentageFromLocation: vi.fn(() => 0)
             },
             getRange: vi.fn(async () => ({
                 toString: () => 'Selected text'
@@ -127,7 +131,7 @@ describe('EpubReader', () => {
         expect(epubMockState.rendition.display).toHaveBeenCalled();
         expect(onPageCountChange).toHaveBeenCalledWith(12);
         expect(onPageChange).toHaveBeenCalledWith(expect.objectContaining({
-            start: { cfi: 'epubcfi(/6/2)' }
+            start: expect.objectContaining({ cfi: 'epubcfi(/6/2)', location: 1 })
         }));
     });
 
@@ -215,5 +219,39 @@ describe('EpubReader', () => {
         expect(container.style.cursor).toBe('grab');
         expect(container.style.touchAction).toBe('auto');
         expect(contentBody.style.userSelect).toBe('none');
+    });
+
+    it('keeps a valid page number after layout changes even when epubjs omits start.location', async () => {
+        const container = document.createElement('div');
+        document.body.appendChild(container);
+        Object.defineProperty(container, 'clientWidth', { configurable: true, value: 960 });
+        Object.defineProperty(container, 'clientHeight', { configurable: true, value: 720 });
+
+        const reader = new EpubReader(container);
+        const onPageChange = vi.fn();
+        const onPageCountChange = vi.fn();
+        reader.setPageChangeCallback(onPageChange);
+        reader.setPageCountCallback(onPageCountChange);
+
+        await reader.load({
+            id: 'book-1',
+            name: 'sample.epub',
+            fileObj: {
+                arrayBuffer: vi.fn().mockResolvedValue(new Uint8Array([0x50, 0x4b, 0x03, 0x04]).buffer)
+            }
+        });
+
+        epubMockState.book.locations.locationFromCfi.mockReturnValue(4);
+        epubMockState.rendition.currentLocation.mockReturnValue({
+            start: { cfi: 'epubcfi(/6/14)', percentage: 0.33 }
+        });
+
+        await reader.onLayoutChange();
+
+        expect(epubMockState.rendition.resize).toHaveBeenCalledWith(960, 720, 'epubcfi(/6/14)');
+        expect(onPageChange).toHaveBeenLastCalledWith(expect.objectContaining({
+            start: expect.objectContaining({ cfi: 'epubcfi(/6/14)', location: 5 })
+        }));
+        expect(onPageCountChange).toHaveBeenLastCalledWith(12);
     });
 });

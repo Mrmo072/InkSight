@@ -29,6 +29,9 @@ export class EpubReader {
         this.deletedCFIs = new Set(); // Track deleted CFIs to prevent re-creation with new IDs
         this.cleanupListeners = null;
         this.pendingSelection = null;
+        this.lastKnownPage = 1;
+        this.lastKnownPageCount = 0;
+        this.layoutChangePromise = Promise.resolve();
         this.touchSelectionScheduler = createTouchSelectionScheduler(
             () => {
                 if (!this.pendingSelection) {
@@ -113,19 +116,28 @@ export class EpubReader {
             // Mouse wheel support & Keydown support inside iframe
             this.rendition.hooks.content.register((contents) => {
                 const doc = contents.document;
-                const win = contents.window;
 
                 doc.addEventListener('wheel', (e) => {
+                    if (e.ctrlKey || e.metaKey) {
+                        if (e.cancelable) e.preventDefault();
+                        return;
+                    }
+
                     // Prevent default scrolling if needed, or just trigger nav
                     if (e.deltaY > 0) {
                         this.onNextPage();
                     } else if (e.deltaY < 0) {
                         this.onPrevPage();
                     }
-                }, { passive: true });
+                }, { passive: false });
 
                 // Keydown listener for DEL inside iframe
                 doc.addEventListener('keydown', (e) => {
+                    if ((e.ctrlKey || e.metaKey) && ['+', '-', '=', '0'].includes(e.key)) {
+                        e.preventDefault();
+                        return;
+                    }
+
                     if (e.key === 'Delete' || e.key === 'Backspace') {
                         if (this.selectedHighlightId) {
                             e.preventDefault(); // Prevent browser back/navigation
@@ -153,7 +165,7 @@ export class EpubReader {
             // Setup hooks
             this.rendition.on('relocated', (location) => {
                 this.cfi = location.start.cfi;
-                this.onPageChange?.(location);
+                this.emitPageChange(location);
             });
 
             // Selection handling
@@ -165,12 +177,13 @@ export class EpubReader {
 
             await this.book.locations.generate(1000);
 
-            this.onPageCountChange?.(this.book.locations.length());
+            this.lastKnownPageCount = this.getPageCount();
+            this.onPageCountChange?.(this.lastKnownPageCount);
 
             // Trigger initial page update
             const currentLocation = this.rendition.currentLocation();
             if (currentLocation && currentLocation.start) {
-                this.onPageChange?.(currentLocation);
+                this.emitPageChange(currentLocation);
             }
 
             // Restore existing highlights
@@ -377,22 +390,84 @@ export class EpubReader {
         this.container.scrollLeft = overflowX > 0 ? overflowX / 2 : 0;
     }
 
+    getPageCount() {
+        const pageCount = this.book?.locations?.length?.();
+        return Number.isFinite(pageCount) && pageCount > 0 ? pageCount : 0;
+    }
+
+    resolveLocationPage(location) {
+        const totalPages = this.getPageCount() || this.lastKnownPageCount;
+        const rawLocation = location?.start?.location;
+        if (Number.isFinite(rawLocation)) {
+            const resolved = rawLocation + 1;
+            return totalPages > 0
+                ? Math.min(totalPages, Math.max(1, resolved))
+                : Math.max(1, resolved);
+        }
+
+        const cfi = location?.start?.cfi || this.cfi;
+        const fromCfi = cfi && this.book?.locations?.locationFromCfi?.(cfi);
+        if (Number.isFinite(fromCfi)) {
+            const resolved = fromCfi + 1;
+            return totalPages > 0
+                ? Math.min(totalPages, Math.max(1, resolved))
+                : Math.max(1, resolved);
+        }
+
+        const percentage = location?.start?.percentage;
+        if (Number.isFinite(percentage) && totalPages > 0) {
+            return Math.min(totalPages, Math.max(1, Math.floor(percentage * totalPages) + 1));
+        }
+
+        return this.lastKnownPage || 1;
+    }
+
+    emitPageChange(location) {
+        const page = this.resolveLocationPage(location);
+        this.lastKnownPage = page;
+        this.onPageChange?.({
+            ...location,
+            start: {
+                ...location?.start,
+                location: page
+            }
+        });
+    }
+
     onLayoutChange() {
-        if (!this.rendition) {
-            return;
-        }
+        this.layoutChangePromise = this.layoutChangePromise
+            .catch(() => {})
+            .then(async () => {
+                if (!this.rendition) {
+                    return;
+                }
 
-        const currentCfi = this.rendition.currentLocation?.()?.start?.cfi || this.cfi;
+                const currentCfi = this.rendition.currentLocation?.()?.start?.cfi || this.cfi;
+                const width = this.container.clientWidth;
+                const height = this.container.clientHeight;
 
-        if (typeof this.rendition.resize === 'function') {
-            this.rendition.resize(this.container.clientWidth, this.container.clientHeight);
-        }
+                if (width < 32 || height < 32) {
+                    return;
+                }
 
-        if (currentCfi) {
-            this.rendition.display(currentCfi);
-        }
+                if (typeof this.rendition.resize === 'function') {
+                    this.rendition.resize(width, height, currentCfi);
+                } else if (currentCfi) {
+                    await this.rendition.display(currentCfi);
+                }
 
-        window.requestAnimationFrame(() => this.centerContentHorizontally());
+                const currentLocation = this.rendition.currentLocation?.();
+                if (currentLocation?.start) {
+                    this.emitPageChange(currentLocation);
+                }
+
+                this.lastKnownPageCount = this.getPageCount() || this.lastKnownPageCount;
+                this.onPageCountChange?.(this.lastKnownPageCount);
+
+                window.requestAnimationFrame(() => this.centerContentHorizontally());
+            });
+
+        return this.layoutChangePromise;
     }
 
     commitSelection(cfiRange, contents) {

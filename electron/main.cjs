@@ -19,6 +19,20 @@ function createWindow() {
 
     console.log('[Main] Window created');
 
+    win.webContents.setVisualZoomLevelLimits(1, 1).catch((error) => {
+        console.error('[Main] Failed to lock visual zoom level:', error);
+    });
+    win.webContents.setZoomFactor(1);
+    win.webContents.on('before-input-event', (event, input) => {
+        if (!(input.control || input.meta)) {
+            return;
+        }
+
+        if (['+', '-', '=', '0'].includes(input.key)) {
+            event.preventDefault();
+        }
+    });
+
     // In dev, load localhost. In prod, load index.html from dist
     const isDev = !app.isPackaged;
 
