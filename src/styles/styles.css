@@ -395,6 +395,7 @@ body {
   transition: background-color 0.2s;
   z-index: 100;
   position: relative;
+  touch-action: none;
   /* Ensure pseudo-element positioning works */
 }
 
@@ -412,6 +413,11 @@ body {
 .resizer:hover,
 .resizer:active {
   background-color: var(--primary);
+}
+
+body.split-resizing {
+  cursor: col-resize !important;
+  user-select: none;
 }
 
 /* Reader Container */

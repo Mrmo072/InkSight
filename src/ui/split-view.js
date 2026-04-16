@@ -24,13 +24,18 @@ export class SplitView {
         }
 
         this.minWidth = 200;
+        this.minCenterWidth = options.minCenterWidth || 300;
         this.compactBreakpoint = options.compactBreakpoint || 1100;
         this.mobileBreakpoint = options.mobileBreakpoint || 680;
         this.mouseResizeMargin = options.mouseResizeMargin || 6;
         this.touchResizeMargin = options.touchResizeMargin || 18;
         this.isCompact = false;
         this.viewportMode = 'desktop';
+        this.activeResize = null;
+        this.pendingResizeClientX = null;
+        this.resizeFrame = null;
         this.handleViewportChange = () => this.applyResponsiveState();
+        this.handleWindowBlur = () => this.stopActiveResize();
         this.panelPresets = options.panelPresets || {
             left: ['30vw', '36vw', '42vw'],
             right: ['32vw', '40vw', '48vw']
@@ -42,114 +47,127 @@ export class SplitView {
 
         this.setupResizers();
         window.addEventListener('resize', this.handleViewportChange);
+        window.addEventListener('blur', this.handleWindowBlur);
         this.applyResponsiveState();
         logger.debug('SplitView initialized successfully');
     }
 
     setupResizers() {
-        // Left Resizer
         const addResizeListeners = (element, isLeft) => {
             const isPointerNearHandle = (event) => {
                 const rect = element.getBoundingClientRect();
-                const clientX = event.touches?.[0]?.clientX ?? event.clientX;
-                const margin = event.touches ? this.touchResizeMargin : this.mouseResizeMargin;
+                const clientX = event.clientX;
+                const isTouchLike = event.pointerType === 'touch' || event.pointerType === 'pen';
+                const margin = isTouchLike ? this.touchResizeMargin : this.mouseResizeMargin;
                 const handleCenter = rect.left + (rect.width / 2);
                 return Math.abs(clientX - handleCenter) <= margin;
             };
 
-            const startResize = (e) => {
-                if (!isPointerNearHandle(e)) {
+            const startResize = (event) => {
+                if (event.button !== undefined && event.button !== 0) {
                     return;
                 }
 
-                e.preventDefault();
-                const panel = isLeft ? this.leftPanel : this.rightPanel;
-                panel.classList.add('resizing');
-
-                if (isLeft) {
-                    document.addEventListener('mousemove', this.resizeLeft);
-                    document.addEventListener('mouseup', this.stopResizeLeft);
-                    document.addEventListener('touchmove', this.resizeLeftTouch, { passive: false });
-                    document.addEventListener('touchend', this.stopResizeLeftTouch);
-                } else {
-                    document.addEventListener('mousemove', this.resizeRight);
-                    document.addEventListener('mouseup', this.stopResizeRight);
-                    document.addEventListener('touchmove', this.resizeRightTouch, { passive: false });
-                    document.addEventListener('touchend', this.stopResizeRightTouch);
+                if (!isPointerNearHandle(event)) {
+                    return;
                 }
-                document.body.style.cursor = 'col-resize';
+
+                event.preventDefault();
+                this.beginResizeSession(element, isLeft ? 'left' : 'right', event);
             };
 
-            element.addEventListener('mousedown', startResize);
-            element.addEventListener('touchstart', (e) => {
-                // Use the first touch point
-                startResize(e);
-            }, { passive: false });
+            element.addEventListener('pointerdown', startResize);
         };
 
         addResizeListeners(this.resizerLeft, true);
         addResizeListeners(this.resizerRight, false);
     }
 
-    resizeLeft = (e) => {
-        this.performResizeLeft(e.clientX);
+    beginResizeSession(handle, panel, event) {
+        this.stopActiveResize();
+
+        const targetPanel = panel === 'left' ? this.leftPanel : this.rightPanel;
+        const oppositePanel = panel === 'left' ? this.rightPanel : this.leftPanel;
+
+        this.activeResize = {
+            handle,
+            panel,
+            pointerId: event.pointerId,
+            viewportWidth: document.documentElement.clientWidth,
+            oppositePanelWidth: oppositePanel.getBoundingClientRect().width
+        };
+        this.pendingResizeClientX = event.clientX;
+
+        targetPanel.classList.add('resizing');
+        document.body.classList.add('split-resizing');
+        document.body.style.cursor = 'col-resize';
+
+        handle.setPointerCapture?.(event.pointerId);
+        window.addEventListener('pointermove', this.handlePointerMove, { passive: true });
+        window.addEventListener('pointerup', this.handlePointerUp);
+        window.addEventListener('pointercancel', this.handlePointerUp);
+        handle.addEventListener('lostpointercapture', this.handleLostPointerCapture);
+
+        this.scheduleResize();
     }
 
-    resizeLeftTouch = (e) => {
-        if (e.cancelable) e.preventDefault();
-        this.performResizeLeft(e.touches[0].clientX);
-    }
-
-    performResizeLeft(clientX) {
-        const newWidth = clientX;
-        // Calculate max width allowing for right panel and min center width
-        const rightPanelWidth = this.rightPanel.getBoundingClientRect().width;
-        const maxLeftWidth = window.innerWidth - rightPanelWidth - 300; // Reserve 300px for center
-
-        if (newWidth > this.minWidth && newWidth < maxLeftWidth) {
-            this.leftPanel.style.width = `${newWidth}px`;
-            this.leftPanel.style.flex = 'none';
-            this.syncPresetIndexFromWidth('left', newWidth);
+    handlePointerMove = (event) => {
+        if (!this.activeResize || event.pointerId !== this.activeResize.pointerId) {
+            return;
         }
+
+        this.pendingResizeClientX = event.clientX;
+        this.scheduleResize();
     }
 
-    stopResizeLeft = () => {
-        this.cleanupResizeLeft();
-    }
-
-    stopResizeLeftTouch = () => {
-        this.cleanupResizeLeft();
-    }
-
-    cleanupResizeLeft() {
-        this.leftPanel.classList.remove('resizing'); // Re-enable transitions
-        document.removeEventListener('mousemove', this.resizeLeft);
-        document.removeEventListener('mouseup', this.stopResizeLeft);
-        document.removeEventListener('touchmove', this.resizeLeftTouch);
-        document.removeEventListener('touchend', this.stopResizeLeftTouch);
-        document.body.style.cursor = 'default';
-    }
-
-    resizeRight = (e) => {
-        this.performResizeRight(e.clientX);
-    }
-
-    resizeRightTouch = (e) => {
-        if (e.cancelable) e.preventDefault();
-        this.performResizeRight(e.touches[0].clientX);
-    }
-
-    performResizeRight(clientX) {
-        const newWidth = window.innerWidth - clientX;
-        // Calculate max width allowing for left panel and min center width
-        const leftPanelWidth = this.leftPanel.getBoundingClientRect().width;
-        const maxRightWidth = window.innerWidth - leftPanelWidth - 300; // Reserve 300px for center
-
-        if (newWidth > this.minWidth && newWidth < maxRightWidth) {
-            this.rightPanel.style.width = `${newWidth}px`;
-            this.rightPanel.style.flex = 'none';
-            this.syncPresetIndexFromWidth('right', newWidth);
+    handlePointerUp = (event) => {
+        if (!this.activeResize || event.pointerId !== this.activeResize.pointerId) {
+            return;
         }
+
+        this.stopActiveResize();
+    }
+
+    handleLostPointerCapture = (event) => {
+        if (!this.activeResize || event.pointerId !== this.activeResize.pointerId) {
+            return;
+        }
+
+        this.stopActiveResize();
+    }
+
+    scheduleResize() {
+        if (this.resizeFrame !== null || !this.activeResize) {
+            return;
+        }
+
+        this.resizeFrame = window.requestAnimationFrame(() => {
+            this.resizeFrame = null;
+            if (!this.activeResize || this.pendingResizeClientX == null) {
+                return;
+            }
+
+            this.performResize(this.activeResize.panel, this.pendingResizeClientX);
+        });
+    }
+
+    performResize(panel, clientX) {
+        if (!this.activeResize) {
+            return;
+        }
+
+        const viewportWidth = this.activeResize.viewportWidth;
+        const maxWidth = viewportWidth - this.activeResize.oppositePanelWidth - this.minCenterWidth;
+        const nextWidth = panel === 'left' ? clientX : viewportWidth - clientX;
+
+        if (nextWidth < this.minWidth || nextWidth > maxWidth) {
+            return;
+        }
+
+        const targetPanel = panel === 'left' ? this.leftPanel : this.rightPanel;
+        targetPanel.style.width = `${nextWidth}px`;
+        targetPanel.style.flex = 'none';
+        this.syncPresetIndexFromWidth(panel, nextWidth);
     }
 
     resolvePresetWidth(panel, preset) {
@@ -183,13 +201,13 @@ export class SplitView {
         if (panel === 'left') {
             return {
                 min: this.minWidth,
-                max: window.innerWidth - rightPanelWidth - 300
+                max: window.innerWidth - rightPanelWidth - this.minCenterWidth
             };
         }
 
         return {
             min: this.minWidth,
-            max: window.innerWidth - leftPanelWidth - 300
+            max: window.innerWidth - leftPanelWidth - this.minCenterWidth
         };
     }
 
@@ -248,20 +266,33 @@ export class SplitView {
         return appliedWidth;
     }
 
-    stopResizeRight = () => {
-        this.cleanupResizeRight();
-    }
+    stopActiveResize() {
+        if (this.resizeFrame !== null) {
+            window.cancelAnimationFrame(this.resizeFrame);
+            this.resizeFrame = null;
+        }
 
-    stopResizeRightTouch = () => {
-        this.cleanupResizeRight();
-    }
+        if (!this.activeResize) {
+            this.pendingResizeClientX = null;
+            document.body.classList.remove('split-resizing');
+            document.body.style.cursor = 'default';
+            return;
+        }
 
-    cleanupResizeRight() {
-        this.rightPanel.classList.remove('resizing'); // Re-enable transitions
-        document.removeEventListener('mousemove', this.resizeRight);
-        document.removeEventListener('mouseup', this.stopResizeRight);
-        document.removeEventListener('touchmove', this.resizeRightTouch);
-        document.removeEventListener('touchend', this.stopResizeRightTouch);
+        const { handle } = this.activeResize;
+        this.leftPanel.classList.remove('resizing');
+        this.rightPanel.classList.remove('resizing');
+        window.removeEventListener('pointermove', this.handlePointerMove);
+        window.removeEventListener('pointerup', this.handlePointerUp);
+        window.removeEventListener('pointercancel', this.handlePointerUp);
+        handle.removeEventListener('lostpointercapture', this.handleLostPointerCapture);
+        if (handle.hasPointerCapture?.(this.activeResize.pointerId)) {
+            handle.releasePointerCapture(this.activeResize.pointerId);
+        }
+
+        this.activeResize = null;
+        this.pendingResizeClientX = null;
+        document.body.classList.remove('split-resizing');
         document.body.style.cursor = 'default';
     }
 
