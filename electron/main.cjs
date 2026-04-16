@@ -11,8 +11,8 @@ function createWindow() {
         width: 1280,
         height: 800,
         webPreferences: {
-            nodeIntegration: true, // Enable Node integration
-            contextIsolation: false, // Disable Context Isolation for direct access
+            nodeIntegration: false,
+            contextIsolation: true,
             preload: preloadPath
         }
     });

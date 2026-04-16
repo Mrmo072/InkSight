@@ -38,6 +38,12 @@ src/
 └── styles/             # 样式文件
 ```
 
+## 模块装配说明
+
+当前 `main.js` 已做过一轮较大规模的职责下沉。关于前端模块的最新职责边界、依赖方向和装配约定，请优先参考：
+
+- [MODULE_DEPENDENCY_MAP.md](/D:/Projects/InkSight/docs/MODULE_DEPENDENCY_MAP.md)
+
 ## 关键模块说明 (Key Modules)
 
 ### 1. Reader System (阅读器系统)

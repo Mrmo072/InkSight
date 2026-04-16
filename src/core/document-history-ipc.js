@@ -20,14 +20,14 @@ export function createWrappedIpcRenderer(rawIpc) {
 
 export function resolveDocumentHistoryIpc() {
     try {
-        if (window.ipcRenderer) {
-            logger.debug('IPC initialized via window.ipcRenderer (wrapped)');
-            return createWrappedIpcRenderer(window.ipcRenderer);
-        }
-
         if (window.electronAPI) {
             logger.debug('IPC initialized via window.electronAPI');
             return window.electronAPI;
+        }
+
+        if (window.ipcRenderer) {
+            logger.debug('IPC initialized via window.ipcRenderer (wrapped)');
+            return createWrappedIpcRenderer(window.ipcRenderer);
         }
 
         if (window.require) {
