@@ -7,12 +7,15 @@ import { getAppContext, initAppContext, setAppService } from './app/app-context.
 import { initAppBootstrap, setupAppEventListeners } from './app/app-bootstrap.js';
 import { createReaderLoader } from './app/reader-loader.js';
 import { registerEventListeners } from './app/event-listeners.js';
-import { buildRecoveryDiagnostics, findLoadedDocumentMatch } from './app/document-relink.js';
 import { createFileLibraryRenderer, getCardsCollection, getDocumentReferenceDetails } from './app/file-library.js';
 import { createWorkspaceDocumentsController } from './app/workspace-documents.js';
 import { createProjectWorkspaceController } from './app/project-workspace.js';
 import { navigateToLinkedSource } from './app/source-navigation.js';
+import { createRecoveryWorkbenchController } from './app/recovery-workbench.js';
+import { buildWorkspaceSearchIndex, queryWorkspaceSearch } from './app/search-index.js';
+import { createSearchController } from './app/search-controller.js';
 import { createLogger } from './core/logger.js';
+import { buildProjectHomeModel, renderProjectHome as renderProjectHomeMarkup } from './app/project-home.js';
 
 const logger = createLogger('Main');
 
@@ -53,6 +56,9 @@ const elements = {
     mobileImportDocumentsBtn: document.getElementById('mobile-import-documents'),
     mobileOpenProjectBtn: document.getElementById('mobile-open-project'),
     mobileSaveProjectBtn: document.getElementById('mobile-save-project'),
+    mobileExportOutlineBtn: document.getElementById('mobile-export-outline'),
+    mobileExportCitationsBtn: document.getElementById('mobile-export-citations'),
+    mobileExportNotesBtn: document.getElementById('mobile-export-notes'),
     pageInfo: document.getElementById('page-info'),
     mobileContextPageInfo: document.getElementById('mobile-context-page-info'),
     mobileDocSummary: document.getElementById('mobile-doc-summary'),
@@ -60,6 +66,10 @@ const elements = {
     toolbarImportDocumentsBtn: document.getElementById('toolbar-import-documents'),
     toolbarOpenProjectBtn: document.getElementById('toolbar-open-project'),
     toolbarSaveProjectBtn: document.getElementById('toolbar-save-project'),
+    toolbarExportOutlineBtn: document.getElementById('toolbar-export-outline'),
+    toolbarExportCitationsBtn: document.getElementById('toolbar-export-citations'),
+    toolbarExportNotesBtn: document.getElementById('toolbar-export-notes'),
+    toolbarSearchBtn: document.getElementById('toolbar-search'),
     toggleSidebarBtn: document.getElementById('toggle-sidebar'),
     toggleNotesBtn: document.getElementById('toggle-notes'),
     toggleOutlineBtn: document.getElementById('toggle-outline'),
@@ -84,7 +94,11 @@ const elements = {
     saveStatusIndicator: document.getElementById('save-status-indicator'),
     appNotifications: document.getElementById('app-notifications'),
     emptyImportDocumentBtn: document.getElementById('empty-import-document'),
-    emptyOpenProjectBtn: document.getElementById('empty-open-project')
+    emptyOpenProjectBtn: document.getElementById('empty-open-project'),
+    searchPanel: document.getElementById('workspace-search-panel'),
+    workspaceSearchInput: document.getElementById('workspace-search-input'),
+    workspaceSearchResults: document.getElementById('workspace-search-results'),
+    workspaceSearchEmpty: document.getElementById('workspace-search-empty')
 };
 
 let currentReader = null;
@@ -104,11 +118,13 @@ const selectionToolbarPositions = {
 let draggedFileId = null;
 let renderFileList = () => {};
 let workspaceDocuments = null;
+let searchController = null;
 const projectWorkspace = createProjectWorkspaceController({
     localStorage,
     sessionStorage,
     saveStatusIndicator: elements.saveStatusIndicator,
-    renderFileList: () => renderFileList()
+    renderFileList: () => renderFileList(),
+    renderProjectHome: () => renderProjectHome()
 });
 
 renderFileList = createFileLibraryRenderer({
@@ -117,6 +133,17 @@ renderFileList = createFileLibraryRenderer({
     getCurrentFileId: () => state.currentFile?.id ?? null,
     getProjectStatus: () => projectWorkspace.getProjectStatus(state.files)
 });
+
+function renderProjectHome() {
+    if (state.currentFile) {
+        return;
+    }
+
+    elements.viewer.innerHTML = renderProjectHomeMarkup(buildProjectHomeModel(
+        getAppContext(),
+        projectWorkspace.getProjectStatus(state.files)
+    ));
+}
 
 workspaceDocuments = createWorkspaceDocumentsController({
     logger,
@@ -138,11 +165,20 @@ workspaceDocuments = createWorkspaceDocumentsController({
     },
     ui: {
         renderFileList: () => renderFileList(),
+        renderProjectHome,
         updateToolbarSummary,
         updateToolAvailability,
         setWorkspaceMode: (...args) => setWorkspaceMode(...args),
         updatePageInfo
     }
+});
+
+const recoveryWorkbench = createRecoveryWorkbenchController({
+    renderFileList: () => renderFileList(),
+    refreshAnnotations: () => getAppContext().annotationList?.refresh?.(),
+    notify: emitAppNotification,
+    promptBulkRelink,
+    showValidation: () => recoveryWorkbench.showRecoveryValidation()
 });
 
 async function createDrawnixView(container) {
@@ -183,88 +219,16 @@ function promptImportDocument() {
     elements.fileInput.click();
 }
 
-function attemptAutoRelinkRecoveredDocuments({ notify = false } = {}) {
-    const appContext = getAppContext();
-    const missingDocuments = appContext.documentManager?.getMissingDocuments?.() ?? [];
-    const loadedDocuments = (appContext.documentManager?.getAllDocuments?.() ?? []).filter((doc) => doc.loaded);
-    let matchedCount = 0;
-
-    missingDocuments.forEach((document) => {
-        const loadedMatch = findLoadedDocumentMatch({
-            document,
-            loadedDocuments,
-            documentManager: appContext.documentManager
-        });
-
-        if (!loadedMatch) {
-            return;
-        }
-
-        appContext.highlightManager?.remapSourceIds?.(loadedMatch.id, document.id);
-        appContext.cardSystem?.remapSourceIds?.(loadedMatch.id, document.id);
-        appContext.cardSystem?.updateSourceNames?.(loadedMatch.id, loadedMatch.name);
-        appContext.highlightManager?.updateSourceNames?.(loadedMatch.id, loadedMatch.name);
-        appContext.documentManager?.unregisterDocument?.(document.id);
-        matchedCount += 1;
-    });
-
-    if (matchedCount > 0) {
-        renderFileList();
-        appContext.annotationList?.refresh?.();
-    }
-
-    if (notify) {
-        if (matchedCount > 0) {
-            emitAppNotification({
-                title: 'Auto Match Complete',
-                message: `Automatically relinked ${matchedCount} restored source ${matchedCount === 1 ? 'file' : 'files'} using documents already loaded in the workspace.`,
-                level: 'success',
-                actions: [
-                    { label: 'Validate', onClick: () => showRecoveryValidation() }
-                ]
-            });
-        } else {
-            emitAppNotification({
-                title: 'Auto Match',
-                message: 'No automatic relink candidates were found among the documents already loaded in this workspace.',
-                level: 'warning',
-                actions: [
-                    { label: 'Import Sources', onClick: () => promptBulkRelink() }
-                ]
-            });
-        }
-    }
-
-    return matchedCount;
+function attemptAutoRelinkRecoveredDocuments(options) {
+    return recoveryWorkbench.attemptAutoRelinkRecoveredDocuments(options);
 }
 
 function showRecoveryValidation() {
-    const diagnostics = buildRecoveryDiagnostics(getAppContext());
-    const unresolvedDocumentCount = diagnostics.missingDocuments.length;
+    return recoveryWorkbench.showRecoveryValidation();
+}
 
-    if (unresolvedDocumentCount === 0) {
-    emitAppNotification({
-        title: 'Links Ready',
-        message: `All saved source documents are linked. ${diagnostics.readyCards} of ${diagnostics.totalCards} cards and ${diagnostics.readyHighlights} of ${diagnostics.totalHighlights} highlights are ready for source navigation.`,
-        level: 'success',
-        duration: 5200,
-        actions: [
-            { label: 'Validate Again', onClick: () => showRecoveryValidation() }
-        ]
-    });
-        return;
-    }
-
-    emitAppNotification({
-        title: 'Links Incomplete',
-        message: `${unresolvedDocumentCount} source ${unresolvedDocumentCount === 1 ? 'file is' : 'files are'} still missing. ${diagnostics.readyCards} of ${diagnostics.totalCards} cards and ${diagnostics.readyHighlights} of ${diagnostics.totalHighlights} highlights are navigation-ready. Use the relink actions in the library to restore linked navigation.`,
-        level: 'warning',
-        duration: 6200,
-        actions: [
-            { label: 'Auto Match', onClick: () => attemptAutoRelinkRecoveredDocuments({ notify: true }) },
-            { label: 'Import Sources', onClick: () => promptBulkRelink() }
-        ]
-    });
+function matchRecoveredDocument(documentId) {
+    return recoveryWorkbench.matchRecoveredDocument(documentId);
 }
 
 function findCardByHighlightId(highlightId) {
@@ -597,6 +561,7 @@ function setupMainEventListeners() {
         ui: {
             promptImportDocument,
             promptBulkRelink,
+            matchRecoveredDocument,
             setWorkspaceMode,
             attemptAutoRelinkRecoveredDocuments,
             renderFileList,
@@ -637,6 +602,33 @@ function setupMainEventListeners() {
     });
 }
 
+function setupSearch() {
+    searchController = createSearchController({
+        elements,
+        buildIndex: (files) => buildWorkspaceSearchIndex(getAppContext(), files),
+        queryIndex: queryWorkspaceSearch,
+        getFiles: () => state.files,
+        onResultSelected: (result) => {
+            if (result.type === 'document') {
+                workspaceDocuments.openFileById(result.actionPayload.documentId, {
+                    onMissingDocument: (documentId) => promptRelinkDocument(documentId)
+                });
+                return;
+            }
+
+            if (result.type === 'card') {
+                window.dispatchEvent(new CustomEvent('card-selected', {
+                    detail: result.actionPayload.cardId
+                }));
+            }
+
+            void handleJumpToSource(result.actionPayload.sourceId, result.actionPayload.highlightId || null);
+            closeCompactPanels();
+        }
+    });
+    searchController.bind();
+}
+
 async function init() {
     const initialized = await initAppBootstrap({
         elements,
@@ -675,6 +667,10 @@ async function init() {
             }
         }
     });
+
+    setupSearch();
+    void projectWorkspace.refreshProjectSnapshotHistory();
+    renderProjectHome();
 
     return initialized;
 }

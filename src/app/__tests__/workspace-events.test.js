@@ -72,6 +72,7 @@ describe('workspace-events', () => {
             ui: {
                 promptImportDocument: vi.fn(),
                 promptBulkRelink: vi.fn(),
+                matchRecoveredDocument: vi.fn(),
                 setWorkspaceMode: vi.fn(),
                 attemptAutoRelinkRecoveredDocuments: vi.fn(),
                 renderFileList: vi.fn(),
@@ -156,6 +157,7 @@ describe('workspace-events', () => {
 
     it('delegates recovery panel actions through the configured callbacks', () => {
         handleRecoveryPanelClick.mockImplementationOnce((event, options) => {
+            options.onMatchDocument('doc-9');
             options.onRecoveryAction('bulk');
             return true;
         });
@@ -169,6 +171,7 @@ describe('workspace-events', () => {
 
         elements.fileList.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
+        expect(callbacks.ui.matchRecoveredDocument).toHaveBeenCalledWith('doc-9');
         expect(callbacks.ui.promptBulkRelink).toHaveBeenCalled();
     });
 });

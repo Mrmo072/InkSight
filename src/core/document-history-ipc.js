@@ -14,6 +14,7 @@ export function createWrappedIpcRenderer(rawIpc) {
         findSaveByMd5: (md5) => rawIpc.invoke('find-save-by-md5', md5),
         getRuntimeStorageInfo: () => rawIpc.invoke('get-runtime-storage-info'),
         saveRuntimeProject: (payload) => rawIpc.invoke('save-runtime-project', payload),
+        listRuntimeProjectSnapshots: (payload) => rawIpc.invoke('list-runtime-project-snapshots', payload),
         loadRuntimeProject: (payload) => rawIpc.invoke('load-runtime-project', payload)
     };
 }

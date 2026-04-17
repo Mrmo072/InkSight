@@ -96,11 +96,18 @@ export function createReaderLoader({
                 });
                 reader.setPageChangeCallback((location) => {
                     setPageInfo(location?.start?.location);
+                    if (getAppContext().currentBook?.md5) {
+                        documentHistoryManager.updateLocation(getAppContext().currentBook.md5, reader.getCurrentLocation?.() || location?.start || {});
+                    }
                 });
             },
             load: async (reader, fileData) => {
                 await reader.load(fileData);
                 enablePaging();
+                const history = documentHistoryManager.getHistory(fileData.id);
+                if (history?.lastLocation) {
+                    reader.goToLocation(history.lastLocation);
+                }
             }
         },
         {
@@ -126,10 +133,22 @@ export function createReaderLoader({
                 reader.setPageChangeCallback((page) => {
                     setPageInfo(page);
                 });
+                reader.setScrollChangeCallback?.((scrollTop) => {
+                    if (getAppContext().currentBook?.md5) {
+                        documentHistoryManager.updateScroll(getAppContext().currentBook.md5, scrollTop);
+                    }
+                });
             },
             load: async (reader, fileData) => {
                 await reader.load(fileData);
                 enablePaging();
+                const history = documentHistoryManager.getHistory(fileData.id);
+                if (history?.lastScrollTop || history?.lastLocation) {
+                    reader.goToLocation({
+                        ...(history.lastLocation || {}),
+                        scrollTop: history.lastScrollTop || 0
+                    });
+                }
             }
         }
     ];

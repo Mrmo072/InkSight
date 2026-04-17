@@ -1,19 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../document-relink.js', () => ({
-    buildRecoveryDiagnostics: vi.fn(() => ({
-        missingDocuments: [],
+    findLoadedDocumentMatch: vi.fn(() => null)
+}));
+
+vi.mock('../recovery-workbench.js', () => ({
+    buildRecoveryWorkbenchModel: vi.fn(() => ({
+        documents: [],
         unresolvedCards: [],
         unresolvedHighlights: [],
-        totalDocuments: 0
-    }))
+        totalDocuments: 0,
+        readyMatches: 0
+    })),
+    renderRecoveryWorkbenchMarkup: vi.fn(() => '')
 }));
 
 describe('file-library', () => {
     let createFileLibraryRenderer;
     let getVisibleDocuments;
     let getDocumentReferenceDetails;
-    let buildRecoveryDiagnostics;
+    let buildRecoveryWorkbenchModel;
+    let renderRecoveryWorkbenchMarkup;
     let fileListElement;
 
     beforeEach(async () => {
@@ -34,7 +41,7 @@ describe('file-library', () => {
         };
 
         ({ createFileLibraryRenderer, getVisibleDocuments, getDocumentReferenceDetails } = await import('../file-library.js'));
-        ({ buildRecoveryDiagnostics } = await import('../document-relink.js'));
+        ({ buildRecoveryWorkbenchModel, renderRecoveryWorkbenchMarkup } = await import('../recovery-workbench.js'));
     });
 
     it('merges loaded files with registered missing documents', () => {
@@ -114,12 +121,27 @@ describe('file-library', () => {
         window.inksight.documentManager.getAllDocuments = vi.fn(() => [
             { id: 'missing-1', name: 'Ghost.pdf', type: 'application/pdf', loaded: false }
         ]);
-        buildRecoveryDiagnostics.mockReturnValueOnce({
-            missingDocuments: [{ id: 'missing-1', name: 'Ghost.pdf', type: 'application/pdf', loaded: false }],
+        buildRecoveryWorkbenchModel.mockReturnValueOnce({
+            documents: [{
+                id: 'missing-1',
+                name: 'Ghost.pdf',
+                type: 'application/pdf',
+                loaded: false,
+                cardCount: 1,
+                highlightCount: 1,
+                statusLabel: 'Ready to auto match',
+                loadedMatch: { id: 'loaded-1', name: 'Recovered Ghost.pdf' }
+            }],
             unresolvedCards: [{ id: 'c-1' }],
             unresolvedHighlights: [{ id: 'h-1' }],
-            totalDocuments: 1
+            totalDocuments: 1,
+            readyMatches: 1
         });
+        renderRecoveryWorkbenchMarkup.mockReturnValueOnce(`
+            <section class="library-recovery-panel">
+              <button data-recovery-match-id="missing-1">Match existing</button>
+            </section>
+        `);
 
         const renderFileList = createFileLibraryRenderer({
             fileListElement,
@@ -137,8 +159,8 @@ describe('file-library', () => {
 
         renderFileList();
 
-        expect(fileListElement.textContent).toContain('waiting to be relinked');
+        expect(fileListElement.querySelector('.library-recovery-panel')).not.toBeNull();
         expect(fileListElement.querySelector('.file-item.disabled')).not.toBeNull();
-        expect(fileListElement.querySelector('[data-relink-document-id="missing-1"]')).not.toBeNull();
+        expect(fileListElement.querySelector('[data-recovery-match-id="missing-1"]')).not.toBeNull();
     });
 });

@@ -33,6 +33,15 @@ export async function getRuntimeStorageInfo() {
     return ipc.getRuntimeStorageInfo();
 }
 
+export async function listRuntimeProjectSnapshots({ runtimeIdentity = {} } = {}) {
+    const ipc = resolveDocumentHistoryIpc();
+    if (!ipc?.listRuntimeProjectSnapshots) {
+        return null;
+    }
+
+    return ipc.listRuntimeProjectSnapshots(runtimeIdentity);
+}
+
 export async function saveRuntimeProjectSnapshot({
     board,
     appContext = {},
@@ -67,13 +76,16 @@ export async function saveRuntimeProjectSnapshot({
     };
 }
 
-export async function loadRuntimeProjectSnapshot({ runtimeIdentity = {} } = {}) {
+export async function loadRuntimeProjectSnapshot({ runtimeIdentity = {}, snapshotId = null } = {}) {
     const ipc = resolveDocumentHistoryIpc();
     if (!ipc?.loadRuntimeProject) {
         return null;
     }
 
-    const result = await ipc.loadRuntimeProject(runtimeIdentity);
+    const result = await ipc.loadRuntimeProject({
+        ...runtimeIdentity,
+        snapshotId
+    });
     if (!result?.success || !result?.manifest) {
         return null;
     }

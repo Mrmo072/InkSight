@@ -254,4 +254,23 @@ describe('EpubReader', () => {
         }));
         expect(onPageCountChange).toHaveBeenLastCalledWith(12);
     });
+
+    it('exposes the current epub location for history restore', async () => {
+        const container = document.createElement('div');
+        document.body.appendChild(container);
+        const reader = new EpubReader(container);
+
+        await reader.load({
+            id: 'book-1',
+            name: 'sample.epub',
+            fileObj: {
+                arrayBuffer: vi.fn().mockResolvedValue(new Uint8Array([0x50, 0x4b, 0x03, 0x04]).buffer)
+            }
+        });
+
+        expect(reader.getCurrentLocation()).toEqual(expect.objectContaining({
+            cfi: 'epubcfi(/6/2)',
+            location: 1
+        }));
+    });
 });

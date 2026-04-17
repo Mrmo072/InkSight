@@ -57,6 +57,46 @@ export class TextReader {
         return getAppContext().cardSystem;
     }
 
+    findRangeByOffsets(startIndex, length) {
+        if (!this.content || !Number.isFinite(startIndex) || !Number.isFinite(length) || length <= 0) {
+            return null;
+        }
+
+        const walker = document.createTreeWalker(this.content, NodeFilter.SHOW_TEXT, null, false);
+        let consumed = 0;
+        let startNode = null;
+        let endNode = null;
+        let startOffset = 0;
+        let endOffset = 0;
+        let node;
+
+        while (node = walker.nextNode()) {
+            const textLength = node.textContent.length;
+
+            if (!startNode && startIndex <= consumed + textLength) {
+                startNode = node;
+                startOffset = Math.max(0, startIndex - consumed);
+            }
+
+            if (startNode && startIndex + length <= consumed + textLength) {
+                endNode = node;
+                endOffset = Math.max(0, startIndex + length - consumed);
+                break;
+            }
+
+            consumed += textLength;
+        }
+
+        if (!startNode || !endNode) {
+            return null;
+        }
+
+        const range = document.createRange();
+        range.setStart(startNode, startOffset);
+        range.setEnd(endNode, endOffset);
+        return range;
+    }
+
     async load(fileData) {
         try {
             this.fileId = fileData.id;
@@ -91,6 +131,9 @@ export class TextReader {
             this.content.addEventListener('mouseup', (e) => this.handleSelection(e));
             this.content.addEventListener('touchend', (e) => {
                 this.touchSelectionScheduler.schedule(e);
+            }, { passive: true });
+            this.container.addEventListener('scroll', () => {
+                this.onScrollChange?.(this.container.scrollTop);
             }, { passive: true });
 
             // Global click to hide toolbar
@@ -128,46 +171,51 @@ export class TextReader {
     }
 
     restoreHighlightVisual(highlight) {
-        // Simple text search restoration for now
         if (!this.content) return;
 
         const textToFind = highlight.text;
         if (!textToFind) return;
 
-        // This is a simplified restoration that finds the FIRST occurrence. 
-        // For robust restoration, we'd need to use the stored index.
-        // But since we are just fixing the deletion sync, this is better than nothing.
-        // TODO: Use highlight.location.index for precise restoration
+        let range = this.findRangeByOffsets(highlight.location?.index, highlight.location?.length || textToFind.length);
+        let restoredWithFallback = false;
 
-        const walker = document.createTreeWalker(this.content, NodeFilter.SHOW_TEXT, null, false);
-        let node;
-        while (node = walker.nextNode()) {
-            if (node.textContent.includes(textToFind)) {
-                // Check if already highlighted to avoid duplicates (simple check)
-                if (node.parentElement.classList.contains('highlight')) continue;
+        if (!range) {
+            restoredWithFallback = true;
+            const walker = document.createTreeWalker(this.content, NodeFilter.SHOW_TEXT, null, false);
+            let node;
+            while (node = walker.nextNode()) {
+                if (node.textContent.includes(textToFind)) {
+                    if (node.parentElement.classList.contains('highlight')) continue;
 
-                const range = document.createRange();
-                const index = node.textContent.indexOf(textToFind);
-                range.setStart(node, index);
-                range.setEnd(node, index + textToFind.length);
-
-                try {
-                    const span = document.createElement('span');
-                    span.className = 'highlight';
-                    this.applyHighlightStyle(span, highlight.color || this.defaultColor);
-                    span.dataset.highlightId = highlight.id;
-
-                    range.surroundContents(span);
-
-                    span.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        this.handleHighlightClick(e, highlight.id);
-                    });
-                } catch (e) {
-                    console.warn('[TextReader] Could not restore highlight:', e);
+                    const index = node.textContent.indexOf(textToFind);
+                    range = document.createRange();
+                    range.setStart(node, index);
+                    range.setEnd(node, index + textToFind.length);
+                    break;
                 }
-                break; // Only restore first occurrence for now
             }
+        }
+
+        if (!range) {
+            return;
+        }
+
+        highlight.needsValidation = restoredWithFallback;
+
+        try {
+            const span = document.createElement('span');
+            span.className = 'highlight';
+            this.applyHighlightStyle(span, highlight.color || this.defaultColor);
+            span.dataset.highlightId = highlight.id;
+
+            range.surroundContents(span);
+
+            span.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.handleHighlightClick(e, highlight.id);
+            });
+        } catch (e) {
+            console.warn('[TextReader] Could not restore highlight:', e);
         }
     }
 
@@ -321,7 +369,7 @@ export class TextReader {
     }
 
     goToLocation(location) {
-        this.container.scrollTop = 0;
+        this.container.scrollTop = Number.isFinite(location?.scrollTop) ? location.scrollTop : 0;
     }
 
     setPageCountCallback(callback) {
@@ -330,6 +378,16 @@ export class TextReader {
 
     setPageChangeCallback(callback) {
         this.onPageChange = callback;
+    }
+
+    setScrollChangeCallback(callback) {
+        this.onScrollChange = callback;
+    }
+
+    getCurrentLocation() {
+        return {
+            scrollTop: this.container?.scrollTop || 0
+        };
     }
 
     setSelectionMode(mode) {

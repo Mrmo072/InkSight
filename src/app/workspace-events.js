@@ -14,11 +14,15 @@ export function createWorkspaceEventListeners({
         { target: elements.toolbarImportDocumentsBtn, event: 'click', handler: ui.promptImportDocument },
         { target: elements.toolbarOpenProjectBtn, event: 'click', handler: () => void projectWorkspace.promptOpenProject() },
         { target: elements.toolbarSaveProjectBtn, event: 'click', handler: () => void projectWorkspace.promptSaveProject() },
+        { target: elements.toolbarExportOutlineBtn, event: 'click', handler: () => projectWorkspace.promptExportArtifact('outline') },
+        { target: elements.toolbarExportCitationsBtn, event: 'click', handler: () => projectWorkspace.promptExportArtifact('citations') },
+        { target: elements.toolbarExportNotesBtn, event: 'click', handler: () => projectWorkspace.promptExportArtifact('notes-package') },
         { target: elements.mobileImportDocumentsBtn, event: 'click', handler: ui.promptImportDocument },
         { target: elements.mobileOpenProjectBtn, event: 'click', handler: () => void projectWorkspace.promptOpenProject() },
         { target: elements.mobileSaveProjectBtn, event: 'click', handler: () => void projectWorkspace.promptSaveProject() },
-        { target: elements.emptyImportDocumentBtn, event: 'click', handler: ui.promptImportDocument },
-        { target: elements.emptyOpenProjectBtn, event: 'click', handler: () => void projectWorkspace.promptOpenProject() },
+        { target: elements.mobileExportOutlineBtn, event: 'click', handler: () => projectWorkspace.promptExportArtifact('outline') },
+        { target: elements.mobileExportCitationsBtn, event: 'click', handler: () => projectWorkspace.promptExportArtifact('citations') },
+        { target: elements.mobileExportNotesBtn, event: 'click', handler: () => projectWorkspace.promptExportArtifact('notes-package') },
         { target: elements.prevBtn, event: 'click', handler: () => navigation.getCurrentReader()?.onPrevPage() },
         { target: elements.nextBtn, event: 'click', handler: () => navigation.getCurrentReader()?.onNextPage() },
         { target: elements.mobilePrevBtn, event: 'click', handler: () => navigation.getCurrentReader()?.onPrevPage() },
@@ -70,14 +74,54 @@ export function createWorkspaceEventListeners({
             handler: (event) => projectWorkspace.handleProjectOpened(event)
         },
         {
+            target: elements.viewer,
+            event: 'click',
+            handler: (event) => {
+                const homeActionButton = event.target.closest('[data-home-action]');
+                if (homeActionButton) {
+                    const action = homeActionButton.getAttribute('data-home-action');
+                    if (action === 'continue-workspace') {
+                        void projectWorkspace.continueLatestWorkspace();
+                    } else if (action === 'import') {
+                        ui.promptImportDocument();
+                    } else if (action === 'open-project') {
+                        void projectWorkspace.promptOpenProject();
+                    } else if (action === 'save-project') {
+                        void projectWorkspace.promptSaveProject();
+                    } else if (action === 'export-notes') {
+                        projectWorkspace.promptExportArtifact('notes-package');
+                    }
+                    return;
+                }
+
+                const recentProjectButton = event.target.closest('[data-recent-project-id]');
+                if (recentProjectButton) {
+                    const projectId = recentProjectButton.getAttribute('data-recent-project-id');
+                    if (projectId) {
+                        void projectWorkspace.openRecentProject(projectId);
+                    }
+                    return;
+                }
+
+                const snapshotButton = event.target.closest('[data-home-snapshot-id]');
+                if (snapshotButton) {
+                    const snapshotId = snapshotButton.getAttribute('data-home-snapshot-id');
+                    if (snapshotId) {
+                        void projectWorkspace.restoreProjectHistorySnapshot(snapshotId);
+                    }
+                }
+            }
+        },
+        {
             target: elements.fileList,
             event: 'click',
             handler: (event) => {
                 const handled = handleRecoveryPanelClick(event, {
+                    onMatchDocument: (documentId) => ui.matchRecoveredDocument(documentId),
                     onRelinkDocument: (documentId) => ui.promptRelinkDocument(documentId),
                     onRecoveryAction: (action) => {
                         if (action === 'auto') {
-                            ui.attemptAutoRelinkRecoveredDocuments({ notify: true });
+                            ui.attemptAutoRelinkRecoveredDocuments({ notifyUser: true });
                         }
                         if (action === 'bulk') {
                             ui.promptBulkRelink();
@@ -126,6 +170,19 @@ export function createWorkspaceEventListeners({
                         void projectWorkspace.promptSaveProject();
                     } else if (action === 'import') {
                         ui.promptImportDocument();
+                    } else if (action === 'history') {
+                        void projectWorkspace.promptProjectHistory();
+                    }
+                    return;
+                }
+
+                const historyRestoreButton = event.target.closest('[data-project-history-id]');
+                if (historyRestoreButton) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const snapshotId = historyRestoreButton.getAttribute('data-project-history-id');
+                    if (snapshotId) {
+                        void projectWorkspace.restoreProjectHistorySnapshot(snapshotId);
                     }
                     return;
                 }

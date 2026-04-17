@@ -68,6 +68,8 @@ app.on('window-all-closed', () => {
 
 const RUNTIME_PROJECT_MANIFEST = 'project.json';
 const RUNTIME_PROJECT_META = 'meta.json';
+const RUNTIME_PROJECT_HISTORY_DIR = 'history';
+const RUNTIME_PROJECT_HISTORY_LIMIT = 10;
 
 // Get the save directory path (Project Root/files/saves)
 const getSaveDir = () => {
@@ -109,6 +111,10 @@ const getRuntimeProjectDir = ({ userId, sessionId, projectId }) => {
     );
 };
 
+const getRuntimeProjectHistoryDir = ({ userId, sessionId, projectId }) => {
+    return path.join(getRuntimeProjectDir({ userId, sessionId, projectId }), RUNTIME_PROJECT_HISTORY_DIR);
+};
+
 const getRuntimeUserSessionsDir = (userId) => {
     return path.join(
         getInstallRuntimeDir(),
@@ -142,6 +148,88 @@ const writeRuntimeBinaryFile = (rootDir, relativePath, bytes) => {
     const absolutePath = path.join(rootDir, relativePath);
     ensureDir(path.dirname(absolutePath));
     fs.writeFileSync(absolutePath, toBuffer(bytes));
+};
+
+const slugifyRuntimeName = (value, fallback) => {
+    const normalized = typeof value === 'string' ? value.trim() : '';
+    const sanitized = normalized.replace(/[^a-zA-Z0-9_-]/g, '-').replace(/-+/g, '-').slice(0, 60);
+    return sanitized || fallback;
+};
+
+const createSnapshotSummary = (manifest, meta = {}) => {
+    const payload = manifest?.payload || {};
+    return {
+        projectName: meta.projectName || 'workspace',
+        bookName: payload.bookName || payload.bookId || 'Workspace',
+        elementCount: Array.isArray(payload.elements) ? payload.elements.length : 0,
+        cardCount: Array.isArray(payload.cards) ? payload.cards.length : 0,
+        highlightCount: Array.isArray(payload.highlights) ? payload.highlights.length : 0,
+        documentCount: Array.isArray(payload.documents) ? payload.documents.length : 0
+    };
+};
+
+const trimSnapshotHistory = (historyRoot) => {
+    if (!fs.existsSync(historyRoot)) {
+        return;
+    }
+
+    const snapshotDirs = fs.readdirSync(historyRoot, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => {
+            const snapshotDir = path.join(historyRoot, entry.name);
+            const metaPath = path.join(snapshotDir, RUNTIME_PROJECT_META);
+            let savedAt = 0;
+            if (fs.existsSync(metaPath)) {
+                try {
+                    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
+                    savedAt = Date.parse(meta.savedAt || 0) || 0;
+                } catch {
+                    savedAt = 0;
+                }
+            }
+            return { snapshotDir, savedAt };
+        })
+        .sort((left, right) => right.savedAt - left.savedAt);
+
+    snapshotDirs.slice(RUNTIME_PROJECT_HISTORY_LIMIT).forEach(({ snapshotDir }) => {
+        fs.rmSync(snapshotDir, { recursive: true, force: true });
+    });
+};
+
+const writeRuntimeSnapshot = ({ rootDir, payload = {}, projectMeta = {}, historyMeta = null }) => {
+    const { manifest, assetEntries = [], documentEntries = [] } = payload;
+    const manifestPath = path.join(rootDir, RUNTIME_PROJECT_MANIFEST);
+    const metaPath = path.join(rootDir, RUNTIME_PROJECT_META);
+
+    ensureDir(rootDir);
+    fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf-8');
+
+    for (const assetEntry of assetEntries) {
+        writeRuntimeBinaryFile(rootDir, assetEntry.path, assetEntry.bytes);
+    }
+
+    for (const documentEntry of documentEntries) {
+        writeRuntimeBinaryFile(rootDir, documentEntry.path, documentEntry.bytes);
+    }
+
+    cleanupRuntimeSubdir(rootDir, 'assets', assetEntries.map((entry) => entry.path));
+    cleanupRuntimeSubdir(rootDir, 'documents', documentEntries.map((entry) => entry.path));
+
+    const summary = createSnapshotSummary(manifest, projectMeta);
+    const meta = {
+        ...projectMeta,
+        ...summary,
+        ...historyMeta,
+        manifest: RUNTIME_PROJECT_MANIFEST
+    };
+    fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), 'utf-8');
+
+    return {
+        manifestPath,
+        metaPath,
+        summary,
+        meta
+    };
 };
 
 const listRelativeFiles = (rootDir, currentDir = rootDir) => {
@@ -314,33 +402,34 @@ ipcMain.handle('save-runtime-project', async (event, payload = {}) => {
         } = payload;
 
         const projectDir = ensureDir(getRuntimeProjectDir({ userId, sessionId, projectId }));
-        const manifestPath = path.join(projectDir, RUNTIME_PROJECT_MANIFEST);
-        const metaPath = path.join(projectDir, RUNTIME_PROJECT_META);
-
-        fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf-8');
-
-        for (const assetEntry of assetEntries) {
-            writeRuntimeBinaryFile(projectDir, assetEntry.path, assetEntry.bytes);
-        }
-
-        for (const documentEntry of documentEntries) {
-            writeRuntimeBinaryFile(projectDir, documentEntry.path, documentEntry.bytes);
-        }
-
-        cleanupRuntimeSubdir(projectDir, 'assets', assetEntries.map((entry) => entry.path));
-        cleanupRuntimeSubdir(projectDir, 'documents', documentEntries.map((entry) => entry.path));
-
-        const meta = {
+        const historyRoot = ensureDir(getRuntimeProjectHistoryDir({ userId, sessionId, projectId }));
+        const baseMeta = {
             userId,
             sessionId,
             projectId,
             projectName,
             savedAt: new Date().toISOString(),
-            manifest: RUNTIME_PROJECT_MANIFEST,
             assetCount: assetEntries.length,
             documentCount: documentEntries.length
         };
-        fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), 'utf-8');
+        const writePayload = { manifest, assetEntries, documentEntries };
+        const { manifestPath, metaPath, summary, meta } = writeRuntimeSnapshot({
+            rootDir: projectDir,
+            payload: writePayload,
+            projectMeta: baseMeta
+        });
+
+        const snapshotId = `${Date.now()}-${slugifyRuntimeName(projectName, 'workspace')}`;
+        const snapshotDir = path.join(historyRoot, snapshotId);
+        writeRuntimeSnapshot({
+            rootDir: snapshotDir,
+            payload: writePayload,
+            projectMeta: baseMeta,
+            historyMeta: {
+                snapshotId
+            }
+        });
+        trimSnapshotHistory(historyRoot);
 
         return {
             success: true,
@@ -348,7 +437,9 @@ ipcMain.handle('save-runtime-project', async (event, payload = {}) => {
             manifestPath,
             metaPath,
             savedAt: meta.savedAt,
-            mode: 'runtime-data'
+            mode: 'runtime-data',
+            snapshotId,
+            summary
         };
     } catch (error) {
         console.error('IPC save-runtime-project error:', error);
@@ -359,10 +450,61 @@ ipcMain.handle('save-runtime-project', async (event, payload = {}) => {
     }
 });
 
+ipcMain.handle('list-runtime-project-snapshots', async (event, payload = {}) => {
+    try {
+        const { userId, sessionId, projectId } = payload.runtimeIdentity || payload;
+        const historyRoot = getRuntimeProjectHistoryDir({ userId, sessionId, projectId });
+        if (!fs.existsSync(historyRoot)) {
+            return {
+                success: true,
+                snapshots: []
+            };
+        }
+
+        const snapshots = fs.readdirSync(historyRoot, { withFileTypes: true })
+            .filter((entry) => entry.isDirectory())
+            .map((entry) => {
+                const snapshotDir = path.join(historyRoot, entry.name);
+                const metaPath = path.join(snapshotDir, RUNTIME_PROJECT_META);
+                if (!fs.existsSync(metaPath)) {
+                    return null;
+                }
+
+                const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
+                return {
+                    snapshotId: meta.snapshotId || entry.name,
+                    savedAt: meta.savedAt || null,
+                    projectName: meta.projectName || null,
+                    bookName: meta.bookName || null,
+                    elementCount: meta.elementCount || 0,
+                    cardCount: meta.cardCount || 0,
+                    highlightCount: meta.highlightCount || 0,
+                    documentCount: meta.documentCount || 0
+                };
+            })
+            .filter(Boolean)
+            .sort((left, right) => Date.parse(right.savedAt || 0) - Date.parse(left.savedAt || 0));
+
+        return {
+            success: true,
+            snapshots
+        };
+    } catch (error) {
+        console.error('IPC list-runtime-project-snapshots error:', error);
+        return {
+            success: false,
+            error: error.message,
+            snapshots: []
+        };
+    }
+});
+
 ipcMain.handle('load-runtime-project', async (event, payload = {}) => {
     try {
-        const { userId, sessionId, projectId } = payload;
-        const projectDir = resolveLatestRuntimeProjectDir({ userId, sessionId, projectId });
+        const { userId, sessionId, projectId, snapshotId } = payload;
+        const projectDir = snapshotId
+            ? path.join(getRuntimeProjectHistoryDir({ userId, sessionId, projectId }), snapshotId)
+            : resolveLatestRuntimeProjectDir({ userId, sessionId, projectId });
         if (!projectDir) {
             return {
                 success: false,
@@ -406,7 +548,8 @@ ipcMain.handle('load-runtime-project', async (event, payload = {}) => {
             projectDir,
             projectId: meta?.projectId || projectId,
             projectName: meta?.projectName || null,
-            savedAt: meta?.savedAt || null
+            savedAt: meta?.savedAt || null,
+            snapshotId: meta?.snapshotId || null
         };
     } catch (error) {
         console.error('IPC load-runtime-project error:', error);

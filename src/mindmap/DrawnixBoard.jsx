@@ -12,6 +12,7 @@ import {
     calculateNodeSize,
     createCenteredPoints
 } from './drawnix-board-utils.js';
+import { createMindmapOrganizerOrderResolver } from './mindmap-organizer.js';
 import { handleBoardOperations, syncMindmapSelection } from './drawnix-board-state.js';
 import {
     createViewportCenterResolver,
@@ -350,14 +351,23 @@ export const DrawnixBoardComponent = () => {
         };
 
 
-        // Expose auto-layout function globally
+        // Expose layout helpers globally
         window.applyAutoLayout = () => applyAutoLayout(b);
+        window.applyMindmapOrganizer = (mode) => applyOrganizedLayout(b, mode);
     };
     const applyAutoLayout = async (boardInstance) => {
+        return applyOrganizedLayout(boardInstance, 'source');
+    };
+
+    const applyOrganizedLayout = async (boardInstance, mode = 'source') => {
         if (!boardInstance || !boardInstance.children) return;
         try {
             const { nodeRects, edgeRoutes } = buildAutoLayoutPlan(boardInstance.children, {
-                getNodeOrder: createNodeOrderResolver()
+                getNodeOrder: createMindmapOrganizerOrderResolver({
+                    mode,
+                    children: boardInstance.children,
+                    getCardById: (cardId) => getAppContext().cardSystem?.cards?.get?.(cardId)
+                })
             });
 
             nodeRects.forEach((rect, nodeId) => {

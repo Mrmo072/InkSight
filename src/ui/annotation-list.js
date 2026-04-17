@@ -10,6 +10,8 @@ export class AnnotationList {
         this.cardSystem = cardSystem;
         this.activeCardId = null;
         this.cleanupListeners = null;
+        this.filterMode = 'all';
+        this.selectedCardIds = new Set();
 
         this.init();
     }
@@ -85,20 +87,53 @@ export class AnnotationList {
             return a.y - b.y;
         });
 
-        this.render(highlightedCards);
+        this.render(this.applyFilters(highlightedCards));
+    }
+
+    getMissingSourceIds() {
+        const documents = getAppContext().documentManager?.getMissingDocuments?.() ?? [];
+        return new Set(documents.map((document) => document.id));
+    }
+
+    applyFilters(items) {
+        const missingSourceIds = this.getMissingSourceIds();
+        return items.filter(({ card }) => {
+            if (this.filterMode === 'all') {
+                return true;
+            }
+
+            if (this.filterMode === 'needs-map') {
+                return card.isOnBoard === false;
+            }
+
+            if (this.filterMode === 'on-map') {
+                return card.isOnBoard !== false;
+            }
+
+            if (this.filterMode === 'missing-links') {
+                return missingSourceIds.has(card.sourceId);
+            }
+
+            return true;
+        });
     }
 
     render(items) {
+        const controls = this.createControlsElement(items);
+
         if (items.length === 0) {
-            this.container.innerHTML = `
-                <div class="empty-state">
+            this.container.innerHTML = '';
+            this.container.appendChild(controls);
+            this.container.insertAdjacentHTML('beforeend', `
+                <div class="empty-state annotation-empty-state">
                     <span class="material-icons-round">edit_note</span>
                     <p>No annotations yet</p>
-                </div>`;
+                </div>`);
             return;
         }
 
         this.container.innerHTML = '';
+        this.container.appendChild(controls);
         const fragment = document.createDocumentFragment();
 
         items.forEach(item => {
@@ -112,6 +147,62 @@ export class AnnotationList {
         if (this.activeCardId) {
             this.highlightItem(this.activeCardId);
         }
+    }
+
+    createControlsElement(items) {
+        const controls = document.createElement('div');
+        controls.className = 'annotation-controls';
+
+        const filterSelect = document.createElement('select');
+        filterSelect.className = 'annotation-filter-select';
+        [
+            ['all', 'All'],
+            ['needs-map', 'To map'],
+            ['on-map', 'On map'],
+            ['missing-links', 'Missing links']
+        ].forEach(([value, label]) => {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = label;
+            option.selected = value === this.filterMode;
+            filterSelect.appendChild(option);
+        });
+        filterSelect.addEventListener('change', (event) => {
+            this.filterMode = event.target.value;
+            this.refresh();
+        });
+
+        const basketMeta = document.createElement('div');
+        basketMeta.className = 'annotation-basket-meta';
+        basketMeta.textContent = `${this.selectedCardIds.size} selected`;
+
+        const addSelectedBtn = document.createElement('button');
+        addSelectedBtn.type = 'button';
+        addSelectedBtn.className = 'annotation-basket-btn';
+        addSelectedBtn.textContent = 'Add selected';
+        addSelectedBtn.disabled = this.selectedCardIds.size === 0;
+        addSelectedBtn.addEventListener('click', (event) => {
+            event.stopPropagation();
+            this.addSelectedCardsToMindMap();
+        });
+
+        const clearSelectedBtn = document.createElement('button');
+        clearSelectedBtn.type = 'button';
+        clearSelectedBtn.className = 'annotation-basket-btn secondary';
+        clearSelectedBtn.textContent = 'Clear';
+        clearSelectedBtn.disabled = this.selectedCardIds.size === 0;
+        clearSelectedBtn.addEventListener('click', (event) => {
+            event.stopPropagation();
+            this.selectedCardIds.clear();
+            this.refresh();
+        });
+
+        controls.appendChild(filterSelect);
+        controls.appendChild(basketMeta);
+        controls.appendChild(addSelectedBtn);
+        controls.appendChild(clearSelectedBtn);
+
+        return controls;
     }
 
     getHighlightMap() {
@@ -146,6 +237,22 @@ export class AnnotationList {
         window.dispatchEvent(new CustomEvent('add-card-to-board', {
             detail: this.buildTransferData(card, highlight)
         }));
+        this.cardSystem.updateCard(card.id, { isOnBoard: true });
+    }
+
+    addSelectedCardsToMindMap() {
+        const highlightMap = this.getHighlightMap();
+        const cards = (this.cardSystem.cards instanceof Map)
+            ? Array.from(this.cardSystem.cards.values())
+            : Object.values(this.cardSystem.cards || {});
+        const selectedCards = cards.filter((card) => this.selectedCardIds.has(card.id) && !card.deleted);
+
+        selectedCards.forEach((card) => {
+            this.addCardToMindMap(card, highlightMap.get(card.highlightId) ?? null);
+        });
+
+        this.selectedCardIds.clear();
+        this.refresh();
     }
 
     createItemElement({ card, highlight, pageNum }) {
@@ -154,6 +261,7 @@ export class AnnotationList {
         div.dataset.cardId = card.id;
         div.dataset.highlightId = card.highlightId;
         div.draggable = true; // Enable Drag
+        div.classList.toggle('selected', this.selectedCardIds.has(card.id));
 
         // Drag Start Handler
         div.addEventListener('dragstart', (e) => {
@@ -190,6 +298,17 @@ export class AnnotationList {
         }
 
         header.appendChild(pageSpan);
+
+        const statusTag = document.createElement('span');
+        statusTag.className = 'annotation-status-tag';
+        if (this.getMissingSourceIds().has(card.sourceId)) {
+            statusTag.textContent = 'Missing link';
+        } else if (card.isOnBoard === false) {
+            statusTag.textContent = 'To map';
+        } else {
+            statusTag.textContent = 'On map';
+        }
+        header.appendChild(statusTag);
         div.appendChild(header);
 
         // Quote (Content)
@@ -264,6 +383,22 @@ export class AnnotationList {
             this.addCardToMindMap(card, highlight);
         });
         actions.appendChild(addToMapBtn);
+
+        const basketBtn = document.createElement('button');
+        basketBtn.className = 'action-btn basket-btn';
+        basketBtn.innerHTML = '<span class="material-icons-round">playlist_add</span><span class="action-label">Basket</span>';
+        basketBtn.title = 'Add to selection basket';
+        basketBtn.setAttribute('aria-label', 'Add annotation to selection basket');
+        basketBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (this.selectedCardIds.has(card.id)) {
+                this.selectedCardIds.delete(card.id);
+            } else {
+                this.selectedCardIds.add(card.id);
+            }
+            this.refresh();
+        });
+        actions.appendChild(basketBtn);
         div.appendChild(actions);
 
         // Click to jump

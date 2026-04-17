@@ -40,6 +40,13 @@ export async function navigateToLinkedSource({
 
     if (typeof reader.scrollToHighlight === 'function') {
         await reader.scrollToHighlight(highlightId);
+        if (highlight.needsValidation) {
+            notify?.({
+                message: 'This restored source location used a fallback match and should be validated against the original document.',
+                level: 'warning'
+            });
+            return { status: 'needs-validation', effectiveSourceId, file, highlight };
+        }
         return { status: 'scrolled-highlight', effectiveSourceId, file, highlight };
     }
 

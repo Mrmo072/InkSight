@@ -18,16 +18,50 @@ export function saveDocumentHistory(history, storage = localStorage, key = DOCUM
     storage.setItem(key, JSON.stringify(history));
 }
 
-export function updateDocumentHistoryPage(history, md5, page, timestamp = Date.now()) {
+function ensureHistoryEntry(history, md5) {
     if (!md5) {
-        return history;
+        return null;
     }
 
     if (!history[md5]) {
         history[md5] = {};
     }
 
-    history[md5].lastPage = page;
-    history[md5].lastOpened = timestamp;
+    return history[md5];
+}
+
+export function updateDocumentHistoryPage(history, md5, page, timestamp = Date.now()) {
+    const entry = ensureHistoryEntry(history, md5);
+    if (!entry) {
+        return history;
+    }
+
+    entry.lastPage = page;
+    entry.lastOpened = timestamp;
+    return history;
+}
+
+export function updateDocumentHistoryLocation(history, md5, location = {}, timestamp = Date.now()) {
+    const entry = ensureHistoryEntry(history, md5);
+    if (!entry) {
+        return history;
+    }
+
+    entry.lastLocation = {
+        ...(entry.lastLocation || {}),
+        ...location
+    };
+    entry.lastOpened = timestamp;
+    return history;
+}
+
+export function updateDocumentHistoryScroll(history, md5, scrollTop, timestamp = Date.now()) {
+    const entry = ensureHistoryEntry(history, md5);
+    if (!entry) {
+        return history;
+    }
+
+    entry.lastScrollTop = Number.isFinite(scrollTop) ? scrollTop : 0;
+    entry.lastOpened = timestamp;
     return history;
 }

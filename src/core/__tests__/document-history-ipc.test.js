@@ -36,6 +36,7 @@ describe('document-history-ipc', () => {
         await ipc.findSaveByMd5('md5-1');
         await ipc.getRuntimeStorageInfo();
         await ipc.saveRuntimeProject({ projectId: 'project-1' });
+        await ipc.listRuntimeProjectSnapshots({ projectId: 'project-1' });
         await ipc.loadRuntimeProject({ projectId: 'project-1' });
 
         expect(invoke).toHaveBeenNthCalledWith(1, 'save-file', 'Book.inksight', '{}');
@@ -44,7 +45,8 @@ describe('document-history-ipc', () => {
         expect(invoke).toHaveBeenNthCalledWith(4, 'find-save-by-md5', 'md5-1');
         expect(invoke).toHaveBeenNthCalledWith(5, 'get-runtime-storage-info');
         expect(invoke).toHaveBeenNthCalledWith(6, 'save-runtime-project', { projectId: 'project-1' });
-        expect(invoke).toHaveBeenNthCalledWith(7, 'load-runtime-project', { projectId: 'project-1' });
+        expect(invoke).toHaveBeenNthCalledWith(7, 'list-runtime-project-snapshots', { projectId: 'project-1' });
+        expect(invoke).toHaveBeenNthCalledWith(8, 'load-runtime-project', { projectId: 'project-1' });
     });
 
     it('returns window.electronAPI directly when available', async () => {
@@ -55,6 +57,7 @@ describe('document-history-ipc', () => {
             findSaveByMd5: vi.fn(),
             getRuntimeStorageInfo: vi.fn(),
             saveRuntimeProject: vi.fn(),
+            listRuntimeProjectSnapshots: vi.fn(),
             loadRuntimeProject: vi.fn()
         };
         window.electronAPI = electronAPI;

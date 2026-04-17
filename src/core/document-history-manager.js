@@ -14,7 +14,9 @@ import {
     DOCUMENT_HISTORY_STORAGE_KEY,
     loadDocumentHistory,
     saveDocumentHistory,
-    updateDocumentHistoryPage
+    updateDocumentHistoryLocation,
+    updateDocumentHistoryPage,
+    updateDocumentHistoryScroll
 } from './document-history-store.js';
 import { createLogger } from './logger.js';
 import {
@@ -67,6 +69,16 @@ export class DocumentHistoryManager {
 
     updatePage(md5, page) {
         updateDocumentHistoryPage(this.history, md5, page);
+        this.saveHistory();
+    }
+
+    updateLocation(md5, location) {
+        updateDocumentHistoryLocation(this.history, md5, location);
+        this.saveHistory();
+    }
+
+    updateScroll(md5, scrollTop) {
+        updateDocumentHistoryScroll(this.history, md5, scrollTop);
         this.saveHistory();
     }
 

@@ -3,6 +3,7 @@ import {
     DOCUMENT_HISTORY_STORAGE_KEY,
     loadDocumentHistory,
     saveDocumentHistory,
+    updateDocumentHistoryLocation,
     updateDocumentHistoryPage
 } from '../document-history-store.js';
 
@@ -61,6 +62,22 @@ describe('document-history-store', () => {
         expect(history).toEqual({
             'book-md5': {
                 lastPage: 21,
+                lastOpened: 123456
+            }
+        });
+    });
+
+    it('updates reader location metadata in-place', () => {
+        const history = {};
+
+        updateDocumentHistoryLocation(history, 'book-md5', { cfi: 'epubcfi(/6/2)', scrollTop: 120 }, 123456);
+
+        expect(history).toEqual({
+            'book-md5': {
+                lastLocation: {
+                    cfi: 'epubcfi(/6/2)',
+                    scrollTop: 120
+                },
                 lastOpened: 123456
             }
         });

@@ -365,6 +365,15 @@ export class EpubReader {
         }
     }
 
+    getCurrentLocation() {
+        const currentLocation = this.rendition?.currentLocation?.()?.start || {};
+        return {
+            cfi: currentLocation.cfi || this.cfi || null,
+            location: Number.isFinite(currentLocation.location) ? currentLocation.location + 1 : this.lastKnownPage,
+            percentage: currentLocation.percentage
+        };
+    }
+
     setPageCountCallback(callback) {
         this.onPageCountChange = callback;
     }

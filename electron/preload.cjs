@@ -9,5 +9,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     findSaveByMd5: (md5) => invoke('find-save-by-md5', md5),
     getRuntimeStorageInfo: () => invoke('get-runtime-storage-info'),
     saveRuntimeProject: (payload) => invoke('save-runtime-project', payload),
+    listRuntimeProjectSnapshots: (payload) => invoke('list-runtime-project-snapshots', payload),
     loadRuntimeProject: (payload) => invoke('load-runtime-project', payload)
 });

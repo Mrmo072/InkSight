@@ -19,6 +19,9 @@ describe('reader-toolbar-events', () => {
             <div id="highlighter-panel"></div>
             <input id="highlighter-height" value="16" />
             <button id="layout-btn"></button>
+            <button id="layout-by-source-btn"></button>
+            <button id="layout-by-time-btn"></button>
+            <button id="layout-loose-btn"></button>
             <div id="mindmap-container"></div>
         `;
         document.body.className = '';
@@ -36,6 +39,7 @@ describe('reader-toolbar-events', () => {
         logger = { warn: vi.fn() };
         window.matchMedia = vi.fn().mockReturnValue({ matches: false });
         window.applyAutoLayout = vi.fn();
+        window.applyMindmapOrganizer = vi.fn();
     });
 
     function setup(overrides = {}) {
@@ -92,5 +96,17 @@ describe('reader-toolbar-events', () => {
 
         expect(setWorkspaceMode).toHaveBeenCalledWith('map');
         expect(window.applyAutoLayout).toHaveBeenCalled();
+    });
+
+    it('routes organizer buttons to the requested mindmap layout modes', () => {
+        setup();
+
+        document.getElementById('layout-by-source-btn').click();
+        document.getElementById('layout-by-time-btn').click();
+        document.getElementById('layout-loose-btn').click();
+
+        expect(window.applyMindmapOrganizer).toHaveBeenNthCalledWith(1, 'source');
+        expect(window.applyMindmapOrganizer).toHaveBeenNthCalledWith(2, 'time');
+        expect(window.applyMindmapOrganizer).toHaveBeenNthCalledWith(3, 'loose');
     });
 });

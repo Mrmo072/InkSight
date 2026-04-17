@@ -112,4 +112,48 @@ describe('TextReader', () => {
         expect(reader.content.querySelector(`[data-highlight-id="${highlight.id}"]`)).toBeNull();
         expect(window.inksight.cardSystem.removeCard).toHaveBeenCalledWith('card-1');
     });
+
+    it('restores text highlights by stored offsets before falling back to text search', async () => {
+        const container = document.createElement('div');
+        document.body.appendChild(container);
+        const reader = new TextReader(container);
+
+        await reader.load({
+            id: 'doc-1',
+            name: 'notes.txt',
+            type: 'text/plain',
+            fileObj: {
+                text: vi.fn().mockResolvedValue('hello world and more')
+            }
+        });
+
+        const highlight = highlightManager.createHighlight('world', { index: 6, length: 5 }, 'doc-1', 'text', '#FFE234');
+        reader.restoreHighlightVisual(highlight);
+
+        expect(reader.content.querySelector(`[data-highlight-id="${highlight.id}"]`)?.textContent).toBe('world');
+        expect(highlight.needsValidation).toBe(false);
+    });
+
+    it('tracks and restores scroll location', async () => {
+        const container = document.createElement('div');
+        document.body.appendChild(container);
+        const reader = new TextReader(container);
+        const onScrollChange = vi.fn();
+
+        await reader.load({
+            id: 'doc-1',
+            name: 'notes.txt',
+            type: 'text/plain',
+            fileObj: {
+                text: vi.fn().mockResolvedValue('hello world')
+            }
+        });
+
+        reader.setScrollChangeCallback(onScrollChange);
+        reader.goToLocation({ scrollTop: 120 });
+        container.dispatchEvent(new Event('scroll'));
+
+        expect(reader.getCurrentLocation()).toEqual({ scrollTop: 120 });
+        expect(onScrollChange).toHaveBeenCalledWith(120);
+    });
 });

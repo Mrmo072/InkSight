@@ -2,6 +2,7 @@ import { emitAppNotification } from '../ui/app-notifications.js';
 import { getAppContext, setAppService, updateCurrentBook } from './app-context.js';
 import { chooseDocumentTarget } from './document-relink.js';
 import { buildDocumentRemovalPrompt, reorderFilesById } from './file-list-helpers.js';
+import { resolveImportDecision } from './import-decision.js';
 
 async function generateHash(message, logger) {
     if (window.crypto && window.crypto.subtle) {
@@ -62,6 +63,7 @@ export function createWorkspaceDocumentsController({
             name: null
         });
         ui.updateToolbarSummary();
+        ui.renderProjectHome?.();
     }
 
     async function openFile(fileData) {
@@ -112,17 +114,28 @@ export function createWorkspaceDocumentsController({
         const importedFileData = [];
 
         for (const file of files) {
-            const targetDocument = chooseDocumentTarget({
+            const decision = resolveImportDecision({
                 file,
-                pendingDocumentImport: pendingDocumentImport?.id ? pendingDocumentImport : null,
+                pendingDocumentImport,
                 documentManager: appContext.documentManager,
-                reservedIds
+                currentFiles: workspace.state.files
             });
+            const targetDocument = decision.mode === 'new'
+                ? null
+                : decision.targetDocumentId
+                    ? appContext.documentManager?.getDocumentInfo?.(decision.targetDocumentId) ?? chooseDocumentTarget({
+                        file,
+                        pendingDocumentImport: { id: decision.targetDocumentId, type: file.type },
+                        documentManager: appContext.documentManager,
+                        reservedIds
+                    })
+                    : null;
 
-            if (pendingDocumentImport?.id && !targetDocument) {
+            if ((pendingDocumentImport?.id || decision.mode === 'relink-only') && !targetDocument) {
+                const relinkTargetName = pendingDocumentImport?.name || file.name;
                 emitAppNotification({
                     title: 'Relink Skipped',
-                    message: `"${file.name}" does not match the expected file type for "${pendingDocumentImport.name}". Please choose a compatible source file.`,
+                    message: `"${file.name}" does not match the expected file type for "${relinkTargetName}". Please choose a compatible source file.`,
                     level: 'warning'
                 });
                 break;
@@ -141,7 +154,8 @@ export function createWorkspaceDocumentsController({
                 type: file.type,
                 lastModified: file.lastModified,
                 fileObj: file,
-                restoredDocumentId: targetDocument?.id || null
+                restoredDocumentId: targetDocument?.id || null,
+                importMode: decision.mode
             };
 
             const existingIndex = workspace.state.files.findIndex((item) => item.id === fileId);
@@ -161,8 +175,21 @@ export function createWorkspaceDocumentsController({
             appContext.cardSystem?.updateSourceNames?.(fileId, file.name);
             appContext.highlightManager?.updateSourceNames?.(fileId, file.name);
             importedFileData.push(fileData);
+            if (decision.mode === 'replace') {
+                emitAppNotification({
+                    title: 'Document Replaced',
+                    message: `"${file.name}" replaced the existing workspace source while preserving linked notes and cards.`,
+                    level: 'success'
+                });
+            } else if (decision.mode === 'relink-only') {
+                emitAppNotification({
+                    title: 'Source Relinked',
+                    message: `"${file.name}" was imported as a recovery source for saved links.`,
+                    level: 'success'
+                });
+            }
 
-            if (pendingDocumentImport?.id) {
+            if (pendingDocumentImport?.id || decision.mode === 'relink-only') {
                 break;
             }
         }

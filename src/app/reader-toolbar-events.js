@@ -18,6 +18,9 @@ export function setupReaderToolbarEvents({
     const highlighterModeBtn = document.getElementById('highlighter-mode');
     const heightSlider = document.getElementById('highlighter-height');
     const layoutBtn = document.getElementById('layout-btn');
+    const layoutBySourceBtn = document.getElementById('layout-by-source-btn');
+    const layoutByTimeBtn = document.getElementById('layout-by-time-btn');
+    const layoutLooseBtn = document.getElementById('layout-loose-btn');
     const mindmapContainer = document.getElementById('mindmap-container');
     const isCoarsePointer = () => window.matchMedia('(pointer: coarse)').matches;
 
@@ -213,6 +216,33 @@ export function setupReaderToolbarEvents({
             }
         ]));
     }
+
+    registerCleanup(registerEventListeners([
+        layoutBySourceBtn && {
+            target: layoutBySourceBtn,
+            event: 'click',
+            handler: () => {
+                setWorkspaceMode('map');
+                window.applyMindmapOrganizer?.('source');
+            }
+        },
+        layoutByTimeBtn && {
+            target: layoutByTimeBtn,
+            event: 'click',
+            handler: () => {
+                setWorkspaceMode('map');
+                window.applyMindmapOrganizer?.('time');
+            }
+        },
+        layoutLooseBtn && {
+            target: layoutLooseBtn,
+            event: 'click',
+            handler: () => {
+                setWorkspaceMode('map');
+                window.applyMindmapOrganizer?.('loose');
+            }
+        }
+    ].filter(Boolean)));
 
     if (mindmapContainer) {
         registerCleanup(registerEventListeners([

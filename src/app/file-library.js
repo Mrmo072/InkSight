@@ -1,5 +1,5 @@
 import { getAppContext } from './app-context.js';
-import { buildRecoveryDiagnostics } from './document-relink.js';
+import { renderRecoveryWorkbenchMarkup, buildRecoveryWorkbenchModel } from './recovery-workbench.js';
 
 function escapeHtml(value) {
     return String(value ?? '')
@@ -75,9 +75,9 @@ export function createFileLibraryRenderer({
     return function renderFileList() {
         const files = getFiles();
         const visibleDocuments = getVisibleDocuments(files);
-        const diagnostics = buildRecoveryDiagnostics(getAppContext());
-        const missingDocuments = diagnostics.missingDocuments;
+        const workbench = buildRecoveryWorkbenchModel(getAppContext());
         const projectStatus = getProjectStatus();
+        const snapshotHistory = Array.isArray(projectStatus.snapshotHistory) ? projectStatus.snapshotHistory : [];
 
         const projectPanelMarkup = `
         <section class="library-project-panel" aria-label="Project actions">
@@ -98,7 +98,24 @@ export function createFileLibraryRenderer({
             <button type="button" class="library-project-btn primary" data-project-action="open">Open Project Folder</button>
             <button type="button" class="library-project-btn" data-project-action="save">Save Project Folder</button>
             <button type="button" class="library-project-btn" data-project-action="import">Import Documents</button>
+            <button type="button" class="library-project-btn" data-project-action="history">Refresh History</button>
           </div>
+          ${snapshotHistory.length ? `
+            <div class="library-project-history">
+              <strong>Recent snapshots</strong>
+              <div class="library-project-history-list">
+                ${snapshotHistory.map((snapshot) => `
+                  <div class="library-project-history-item">
+                    <div class="library-project-history-copy">
+                      <span>${escapeHtml(snapshot.projectName)}</span>
+                      <span>${escapeHtml(snapshot.bookName)} · ${snapshot.cardCount} cards · ${snapshot.highlightCount} highlights</span>
+                    </div>
+                    <button type="button" class="library-project-history-btn" data-project-history-id="${escapeHtml(snapshot.snapshotId)}">Restore</button>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
         </section>
     `;
 
@@ -114,38 +131,7 @@ export function createFileLibraryRenderer({
             return;
         }
 
-        const recoveryMarkup = missingDocuments.length ? `
-        <section class="library-recovery-panel" aria-label="Missing source files">
-          <div class="library-recovery-header">
-            <span class="material-icons-round">link_off</span>
-            <div class="library-recovery-copy">
-              <strong>${missingDocuments.length} source ${missingDocuments.length === 1 ? 'file is' : 'files are'} waiting to be relinked</strong>
-              <p>Re-import the original documents to restore jump-back navigation from the mind map.</p>
-            </div>
-          </div>
-          <div class="library-recovery-stats">
-            <span>${diagnostics.unresolvedCards.length} cards</span>
-            <span>${diagnostics.unresolvedHighlights.length} highlights</span>
-            <span>${diagnostics.totalDocuments} saved docs</span>
-          </div>
-          <div class="library-recovery-actions">
-            <button type="button" class="library-recovery-secondary-btn" data-recovery-action="auto">Auto match</button>
-            <button type="button" class="library-recovery-secondary-btn" data-recovery-action="bulk">Import sources</button>
-            <button type="button" class="library-recovery-secondary-btn" data-recovery-action="validate">Validate links</button>
-          </div>
-          <div class="library-recovery-list">
-            ${missingDocuments.map((doc) => `
-              <div class="library-recovery-item">
-                <div class="library-recovery-item-copy">
-                  <span class="library-recovery-name">${escapeHtml(doc.name)}</span>
-                  <span class="library-recovery-meta">${escapeHtml(doc.type || 'Unknown file type')}</span>
-                </div>
-                <button type="button" class="library-recovery-btn" data-relink-document-id="${escapeHtml(doc.id)}">Relink</button>
-              </div>
-            `).join('')}
-          </div>
-        </section>
-    ` : '';
+        const recoveryMarkup = renderRecoveryWorkbenchMarkup(workbench);
 
         fileListElement.innerHTML = `
         ${projectPanelMarkup}

@@ -78,7 +78,10 @@ export async function saveCurrentProject(board, options = {}) {
         detail: {
             savedAt: Date.now(),
             mode: 'Local project export',
-            projectId: appContext.currentProjectId || null
+            projectId: appContext.currentProjectId || null,
+            projectName: appContext.currentBook?.name || fileName || 'workspace',
+            directoryName: result.directoryHandle?.name || appContext.currentProjectDirectoryHandle?.name || null,
+            source: 'project-folder'
         }
     }));
 
@@ -172,7 +175,10 @@ export async function openProjectFile(board, listRender = null) {
         detail: {
             openedAt: Date.now(),
             mode: 'Local project export',
-            projectId: getAppContext().currentProjectId || null
+            projectId: getAppContext().currentProjectId || null,
+            projectName: getAppContext().currentBook?.name || projectDirectoryHandle?.name || 'workspace',
+            directoryName: projectDirectoryHandle?.name || null,
+            source: 'project-folder'
         }
     }));
 
