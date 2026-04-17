@@ -1,4 +1,5 @@
 import { highlightManager } from '../core/highlight-manager.js';
+import { getAppContext } from '../app/app-context.js';
 import { PDFHighlightToolbar } from './pdf-highlight-toolbar.jsx';
 import { registerEventListeners } from '../app/event-listeners.js';
 
@@ -118,9 +119,14 @@ export function registerBasicReaderListeners(reader, { onCardDeleted }) {
     };
 
     reader.handleCardDeleted = (e) => {
-        const { highlightId, deleted } = e.detail;
+        const { id, highlightId, deleted } = e.detail;
+        const cardSystem = reader.getCardSystem?.() || getAppContext().cardSystem;
+        const card = id ? cardSystem?.cards?.get?.(id) : null;
 
         if (deleted && highlightId) {
+            if (card && card.deleted !== true) {
+                return;
+            }
             onCardDeleted(highlightId, e.detail);
             return;
         }

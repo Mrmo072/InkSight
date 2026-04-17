@@ -73,11 +73,12 @@ export class AnnotationList {
         const highlightMap = this.getHighlightMap();
         const highlightedCards = cards.map(card => {
             const highlight = highlightMap.get(card.highlightId) ?? null;
+            const location = highlight?.location || card.location || null;
             return {
                 card,
                 highlight,
-                pageNum: highlight?.location?.page || 9999, // Sort end if unknown
-                y: highlight?.location?.rects?.[0]?.top || 0
+                pageNum: location?.page || location?.rects?.[0]?.page || 9999, // Sort end if unknown
+                y: location?.rects?.[0]?.top || 0
             };
         });
 

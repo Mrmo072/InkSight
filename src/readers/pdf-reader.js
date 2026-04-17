@@ -173,8 +173,9 @@ export class PDFReader {
 
     initEventHandlers() {
         this.handleCardSoftDeleted = (e) => {
-            const { highlightId } = e.detail;
-            if (highlightId) {
+            const { id, highlightId, deleted } = e.detail;
+            const card = id ? getAppContext().cardSystem?.cards?.get?.(id) : null;
+            if (deleted && highlightId && (!card || card.deleted === true)) {
                 this.removeHighlightOverlays(highlightId);
             }
         };

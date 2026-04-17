@@ -1,6 +1,14 @@
 import { v4 as uuidv4 } from 'uuid';
 import { highlightManager } from './highlight-manager.js';
 
+function cloneLocation(location) {
+    if (!location) {
+        return null;
+    }
+
+    return JSON.parse(JSON.stringify(location));
+}
+
 export class CardSystem {
     constructor() {
         this.cards = new Map(); // Changed from array to Map
@@ -37,6 +45,8 @@ export class CardSystem {
             note: '',
             sourceId: highlight.sourceId,
             sourceName: highlight.sourceName, // Copy sourceName from highlight
+            location: cloneLocation(highlight.location),
+            highlightType: highlight.type,
             position: { x: 100, y: 100 },
             createdAt: new Date().toISOString(),
             color: highlight.color, // Store color from highlight
@@ -60,6 +70,7 @@ export class CardSystem {
             sourceId: sourceId,
             sourceName: sourceName, // Store sourceName
             location: location,
+            highlightType: type,
             position: { x: 100, y: 100 },
             createdAt: new Date().toISOString(),
             color: color // Store color

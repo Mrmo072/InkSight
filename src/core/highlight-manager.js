@@ -5,6 +5,34 @@ export class HighlightManager {
         this.highlights = [];
     }
 
+    upsertHighlight(highlightData) {
+        if (!highlightData?.id) {
+            return null;
+        }
+
+        const highlight = {
+            ...highlightData,
+            text: typeof highlightData.text === 'string' ? highlightData.text.trim() : '',
+            createdAt: highlightData.createdAt || new Date().toISOString()
+        };
+        const existingIndex = this.highlights.findIndex((item) => item.id === highlight.id);
+
+        if (existingIndex >= 0) {
+            this.highlights[existingIndex] = {
+                ...this.highlights[existingIndex],
+                ...highlight
+            };
+        } else {
+            this.highlights.push(highlight);
+        }
+
+        window.dispatchEvent(new CustomEvent('highlights-restored', {
+            detail: { highlights: this.highlights }
+        }));
+
+        return this.getHighlight(highlight.id);
+    }
+
     createHighlight(text, location, sourceId, type = 'text', color = 'var(--highlight-color)', sourceName = null) {
         const highlight = {
             id: uuidv4(),

@@ -1,5 +1,6 @@
 import { Transforms, getSelectedElements } from '@plait/core';
 import { v4 as uuidv4 } from 'uuid';
+import { getAppContext } from '../app/app-context.js';
 
 export function emitMindmapSelectionChanged(detail) {
     window.dispatchEvent(new CustomEvent('mindmap-selection-changed', {
@@ -98,6 +99,21 @@ function handleRemovedNode(op, cardSystem, logger) {
     if (!node.data?.cardId) {
         logger?.warn?.('Removed node missing cardId', node);
         return;
+    }
+
+    const card = cardSystem.cards.get(node.data.cardId);
+    const highlightManager = getAppContext().highlightManager;
+    if (card?.highlightId && card.location && !highlightManager?.getHighlight?.(card.highlightId)) {
+        highlightManager?.upsertHighlight?.({
+            id: card.highlightId,
+            text: card.content || '',
+            location: card.location,
+            sourceId: card.sourceId,
+            sourceName: card.sourceName,
+            type: card.highlightType || card.type || 'text',
+            createdAt: card.createdAt,
+            color: card.color
+        });
     }
 
     cardSystem.updateCard(node.data.cardId, { isOnBoard: false });

@@ -70,6 +70,30 @@ describe('HighlightManager', () => {
         expect(highlightManager.getHighlight('h-2').sourceName).toBe('Preset.pdf');
     });
 
+    it('can upsert a highlight by its existing id and notify the UI', () => {
+        const listener = vi.fn();
+        window.addEventListener('highlights-restored', listener);
+
+        highlightManager.upsertHighlight({
+            id: 'h-9',
+            text: ' Recovered quote ',
+            location: { page: 9 },
+            sourceId: 'doc-9',
+            sourceName: 'Recovered.pdf',
+            color: '#ffe234'
+        });
+
+        expect(highlightManager.getHighlight('h-9')).toEqual(expect.objectContaining({
+            id: 'h-9',
+            text: 'Recovered quote',
+            location: { page: 9 },
+            sourceId: 'doc-9'
+        }));
+        expect(listener).toHaveBeenCalled();
+
+        window.removeEventListener('highlights-restored', listener);
+    });
+
     it('removes and clears highlights while notifying the UI', () => {
         const removedListener = vi.fn();
         const clearedListener = vi.fn();

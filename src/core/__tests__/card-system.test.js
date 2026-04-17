@@ -19,6 +19,7 @@ describe('CardSystem', () => {
             detail: {
                 id: 'h-1',
                 text: 'Important passage',
+                location: { page: 5, rects: [{ top: 18 }] },
                 sourceId: 'doc-1',
                 sourceName: 'Book.pdf',
                 color: '#ffe234'
@@ -30,6 +31,7 @@ describe('CardSystem', () => {
         expect(cards[0]).toEqual(expect.objectContaining({
             highlightId: 'h-1',
             content: 'Important passage',
+            location: { page: 5, rects: [{ top: 18 }] },
             sourceId: 'doc-1',
             sourceName: 'Book.pdf'
         }));
