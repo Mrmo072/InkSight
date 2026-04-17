@@ -47,55 +47,67 @@ export function renderProjectHome(model = {}) {
             <span class="material-icons-round project-home-icon">auto_stories</span>
             <div class="project-home-copy">
               <h2>${escapeHtml(model.title || 'InkSight Workspace')}</h2>
-              <p>Open a saved project, continue your latest workspace, or export your current notes for writing.</p>
+              <p class="text-two-line">Resume, open, or capture.</p>
             </div>
           </div>
           <div class="project-home-grid">
             <section class="project-home-card accent">
               <div class="project-home-card-copy">
-                <strong>Continue Workspace</strong>
-                <p>${escapeHtml(model.continueSummary || 'Resume the last runtime workspace snapshot')}</p>
+                <span class="material-icons-round project-home-card-icon">play_circle</span>
+                <strong>Continue</strong>
+                <p class="text-two-line">${escapeHtml(model.continueSummary || 'Resume latest workspace')}</p>
               </div>
               <button type="button" class="project-home-btn primary" data-home-action="continue-workspace" ${model.canContinueWorkspace ? '' : 'disabled'}>
-                Continue
+                <span class="material-icons-round">play_arrow</span>
               </button>
             </section>
             <section class="project-home-card">
               <div class="project-home-card-copy">
-                <strong>Quick Actions</strong>
-                <p>Import sources, open a project folder, save a project folder, or export notes.</p>
+                <span class="material-icons-round project-home-card-icon">bolt</span>
+                <strong>Quick</strong>
+                <p class="text-two-line">Core workspace actions.</p>
               </div>
               <div class="project-home-actions">
-                <button type="button" class="project-home-btn" data-home-action="import">Import Documents</button>
-                <button type="button" class="project-home-btn" data-home-action="open-project">Open Project Folder</button>
-                <button type="button" class="project-home-btn" data-home-action="save-project">Save Project Folder</button>
-                <button type="button" class="project-home-btn" data-home-action="export-notes">Export Notes Package</button>
+                <button type="button" class="project-home-btn icon-tile" data-home-action="import" title="Import Documents" aria-label="Import Documents"><span class="material-icons-round">library_add</span></button>
+                <button type="button" class="project-home-btn icon-tile" data-home-action="open-project" title="Open Project Folder" aria-label="Open Project Folder"><span class="material-icons-round">folder_open</span></button>
+                <button type="button" class="project-home-btn icon-tile" data-home-action="save-project" title="Save Project Folder" aria-label="Save Project Folder"><span class="material-icons-round">save</span></button>
+                <button type="button" class="project-home-btn icon-tile" data-home-action="export-notes" title="Export Notes Package" aria-label="Export Notes Package"><span class="material-icons-round">note_add</span></button>
               </div>
             </section>
             <section class="project-home-card">
               <div class="project-home-card-copy">
-                <strong>Recent Projects</strong>
-                <p>${recentProjects.length ? 'Pick up a saved project record. Project folders will ask for access again when needed.' : 'Saved project records will appear here after your first open or export.'}</p>
+                <span class="material-icons-round project-home-card-icon">folder_copy</span>
+                <strong>Recent</strong>
+                <p class="text-two-line">${recentProjects.length ? 'Saved project records.' : 'No recent projects.'}</p>
               </div>
               <div class="project-home-list">
                 ${recentProjects.length ? recentProjects.map((project) => `
                   <button type="button" class="project-home-list-item" data-recent-project-id="${escapeHtml(project.projectId)}">
-                    <span>${escapeHtml(project.projectName)}</span>
-                    <span>${escapeHtml(project.directoryName || (project.source === 'project-folder' ? 'Project folder' : 'Server workspace'))} · ${formatTimestamp(project.lastOpenedAt)}</span>
+                    <span class="material-icons-round project-home-list-icon">${project.source === 'project-folder' ? 'folder' : 'history'}</span>
+                    <span class="project-home-list-copy">
+                      <span class="text-two-line">${escapeHtml(project.projectName)}</span>
+                      <span class="text-two-line">${escapeHtml(project.directoryName || (project.source === 'project-folder' ? 'Project folder' : 'Server workspace'))} · ${formatTimestamp(project.lastOpenedAt)}</span>
+                    </span>
+                    <span class="material-icons-round project-home-list-arrow">arrow_forward</span>
                   </button>
                 `).join('') : '<div class="project-home-list-empty">No recent projects yet.</div>'}
               </div>
             </section>
             <section class="project-home-card">
               <div class="project-home-card-copy">
-                <strong>Recent Snapshots</strong>
-                <p>Restore a recent runtime workspace snapshot without reopening every source manually.</p>
+                <span class="material-icons-round project-home-card-icon">history</span>
+                <strong>Snapshots</strong>
+                <p class="text-two-line">Recent recover points.</p>
               </div>
               <div class="project-home-list">
                 ${recentSnapshots.length ? recentSnapshots.map((snapshot) => `
                   <button type="button" class="project-home-list-item" data-home-snapshot-id="${escapeHtml(snapshot.snapshotId)}">
-                    <span>${escapeHtml(snapshot.projectName || 'Workspace snapshot')}</span>
-                    <span>${escapeHtml(snapshot.bookName || 'Workspace')} · ${formatTimestamp(Date.parse(snapshot.savedAt || 0))}</span>
+                    <span class="material-icons-round project-home-list-icon">restore</span>
+                    <span class="project-home-list-copy">
+                      <span class="text-two-line">${escapeHtml(snapshot.projectName || 'Workspace snapshot')}</span>
+                      <span class="text-two-line">${escapeHtml(snapshot.bookName || 'Workspace')} · ${formatTimestamp(Date.parse(snapshot.savedAt || 0))}</span>
+                    </span>
+                    <span class="material-icons-round project-home-list-arrow">arrow_forward</span>
                   </button>
                 `).join('') : '<div class="project-home-list-empty">No snapshots saved yet.</div>'}
               </div>

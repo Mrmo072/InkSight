@@ -112,19 +112,19 @@ export function renderRecoveryWorkbenchMarkup(workbench) {
             <span class="material-icons-round">link_off</span>
             <div class="library-recovery-copy">
               <strong>${workbench.documents.length} source ${workbench.documents.length === 1 ? 'file is' : 'files are'} waiting to be relinked</strong>
-              <p>Review affected cards and highlights, auto-match known files, or import the original sources to restore source navigation.</p>
+              <p class="text-two-line">Auto match, import, or validate source links.</p>
             </div>
           </div>
           <div class="library-recovery-stats">
-            <span>${workbench.unresolvedCards.length} cards blocked</span>
-            <span>${workbench.unresolvedHighlights.length} highlights blocked</span>
-            <span>${workbench.readyMatches} auto matches ready</span>
-            <span>${workbench.totalDocuments} saved docs</span>
+            <span><span class="material-icons-round">sticky_note_2</span>${workbench.unresolvedCards.length}</span>
+            <span><span class="material-icons-round">format_quote</span>${workbench.unresolvedHighlights.length}</span>
+            <span><span class="material-icons-round">auto_awesome</span>${workbench.readyMatches}</span>
+            <span><span class="material-icons-round">description</span>${workbench.totalDocuments}</span>
           </div>
-          <div class="library-recovery-actions">
-            <button type="button" class="library-recovery-secondary-btn" data-recovery-action="auto">Auto match</button>
-            <button type="button" class="library-recovery-secondary-btn" data-recovery-action="bulk">Import sources</button>
-            <button type="button" class="library-recovery-secondary-btn" data-recovery-action="validate">Validate links</button>
+          <div class="library-recovery-actions icon-row">
+            <button type="button" class="library-recovery-secondary-btn icon-only-btn" data-recovery-action="auto" title="Auto Match" aria-label="Auto Match"><span class="material-icons-round">auto_awesome</span></button>
+            <button type="button" class="library-recovery-secondary-btn icon-only-btn" data-recovery-action="bulk" title="Import Sources" aria-label="Import Sources"><span class="material-icons-round">upload_file</span></button>
+            <button type="button" class="library-recovery-secondary-btn icon-only-btn" data-recovery-action="validate" title="Validate Links" aria-label="Validate Links"><span class="material-icons-round">task_alt</span></button>
           </div>
           ${workbench.lastSummary ? `
             <div class="library-recovery-summary">
@@ -139,10 +139,10 @@ export function renderRecoveryWorkbenchMarkup(workbench) {
                   <span class="library-recovery-name">${escapeHtml(document.name)}</span>
                   <span class="library-recovery-meta">${escapeHtml(document.type || 'Unknown file type')}</span>
                   <div class="library-recovery-tags">
-                    <span>${document.cardCount} cards</span>
-                    <span>${document.highlightCount} highlights</span>
-                    <span>${escapeHtml(document.statusLabel)}</span>
-                    ${document.loadedMatch ? `<span title="${escapeHtml(document.loadedMatch.name)}">Match found: ${escapeHtml(document.loadedMatch.name)}</span>` : ''}
+                    <span title="Cards"><span class="material-icons-round">sticky_note_2</span>${document.cardCount}</span>
+                    <span title="Highlights"><span class="material-icons-round">format_quote</span>${document.highlightCount}</span>
+                    <span title="${escapeHtml(document.statusLabel)}"><span class="material-icons-round">${document.loadedMatch ? 'task_alt' : 'warning_amber'}</span>${escapeHtml(document.statusLabel)}</span>
+                    ${document.loadedMatch ? `<span title="${escapeHtml(document.loadedMatch.name)}"><span class="material-icons-round">link</span>${escapeHtml(document.loadedMatch.name)}</span>` : ''}
                   </div>
                   ${document.affectedPreview.length ? `
                     <div class="library-recovery-preview">
@@ -151,8 +151,8 @@ export function renderRecoveryWorkbenchMarkup(workbench) {
                   ` : ''}
                 </div>
                 <div class="library-recovery-item-actions">
-                  ${document.loadedMatch ? `<button type="button" class="library-recovery-btn" data-recovery-match-id="${escapeHtml(document.id)}">Match existing</button>` : ''}
-                  <button type="button" class="library-recovery-btn secondary" data-relink-document-id="${escapeHtml(document.id)}">Relink</button>
+                  ${document.loadedMatch ? `<button type="button" class="library-recovery-btn icon-only-btn" data-recovery-match-id="${escapeHtml(document.id)}" title="Match Existing" aria-label="Match Existing"><span class="material-icons-round">link</span></button>` : ''}
+                  <button type="button" class="library-recovery-btn secondary icon-only-btn" data-relink-document-id="${escapeHtml(document.id)}" title="Relink Source" aria-label="Relink Source"><span class="material-icons-round">upload_file</span></button>
                 </div>
               </div>
             `).join('')}

@@ -8,10 +8,8 @@
   <link rel="icon" type="image/svg+xml" href="./logo.svg" />
   <link rel="stylesheet" href="https://unpkg.com/pdfjs-dist@4.10.38/web/pdf_viewer.css" />
   <link rel="stylesheet" href="./src/styles/styles.css" />
-  <link rel="stylesheet" href="./src/styles/styles-enhanced.css" />
   <link rel="stylesheet" href="./src/styles/themes.css" />
-  <link rel="stylesheet" href="./src/styles/themes-override.css" />
-  <link rel="stylesheet" href="./src/styles/styles-premium.css" />
+  <link rel="stylesheet" href="./src/styles/workspace-ui.css" />
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@500;600;700&family=Noto+Serif+SC:wght@400;700&display=swap"
@@ -73,42 +71,51 @@
         </div>
 
         <div class="toolbar-mobile-summary" aria-live="polite">
-          <span id="mobile-doc-summary" class="toolbar-mobile-title">No document open</span>
-          <span id="mobile-page-info" class="toolbar-mobile-meta">-- / --</span>
+          <span id="mobile-doc-summary" class="toolbar-mobile-title">No doc</span>
+          <span id="mobile-page-info" class="toolbar-mobile-meta">—</span>
         </div>
 
         <div class="toolbar-section toolbar-section-center">
           <div class="toolbar-doc-block">
-            <span id="doc-title">No document open</span>
+            <div class="toolbar-doc-copy">
+              <div id="doc-title" class="text-two-line" title="No doc">No doc</div>
+            </div>
             <div class="toolbar-doc-actions">
-              <button id="toolbar-import-documents" class="icon-btn small" title="Import Documents">
-                <span class="material-icons-round">library_add</span>
-              </button>
-              <button id="toolbar-open-project" class="icon-btn small" title="Open Project Folder">
-                <span class="material-icons-round">folder_open</span>
-              </button>
-              <button id="toolbar-save-project" class="icon-btn small" title="Save Project Folder">
-                <span class="material-icons-round">save</span>
-              </button>
-              <button id="toolbar-export-outline" class="icon-btn small" title="Export Markdown Outline">
-                <span class="material-icons-round">segment</span>
-              </button>
-              <button id="toolbar-export-citations" class="icon-btn small" title="Export Citation List">
-                <span class="material-icons-round">format_quote</span>
-              </button>
-              <button id="toolbar-export-notes" class="icon-btn small" title="Export Reading Notes Package">
-                <span class="material-icons-round">note_add</span>
-              </button>
+              <div class="toolbar-action-group" aria-label="Project actions">
+                <button id="toolbar-import-documents" class="icon-btn small action-pill" title="Import Documents" aria-label="Import Documents">
+                  <span class="material-icons-round">library_add</span>
+                </button>
+                <button id="toolbar-open-project" class="icon-btn small action-pill" title="Open Project Folder" aria-label="Open Project Folder">
+                  <span class="material-icons-round">folder_open</span>
+                </button>
+                <button id="toolbar-save-project" class="icon-btn small action-pill" title="Save Project Folder" aria-label="Save Project Folder">
+                  <span class="material-icons-round">save</span>
+                </button>
+              </div>
+              <div class="toolbar-action-group subtle" aria-label="Export actions">
+                <button id="toolbar-export-outline" class="icon-btn small action-pill" title="Export Markdown Outline" aria-label="Export Markdown Outline">
+                  <span class="material-icons-round">segment</span>
+                </button>
+                <button id="toolbar-export-citations" class="icon-btn small action-pill" title="Export Citation List" aria-label="Export Citation List">
+                  <span class="material-icons-round">format_quote</span>
+                </button>
+                <button id="toolbar-export-notes" class="icon-btn small action-pill" title="Export Reading Notes Package" aria-label="Export Reading Notes Package">
+                  <span class="material-icons-round">note_add</span>
+                </button>
+              </div>
             </div>
           </div>
           <div class="workspace-mode-group" role="tablist" aria-label="Workspace mode">
             <button id="workspace-mode-reading" class="workspace-mode-btn active" type="button" role="tab" aria-selected="true">
+              <span class="material-icons-round">auto_stories</span>
               Read
             </button>
             <button id="workspace-mode-capture" class="workspace-mode-btn" type="button" role="tab" aria-selected="false">
+              <span class="material-icons-round">edit_note</span>
               Capture
             </button>
             <button id="workspace-mode-map" class="workspace-mode-btn" type="button" role="tab" aria-selected="false">
+              <span class="material-icons-round">account_tree</span>
               Map
             </button>
           </div>
@@ -133,7 +140,7 @@
             <button id="mobile-prev-page" class="icon-btn" disabled>
               <span class="material-icons-round">chevron_left</span>
             </button>
-            <span id="mobile-context-page-info">-- / --</span>
+            <span id="mobile-context-page-info">—</span>
             <button id="mobile-next-page" class="icon-btn" disabled>
               <span class="material-icons-round">chevron_right</span>
             </button>
@@ -153,14 +160,14 @@
           </div>
         </div>
         <div class="mobile-context-row mobile-project-actions" aria-label="Mobile project actions">
-          <button id="mobile-import-documents" class="mobile-project-btn primary" type="button">Import</button>
-          <button id="mobile-open-project" class="mobile-project-btn" type="button">Open</button>
-          <button id="mobile-save-project" class="mobile-project-btn" type="button">Save</button>
+          <button id="mobile-import-documents" class="mobile-project-btn primary" type="button"><span class="material-icons-round">library_add</span><span>Import</span></button>
+          <button id="mobile-open-project" class="mobile-project-btn" type="button"><span class="material-icons-round">folder_open</span><span>Open</span></button>
+          <button id="mobile-save-project" class="mobile-project-btn" type="button"><span class="material-icons-round">save</span><span>Save</span></button>
         </div>
         <div class="mobile-context-row mobile-project-actions" aria-label="Mobile export actions">
-          <button id="mobile-export-outline" class="mobile-project-btn" type="button">Outline</button>
-          <button id="mobile-export-citations" class="mobile-project-btn" type="button">Citations</button>
-          <button id="mobile-export-notes" class="mobile-project-btn" type="button">Notes</button>
+          <button id="mobile-export-outline" class="mobile-project-btn subtle" type="button"><span class="material-icons-round">segment</span><span>Outline</span></button>
+          <button id="mobile-export-citations" class="mobile-project-btn subtle" type="button"><span class="material-icons-round">format_quote</span><span>Cite</span></button>
+          <button id="mobile-export-notes" class="mobile-project-btn subtle" type="button"><span class="material-icons-round">note_add</span><span>Notes</span></button>
         </div>
       </div>
 
@@ -176,10 +183,14 @@
 
         <div id="outline-sidebar" class="outline-sidebar collapsed">
           <div class="outline-header">
-            <span>Outline</span>
-            <button id="close-outline-panel" class="icon-btn close-outline-btn" title="Close Outline">
-              <span class="material-icons-round">close</span>
-            </button>
+            <div class="panel-title-group">
+              <span class="panel-title-text">Outline</span>
+            </div>
+            <div class="panel-actions">
+              <button id="close-outline-panel" class="icon-btn close-outline-btn" title="Close Outline">
+                <span class="material-icons-round">close</span>
+              </button>
+            </div>
           </div>
           <div id="outline-content" class="outline-content">
             <div class="outline-empty">No outline available</div>
@@ -197,7 +208,7 @@
           <button id="prev-page" class="icon-btn" disabled>
             <span class="material-icons-round">chevron_left</span>
           </button>
-          <span id="page-info">-- / --</span>
+          <span id="page-info">—</span>
           <button id="next-page" class="icon-btn" disabled>
             <span class="material-icons-round">chevron_right</span>
           </button>
@@ -286,6 +297,8 @@
             <p>No annotations yet</p>
           </div>
         </div>
+
+        <div id="notes-inner-resizer" class="notes-inner-resizer" aria-hidden="true"></div>
 
         <div id="mindmap-container" class="mindmap-container">
           <div class="mindmap-placeholder">

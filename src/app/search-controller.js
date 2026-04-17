@@ -17,9 +17,10 @@ function renderResultGroup(title, results) {
           <div class="workspace-search-group-results">
             ${results.map((result) => `
               <button type="button" class="workspace-search-result" data-search-result-id="${result.id}" data-search-result-type="${result.type}">
-                <span class="workspace-search-result-title">${result.title}</span>
+                <span class="workspace-search-result-icon material-icons-round">${result.type === 'document' ? 'description' : result.type === 'card' ? 'sticky_note_2' : 'format_quote'}</span>
+                <span class="workspace-search-result-title text-two-line">${result.title}</span>
                 <span class="workspace-search-result-meta">${result.type}</span>
-                <span class="workspace-search-result-excerpt">${result.excerpt || 'No preview available'}</span>
+                <span class="workspace-search-result-excerpt text-three-line">${result.excerpt || 'No preview available'}</span>
               </button>
             `).join('')}
           </div>

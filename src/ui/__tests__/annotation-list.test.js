@@ -41,15 +41,12 @@ describe('annotation-list', () => {
         const list = new AnnotationList('annotation-list', cardSystem);
         list.load('doc-1');
 
-        const filter = document.querySelector('.annotation-filter-select');
-        filter.value = 'needs-map';
-        filter.dispatchEvent(new Event('change', { bubbles: true }));
+        document.querySelector('[data-filter="needs-map"]').click();
 
         expect(document.querySelectorAll('.annotation-item')).toHaveLength(1);
         expect(document.querySelector('.annotation-item').dataset.cardId).toBe('card-1');
 
-        filter.value = 'missing-links';
-        filter.dispatchEvent(new Event('change', { bubbles: true }));
+        document.querySelector('[data-filter="missing-links"]').click();
 
         expect(document.querySelectorAll('.annotation-item')).toHaveLength(2);
     });
@@ -63,7 +60,7 @@ describe('annotation-list', () => {
         basketButtons[0].click();
         basketButtons[1].click();
 
-        document.querySelector('.annotation-basket-btn').click();
+        document.querySelector('.annotation-basket-btn:not(.secondary)').click();
 
         const addEvents = dispatchSpy.mock.calls
             .map(([event]) => event)

@@ -98,7 +98,10 @@ const elements = {
     searchPanel: document.getElementById('workspace-search-panel'),
     workspaceSearchInput: document.getElementById('workspace-search-input'),
     workspaceSearchResults: document.getElementById('workspace-search-results'),
-    workspaceSearchEmpty: document.getElementById('workspace-search-empty')
+    workspaceSearchEmpty: document.getElementById('workspace-search-empty'),
+    annotationList: document.getElementById('annotation-list'),
+    mindmapContainer: document.getElementById('mindmap-container'),
+    notesInnerResizer: document.getElementById('notes-inner-resizer')
 };
 
 let currentReader = null;
@@ -119,6 +122,8 @@ let draggedFileId = null;
 let renderFileList = () => {};
 let workspaceDocuments = null;
 let searchController = null;
+let workspaceModeTransitionTimeout = null;
+const NOTES_SPLIT_WIDTH_KEY = 'inksight:notes-split-width';
 const projectWorkspace = createProjectWorkspaceController({
     localStorage,
     sessionStorage,
@@ -190,6 +195,161 @@ function registerCleanup(cleanup) {
     return cleanup;
 }
 
+function setupNotesInnerResizer() {
+    const annotationListEl = elements.annotationList;
+    const mindmapContainerEl = elements.mindmapContainer;
+    const resizerEl = elements.notesInnerResizer;
+    const notesPanelEl = document.getElementById('notes-panel');
+
+    if (!annotationListEl || !mindmapContainerEl || !resizerEl || !notesPanelEl) {
+        return;
+    }
+
+    const minWidth = 180;
+    const minMindmapWidth = 220;
+    let activePointerId = null;
+    let dragging = false;
+    let pendingClientX = null;
+    let resizeFrame = null;
+    let dragBounds = null;
+    let lastAppliedWidth = null;
+
+    const isResizableLayout = () => !document.body.classList.contains('compact-layout') && !document.body.classList.contains('mobile-layout');
+
+    const clampWidth = (width, bounds) => Math.max(bounds.minWidth, Math.min(width, bounds.maxWidth));
+
+    const measureBounds = () => {
+        const panelContent = notesPanelEl.querySelector('.panel-content');
+        if (!panelContent) {
+            return null;
+        }
+
+        const rect = panelContent.getBoundingClientRect();
+        return {
+            left: rect.left,
+            minWidth,
+            maxWidth: Math.max(
+                minWidth + 40,
+                Math.floor(rect.width - minMindmapWidth - resizerEl.getBoundingClientRect().width)
+            )
+        };
+    };
+
+    const applyStoredWidth = () => {
+        if (!isResizableLayout()) {
+            annotationListEl.style.width = '';
+            return;
+        }
+
+        const storedWidth = Number.parseFloat(localStorage.getItem(NOTES_SPLIT_WIDTH_KEY) || '');
+        if (!Number.isFinite(storedWidth)) {
+            return;
+        }
+
+        const bounds = measureBounds();
+        if (!bounds) {
+            return;
+        }
+
+        const clampedWidth = clampWidth(storedWidth, bounds);
+        annotationListEl.style.width = `${clampedWidth}px`;
+        lastAppliedWidth = clampedWidth;
+    };
+
+    const flushResize = () => {
+        resizeFrame = null;
+        if (!dragging || pendingClientX == null || !dragBounds) {
+            return;
+        }
+
+        const nextWidth = pendingClientX - dragBounds.left;
+        const clampedWidth = clampWidth(nextWidth, dragBounds);
+        if (clampedWidth === lastAppliedWidth) {
+            return;
+        }
+
+        annotationListEl.style.width = `${clampedWidth}px`;
+        lastAppliedWidth = clampedWidth;
+    };
+
+    const scheduleResize = () => {
+        if (resizeFrame !== null) {
+            return;
+        }
+
+        resizeFrame = window.requestAnimationFrame(flushResize);
+    };
+
+    const stopDragging = () => {
+        if (!dragging) {
+            return;
+        }
+
+        dragging = false;
+        pendingClientX = null;
+        dragBounds = null;
+        activePointerId = null;
+        document.body.classList.remove('notes-split-resizing');
+        if (resizeFrame !== null) {
+            window.cancelAnimationFrame(resizeFrame);
+            resizeFrame = null;
+        }
+        if (Number.isFinite(lastAppliedWidth)) {
+            localStorage.setItem(NOTES_SPLIT_WIDTH_KEY, String(lastAppliedWidth));
+        }
+    };
+
+    const handlePointerMove = (event) => {
+        if (!dragging || event.pointerId !== activePointerId) {
+            return;
+        }
+
+        pendingClientX = event.clientX;
+        scheduleResize();
+    };
+
+    const handlePointerUp = (event) => {
+        if (event.pointerId !== activePointerId) {
+            return;
+        }
+
+        stopDragging();
+    };
+
+    resizerEl.addEventListener('pointerdown', (event) => {
+        if (!isResizableLayout()) {
+            return;
+        }
+
+        if (event.button !== undefined && event.button !== 0) {
+            return;
+        }
+
+        dragging = true;
+        activePointerId = event.pointerId;
+        dragBounds = measureBounds();
+        if (!dragBounds) {
+            dragging = false;
+            activePointerId = null;
+            return;
+        }
+        lastAppliedWidth = annotationListEl.getBoundingClientRect().width;
+        pendingClientX = event.clientX;
+        document.body.classList.add('notes-split-resizing');
+        resizerEl.setPointerCapture?.(event.pointerId);
+        event.preventDefault();
+        scheduleResize();
+    });
+
+    window.addEventListener('pointermove', handlePointerMove, { passive: true });
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
+    window.addEventListener('resize', applyStoredWidth);
+    window.addEventListener('layout-panel-toggled', applyStoredWidth);
+
+    applyStoredWidth();
+}
+
 function promptRelinkDocument(documentId) {
     const targetDocument = getAppContext().documentManager?.getDocumentInfo?.(documentId);
     if (!targetDocument || targetDocument.loaded) {
@@ -253,9 +413,18 @@ function findHighlightById(highlightId) {
 }
 
 function updateToolbarSummary() {
-    const title = state.currentFile?.name || 'No document open';
+    const title = state.currentFile?.name || 'No doc';
+    const hasDocument = Boolean(state.currentFile);
+    elements.readerContainer?.classList.toggle('no-document-open', !hasDocument);
+    elements.readerToolbar?.classList.toggle('toolbar-home', !hasDocument);
     elements.mobileDocSummary && (elements.mobileDocSummary.textContent = title);
-    elements.docTitle && (elements.docTitle.textContent = title);
+    if (elements.mobileDocSummary) {
+        elements.mobileDocSummary.title = title;
+    }
+    if (elements.docTitle) {
+        elements.docTitle.textContent = title;
+        elements.docTitle.title = title;
+    }
 }
 
 function setMobileToolbarExpanded(expanded) {
@@ -307,6 +476,43 @@ function syncReaderLayoutAfterModeChange() {
 
     readerLayoutSyncTimeout = window.setTimeout(() => {
         relayout();
+    }, 260);
+}
+
+function beginWorkspaceModeTransition(nextMode) {
+    const root = elements.readerContainer;
+    if (!root) {
+        document.body.dataset.workspaceMode = nextMode;
+        return;
+    }
+
+    const previousMode = document.body.dataset.workspaceMode || state.workspaceMode || 'reading';
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+
+    if (workspaceModeTransitionTimeout) {
+        clearTimeout(workspaceModeTransitionTimeout);
+    }
+
+    root.classList.remove('mode-transitioning');
+    document.body.classList.remove('workspace-mode-transitioning');
+
+    if (reducedMotion) {
+        document.body.dataset.workspaceMode = nextMode;
+        root.dataset.workspaceMode = nextMode;
+        delete root.dataset.modeTransition;
+        return;
+    }
+
+    root.dataset.modeTransition = `${previousMode}-${nextMode}`;
+    root.dataset.workspaceMode = nextMode;
+    document.body.dataset.workspaceMode = nextMode;
+    root.classList.add('mode-transitioning');
+    document.body.classList.add('workspace-mode-transitioning');
+
+    workspaceModeTransitionTimeout = window.setTimeout(() => {
+        root.classList.remove('mode-transitioning');
+        document.body.classList.remove('workspace-mode-transitioning');
+        delete root.dataset.modeTransition;
     }, 260);
 }
 
@@ -430,7 +636,7 @@ function setupFloatingSelectionToolbar() {
 }
 
 function applyWorkspaceLayout(mode) {
-    document.body.dataset.workspaceMode = mode;
+    beginWorkspaceModeTransition(mode);
     state.workspaceMode = mode;
     syncWorkspaceModeButtons(mode);
 
@@ -669,6 +875,7 @@ async function init() {
     });
 
     setupSearch();
+    setupNotesInnerResizer();
     void projectWorkspace.refreshProjectSnapshotHistory();
     renderProjectHome();
 
@@ -745,9 +952,9 @@ function updatePageInfo() {
         elements.mobilePageInfo && (elements.mobilePageInfo.textContent = `${state.currentPage} / ${state.totalPages}`);
         elements.mobileContextPageInfo && (elements.mobileContextPageInfo.textContent = `${state.currentPage} / ${state.totalPages}`);
     } else {
-        elements.pageInfo.textContent = '-- / --';
-        elements.mobilePageInfo && (elements.mobilePageInfo.textContent = '-- / --');
-        elements.mobileContextPageInfo && (elements.mobileContextPageInfo.textContent = '-- / --');
+        elements.pageInfo.textContent = '—';
+        elements.mobilePageInfo && (elements.mobilePageInfo.textContent = '—');
+        elements.mobileContextPageInfo && (elements.mobileContextPageInfo.textContent = '—');
     }
 }
 

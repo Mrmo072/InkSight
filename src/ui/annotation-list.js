@@ -153,33 +153,52 @@ export class AnnotationList {
         const controls = document.createElement('div');
         controls.className = 'annotation-controls';
 
-        const filterSelect = document.createElement('select');
-        filterSelect.className = 'annotation-filter-select';
+        const toolbarMain = document.createElement('div');
+        toolbarMain.className = 'annotation-toolbar-main';
+
+        const filterGroup = document.createElement('div');
+        filterGroup.className = 'annotation-filter-group';
         [
-            ['all', 'All'],
-            ['needs-map', 'To map'],
-            ['on-map', 'On map'],
-            ['missing-links', 'Missing links']
-        ].forEach(([value, label]) => {
-            const option = document.createElement('option');
-            option.value = value;
-            option.textContent = label;
-            option.selected = value === this.filterMode;
-            filterSelect.appendChild(option);
+            ['all', 'apps', 'All annotations'],
+            ['needs-map', 'playlist_add_check_circle', 'Need mapping'],
+            ['on-map', 'account_tree', 'On map'],
+            ['missing-links', 'link_off', 'Missing links']
+        ].forEach(([value, icon, label]) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'annotation-filter-btn';
+            button.dataset.filter = value;
+            button.title = label;
+            button.setAttribute('aria-label', label);
+            button.setAttribute('aria-pressed', String(value === this.filterMode));
+            if (value === this.filterMode) {
+                button.classList.add('active');
+            }
+            button.innerHTML = `<span class="material-icons-round">${icon}</span>`;
+            button.addEventListener('click', () => {
+                this.filterMode = value;
+                this.refresh();
+            });
+            filterGroup.appendChild(button);
         });
-        filterSelect.addEventListener('change', (event) => {
-            this.filterMode = event.target.value;
-            this.refresh();
-        });
+        toolbarMain.appendChild(filterGroup);
 
         const basketMeta = document.createElement('div');
         basketMeta.className = 'annotation-basket-meta';
-        basketMeta.textContent = `${this.selectedCardIds.size} selected`;
+        basketMeta.innerHTML = `
+            <span class="material-icons-round">done_all</span>
+            <span>${this.selectedCardIds.size} selected</span>
+        `;
+
+        const toolbarSide = document.createElement('div');
+        toolbarSide.className = 'annotation-toolbar-side';
 
         const addSelectedBtn = document.createElement('button');
         addSelectedBtn.type = 'button';
         addSelectedBtn.className = 'annotation-basket-btn';
-        addSelectedBtn.textContent = 'Add selected';
+        addSelectedBtn.title = 'Add selected to mind map';
+        addSelectedBtn.setAttribute('aria-label', 'Add selected annotations to mind map');
+        addSelectedBtn.innerHTML = '<span class="material-icons-round">account_tree</span>';
         addSelectedBtn.disabled = this.selectedCardIds.size === 0;
         addSelectedBtn.addEventListener('click', (event) => {
             event.stopPropagation();
@@ -189,7 +208,9 @@ export class AnnotationList {
         const clearSelectedBtn = document.createElement('button');
         clearSelectedBtn.type = 'button';
         clearSelectedBtn.className = 'annotation-basket-btn secondary';
-        clearSelectedBtn.textContent = 'Clear';
+        clearSelectedBtn.title = 'Clear selection basket';
+        clearSelectedBtn.setAttribute('aria-label', 'Clear selection basket');
+        clearSelectedBtn.innerHTML = '<span class="material-icons-round">clear_all</span>';
         clearSelectedBtn.disabled = this.selectedCardIds.size === 0;
         clearSelectedBtn.addEventListener('click', (event) => {
             event.stopPropagation();
@@ -197,10 +218,12 @@ export class AnnotationList {
             this.refresh();
         });
 
-        controls.appendChild(filterSelect);
-        controls.appendChild(basketMeta);
-        controls.appendChild(addSelectedBtn);
-        controls.appendChild(clearSelectedBtn);
+        toolbarSide.appendChild(basketMeta);
+        toolbarSide.appendChild(addSelectedBtn);
+        toolbarSide.appendChild(clearSelectedBtn);
+
+        controls.appendChild(toolbarMain);
+        controls.appendChild(toolbarSide);
 
         return controls;
     }
@@ -282,22 +305,25 @@ export class AnnotationList {
         const header = document.createElement('div');
         header.className = 'annotation-header';
 
+        const headerMeta = document.createElement('div');
+        headerMeta.className = 'annotation-header-meta';
+
         const pageSpan = document.createElement('span');
         pageSpan.className = 'page-tag';
-        pageSpan.textContent = `Page ${pageNum === 9999 ? '?' : pageNum}`;
+        pageSpan.innerHTML = `<span class="material-icons-round">article</span><span>${pageNum === 9999 ? 'Page ?' : `Page ${pageNum}`}</span>`;
 
         if (highlight?.color) {
             const dot = document.createElement('span');
+            dot.className = 'annotation-color-dot';
             dot.style.width = '8px';
             dot.style.height = '8px';
             dot.style.borderRadius = '50%';
             dot.style.backgroundColor = highlight.color;
-            dot.style.marginRight = '6px';
             dot.style.display = 'inline-block';
-            header.prepend(dot);
+            pageSpan.prepend(dot);
         }
 
-        header.appendChild(pageSpan);
+        headerMeta.appendChild(pageSpan);
 
         const statusTag = document.createElement('span');
         statusTag.className = 'annotation-status-tag';
@@ -308,12 +334,45 @@ export class AnnotationList {
         } else {
             statusTag.textContent = 'On map';
         }
-        header.appendChild(statusTag);
+        headerMeta.appendChild(statusTag);
+        header.appendChild(headerMeta);
+
+        const headerActions = document.createElement('div');
+        headerActions.className = 'annotation-header-actions';
+
+        const selectBtn = document.createElement('button');
+        selectBtn.className = 'action-btn basket-btn annotation-select-btn';
+        if (this.selectedCardIds.has(card.id)) {
+            selectBtn.classList.add('active');
+        }
+        selectBtn.innerHTML = '<span class="material-icons-round">check_circle</span>';
+        selectBtn.title = 'Select for batch actions';
+        selectBtn.setAttribute('aria-label', 'Select annotation for batch actions');
+        selectBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (this.selectedCardIds.has(card.id)) {
+                this.selectedCardIds.delete(card.id);
+            } else {
+                this.selectedCardIds.add(card.id);
+            }
+            this.refresh();
+        });
+        headerActions.appendChild(selectBtn);
+        header.appendChild(headerActions);
+
         div.appendChild(header);
+
+        const sourceMeta = document.createElement('div');
+        sourceMeta.className = 'annotation-source-meta text-two-line';
+        sourceMeta.innerHTML = `
+            <span class="material-icons-round annotation-source-icon">description</span>
+            <span>${card.sourceName || 'Unknown source'}</span>
+        `;
+        div.appendChild(sourceMeta);
 
         // Quote (Content)
         const quote = document.createElement('div');
-        quote.className = 'annotation-quote';
+        quote.className = 'annotation-quote text-three-line';
         if (card.imageData) {
             const img = document.createElement('img');
             img.src = card.imageData;
@@ -354,15 +413,24 @@ export class AnnotationList {
         input.addEventListener('change', (e) => {
             this.cardSystem.updateCard(card.id, { note: e.target.value });
         });
-        div.appendChild(input);
+        const noteWrap = document.createElement('div');
+        noteWrap.className = 'annotation-note-wrap';
+        noteWrap.appendChild(input);
+        div.appendChild(noteWrap);
 
         // Actions (Delete)
         const actions = document.createElement('div');
-        actions.className = 'item-actions';
+        actions.className = 'item-actions annotation-actions';
+
+        const actionMain = document.createElement('div');
+        actionMain.className = 'annotation-actions-main';
+
+        const actionDanger = document.createElement('div');
+        actionDanger.className = 'annotation-actions-danger';
 
         const delBtn = document.createElement('button');
-        delBtn.className = 'action-btn';
-        delBtn.innerHTML = '<span class="material-icons-round">delete</span><span class="action-label">Delete</span>';
+        delBtn.className = 'action-btn danger';
+        delBtn.innerHTML = '<span class="material-icons-round">delete</span>';
         delBtn.title = 'Delete';
         delBtn.setAttribute('aria-label', 'Delete annotation');
         delBtn.addEventListener('click', (e) => {
@@ -371,34 +439,35 @@ export class AnnotationList {
                 this.cardSystem.removeCard(card.id);
             }
         });
-        actions.appendChild(delBtn);
+        actionDanger.appendChild(delBtn);
 
         const addToMapBtn = document.createElement('button');
         addToMapBtn.className = 'action-btn add-to-map-btn';
-        addToMapBtn.innerHTML = '<span class="material-icons-round">account_tree</span><span class="action-label">To map</span>';
+        if (card.isOnBoard !== false) {
+            addToMapBtn.classList.add('active');
+        }
+        addToMapBtn.innerHTML = '<span class="material-icons-round">account_tree</span>';
         addToMapBtn.title = 'Add to mind map';
         addToMapBtn.setAttribute('aria-label', 'Add annotation to mind map');
         addToMapBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             this.addCardToMindMap(card, highlight);
         });
-        actions.appendChild(addToMapBtn);
+        actionMain.appendChild(addToMapBtn);
 
-        const basketBtn = document.createElement('button');
-        basketBtn.className = 'action-btn basket-btn';
-        basketBtn.innerHTML = '<span class="material-icons-round">playlist_add</span><span class="action-label">Basket</span>';
-        basketBtn.title = 'Add to selection basket';
-        basketBtn.setAttribute('aria-label', 'Add annotation to selection basket');
-        basketBtn.addEventListener('click', (e) => {
+        const jumpBtn = document.createElement('button');
+        jumpBtn.className = 'action-btn annotation-jump-btn';
+        jumpBtn.innerHTML = '<span class="material-icons-round">north_east</span>';
+        jumpBtn.title = 'Open in reader';
+        jumpBtn.setAttribute('aria-label', 'Open annotation in reader');
+        jumpBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (this.selectedCardIds.has(card.id)) {
-                this.selectedCardIds.delete(card.id);
-            } else {
-                this.selectedCardIds.add(card.id);
-            }
-            this.refresh();
+            this.handleItemClick(card.id, card.highlightId);
         });
-        actions.appendChild(basketBtn);
+        actionMain.appendChild(jumpBtn);
+
+        actions.appendChild(actionMain);
+        actions.appendChild(actionDanger);
         div.appendChild(actions);
 
         // Click to jump

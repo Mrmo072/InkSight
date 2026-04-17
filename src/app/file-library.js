@@ -12,10 +12,14 @@ function escapeHtml(value) {
 
 function describeDocumentStatus(file, index) {
     if (file.loaded) {
-        return `Document ${index + 1}`;
+        const typeLabel = String(file.type || '')
+            .replace('application/', '')
+            .replace('text/', '')
+            .toUpperCase();
+        return typeLabel || `DOC ${index + 1}`;
     }
 
-    return 'Source file missing - re-import to relink';
+    return 'Missing';
 }
 
 export function getCardsCollection(cardSystem = getAppContext().cardSystem) {
@@ -78,54 +82,34 @@ export function createFileLibraryRenderer({
         const workbench = buildRecoveryWorkbenchModel(getAppContext());
         const projectStatus = getProjectStatus();
         const snapshotHistory = Array.isArray(projectStatus.snapshotHistory) ? projectStatus.snapshotHistory : [];
+        const latestSnapshot = snapshotHistory[0] ?? null;
+        const projectStatusLabel = projectStatus.linkedToDirectory ? 'Linked' : 'Autosave';
 
         const projectPanelMarkup = `
-        <section class="library-project-panel" aria-label="Project actions">
+        <section class="library-project-panel workspace-card compact-footer" aria-label="Project actions">
           <div class="library-project-header">
             <span class="material-icons-round">folder_managed</span>
             <div class="library-project-copy">
-              <strong>${projectStatus.title}</strong>
-              <p>${projectStatus.description}</p>
+              <strong class="text-single-line">${projectStatus.title}</strong>
+              <span class="library-project-status text-single-line">${projectStatusLabel}</span>
             </div>
           </div>
-          <div class="library-project-meta">
-            <span>${projectStatus.summary}</span>
-            <span>${projectStatus.linkedToDirectory ? 'Local export linked' : 'Server workspace autosave'}</span>
-            ${projectStatus.projectDirectoryName ? `<span title="${escapeHtml(projectStatus.projectDirectoryName)}">${escapeHtml(projectStatus.projectDirectoryName)}</span>` : ''}
-            ${projectStatus.runtimeRoot ? `<span title="${escapeHtml(projectStatus.runtimeRoot)}">runtime-data</span>` : ''}
+          <div class="library-project-actions icon-row">
+            ${latestSnapshot ? `<button type="button" class="library-project-btn icon-only-btn" data-project-history-id="${escapeHtml(latestSnapshot.snapshotId)}" title="Restore Latest Snapshot" aria-label="Restore Latest Snapshot"><span class="material-icons-round">restore</span></button>` : ''}
+            <button type="button" class="library-project-btn primary icon-only-btn" data-project-action="open" title="Open Project Folder" aria-label="Open Project Folder"><span class="material-icons-round">folder_open</span></button>
+            <button type="button" class="library-project-btn icon-only-btn" data-project-action="save" title="Save Project Folder" aria-label="Save Project Folder"><span class="material-icons-round">save</span></button>
+            <button type="button" class="library-project-btn icon-only-btn" data-project-action="import" title="Import Documents" aria-label="Import Documents"><span class="material-icons-round">library_add</span></button>
+            <button type="button" class="library-project-btn icon-only-btn" data-project-action="history" title="Refresh History" aria-label="Refresh History"><span class="material-icons-round">history</span></button>
           </div>
-          <div class="library-project-actions">
-            <button type="button" class="library-project-btn primary" data-project-action="open">Open Project Folder</button>
-            <button type="button" class="library-project-btn" data-project-action="save">Save Project Folder</button>
-            <button type="button" class="library-project-btn" data-project-action="import">Import Documents</button>
-            <button type="button" class="library-project-btn" data-project-action="history">Refresh History</button>
-          </div>
-          ${snapshotHistory.length ? `
-            <div class="library-project-history">
-              <strong>Recent snapshots</strong>
-              <div class="library-project-history-list">
-                ${snapshotHistory.map((snapshot) => `
-                  <div class="library-project-history-item">
-                    <div class="library-project-history-copy">
-                      <span>${escapeHtml(snapshot.projectName)}</span>
-                      <span>${escapeHtml(snapshot.bookName)} · ${snapshot.cardCount} cards · ${snapshot.highlightCount} highlights</span>
-                    </div>
-                    <button type="button" class="library-project-history-btn" data-project-history-id="${escapeHtml(snapshot.snapshotId)}">Restore</button>
-                  </div>
-                `).join('')}
-              </div>
-            </div>
-          ` : ''}
         </section>
     `;
 
         if (!visibleDocuments.length) {
             fileListElement.innerHTML = `
-            ${projectPanelMarkup}
             <div class="library-empty-state">
               <span class="material-icons-round">upload_file</span>
-              <h3>Your library is empty</h3>
-              <p>Import reading sources or open a saved project folder to get started.</p>
+              <h3>Empty</h3>
+              <p>Import or open</p>
             </div>
         `;
             return;
@@ -134,8 +118,7 @@ export function createFileLibraryRenderer({
         const recoveryMarkup = renderRecoveryWorkbenchMarkup(workbench);
 
         fileListElement.innerHTML = `
-        ${projectPanelMarkup}
-        ${recoveryMarkup}
+        <div class="library-documents">
         ${visibleDocuments.map((file, index) => `
         <div class="file-item ${getCurrentFileId() === file.id ? 'active' : ''} ${file.loaded ? '' : 'disabled'}" 
              data-open-file-id="${escapeHtml(file.id)}"
@@ -144,8 +127,8 @@ export function createFileLibraryRenderer({
              title="${escapeHtml(file.loaded ? file.name : `${file.name} - re-import this source file to relink annotations`)}">
           <span class="material-icons-round file-item-icon">description</span>
           <span class="file-item-body">
-            <span class="text-truncate file-item-name">${escapeHtml(file.name)}</span>
-            <span class="file-item-meta">${describeDocumentStatus(file, index)}</span>
+            <span class="file-item-name text-two-line">${escapeHtml(file.name)}</span>
+            <span class="file-item-meta text-single-line">${escapeHtml(describeDocumentStatus(file, index))}</span>
           </span>
           ${file.loaded ? `
           <span class="file-item-actions">
@@ -162,6 +145,9 @@ export function createFileLibraryRenderer({
           ` : ''}
         </div>
     `).join('')}
+        </div>
+        ${recoveryMarkup}
+        ${projectPanelMarkup}
     `;
     };
 }

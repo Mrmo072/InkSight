@@ -113,8 +113,8 @@ describe('file-library', () => {
 
         renderFileList();
 
-        expect(fileListElement.textContent).toContain('Your library is empty');
-        expect(fileListElement.querySelector('[data-project-action="import"]')).not.toBeNull();
+        expect(fileListElement.textContent).toContain('Empty');
+        expect(fileListElement.querySelector('.library-project-panel')).toBeNull();
     });
 
     it('renders recovery and disabled document states for missing sources', () => {
