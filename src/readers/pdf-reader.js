@@ -362,6 +362,7 @@ export class PDFReader {
         applyReaderSelectionMode({
             container: this.container,
             mode,
+            targetElements: Array.from(this.container.querySelectorAll('.textLayer')),
             nonTextTouchAction: mode === 'pan' ? 'pan-x pan-y pinch-zoom' : 'none'
         });
     }
@@ -811,6 +812,12 @@ export class PDFReader {
                 });
 
                 textLayer.render().then(() => {
+                    applyReaderSelectionMode({
+                        container: this.container,
+                        mode: this.selectionMode,
+                        targetElements: [textLayerDiv],
+                        nonTextTouchAction: this.selectionMode === 'pan' ? 'pan-x pan-y pinch-zoom' : 'none'
+                    });
                     textLayerDiv.addEventListener('mouseup', () => {
                         if (this.selectionMode === 'text') {
                             this.handleSelection(pageInfo.num);

@@ -7,19 +7,21 @@ const logger = createLogger('SelectionSync');
 export function setupSelectionSync({
     findCardById,
     findCardByHighlightId,
+    getCurrentReader,
     isCompactLayout,
     collapseNotesPanel
 }) {
     const handleSelectionSync = (itemId, origin) => {
         logger.debug('Selection sync', { itemId, origin });
 
-        if (origin !== 'highlight' && getAppContext().pdfReader) {
+        const activeReader = getCurrentReader?.() ?? getAppContext().pdfReader;
+        if (origin !== 'highlight' && activeReader?.scrollToHighlight) {
             const highlightId = origin === 'mindmap' || origin === 'annotation'
                 ? findCardById(itemId)?.highlightId
                 : itemId;
 
             if (highlightId) {
-                getAppContext().pdfReader.scrollToHighlight(highlightId);
+                activeReader.scrollToHighlight(highlightId);
             }
         }
 

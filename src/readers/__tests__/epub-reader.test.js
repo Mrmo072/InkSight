@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { highlightManager } from '../../core/highlight-manager.js';
 
 const toolbarInstances = [];
 const epubMockState = {
@@ -7,7 +6,8 @@ const epubMockState = {
     rendition: null,
     contents: [],
     renditionHandlers: {},
-    annotationClickHandlers: new Map()
+    annotationClickHandlers: new Map(),
+    locationFromCfiValue: 0
 };
 
 vi.mock('../pdf-highlight-toolbar.jsx', () => ({
@@ -70,7 +70,7 @@ vi.mock('epubjs', () => ({
             locations: {
                 generate: vi.fn(async () => {}),
                 length: vi.fn(() => 12),
-                locationFromCfi: vi.fn(() => 0),
+                locationFromCfi: vi.fn(() => epubMockState.locationFromCfiValue),
                 percentageFromCfi: vi.fn(() => 0),
                 percentageFromLocation: vi.fn(() => 0)
             },
@@ -91,20 +91,23 @@ vi.mock('epubjs', () => ({
 describe('EpubReader', () => {
     let EpubReader;
     let activeCardSystem;
+    let activeHighlightManager;
 
     beforeEach(async () => {
         vi.resetModules();
         toolbarInstances.length = 0;
-        highlightManager.clearAll();
+        epubMockState.locationFromCfiValue = 0;
         window.inksight = {
             currentBook: { md5: null, name: null, id: null },
             cardSystem: null
         };
 
         ({ EpubReader } = await import('../epub-reader.js'));
+        ({ highlightManager: activeHighlightManager } = await import('../../core/highlight-manager.js'));
         ({ cardSystem: activeCardSystem } = await import('../../core/card-system.js'));
+        activeHighlightManager.clearAll();
         activeCardSystem.clearAll();
-        vi.spyOn(activeCardSystem, 'removeCard').mockImplementation(() => {});
+        vi.spyOn(activeCardSystem, 'deleteCard').mockImplementation(() => {});
         window.inksight.cardSystem = activeCardSystem;
     });
 
@@ -139,6 +142,10 @@ describe('EpubReader', () => {
         const container = document.createElement('div');
         document.body.appendChild(container);
         const reader = new EpubReader(container);
+        const clickEvents = [];
+        window.addEventListener('highlight-clicked', (event) => {
+            clickEvents.push(event.detail);
+        });
 
         await reader.load({
             id: 'book-1',
@@ -164,6 +171,7 @@ describe('EpubReader', () => {
             'card-1'
         );
         expect(reader.selectedHighlightId).toBe('highlight-1');
+        expect(clickEvents).toEqual([{ highlightId: 'highlight-1', cardId: 'card-1' }]);
     });
 
     it('removes annotation visuals and dispatches card removal when deleting a highlight', async () => {
@@ -189,7 +197,7 @@ describe('EpubReader', () => {
         reader.deleteHighlight('highlight-1', 'card-1');
 
         expect(epubMockState.rendition.annotations.remove).toHaveBeenCalledWith('epubcfi(/6/10)', 'highlight');
-        expect(activeCardSystem.removeCard).toHaveBeenCalledWith('card-1');
+        expect(activeCardSystem.deleteCard).toHaveBeenCalledWith('card-1');
         expect(reader.annotations.has('highlight-1')).toBe(false);
         expect(reader.selectedHighlightId).toBeNull();
         expect(toolbarInstances[0].hide).toHaveBeenCalled();
@@ -241,7 +249,7 @@ describe('EpubReader', () => {
             }
         });
 
-        epubMockState.book.locations.locationFromCfi.mockReturnValue(4);
+        epubMockState.locationFromCfiValue = 4;
         epubMockState.rendition.currentLocation.mockReturnValue({
             start: { cfi: 'epubcfi(/6/14)', percentage: 0.33 }
         });
@@ -272,5 +280,110 @@ describe('EpubReader', () => {
             cfi: 'epubcfi(/6/2)',
             location: 1
         }));
+    });
+
+    it('stores a resolved page number when committing an epub highlight selection', async () => {
+        const container = document.createElement('div');
+        document.body.appendChild(container);
+        const reader = new EpubReader(container);
+
+        await reader.load({
+            id: 'book-1',
+            name: 'sample.epub',
+            fileObj: {
+                arrayBuffer: vi.fn().mockResolvedValue(new Uint8Array([0x50, 0x4b, 0x03, 0x04]).buffer)
+            }
+        });
+
+        epubMockState.locationFromCfiValue = 6;
+        const contents = epubMockState.contents[0];
+        reader.commitSelection('epubcfi(/6/18)', contents);
+        await Promise.resolve();
+
+        await Promise.resolve();
+
+        const createdHighlight = activeHighlightManager.highlights.at(-1);
+        expect(createdHighlight.location).toEqual(expect.objectContaining({
+            cfi: 'epubcfi(/6/18)',
+            page: 7
+        }));
+    });
+
+    it('backfills missing page info when restoring epub highlights and uses flash restore flow', async () => {
+        vi.useFakeTimers();
+
+        const container = document.createElement('div');
+        document.body.appendChild(container);
+        const reader = new EpubReader(container);
+
+        activeHighlightManager.upsertHighlight({
+            id: 'highlight-restore',
+            text: 'Restored text',
+            sourceId: 'book-1',
+            location: { cfi: 'epubcfi(/6/22)' },
+            color: '#FFE234'
+        });
+
+        epubMockState.locationFromCfiValue = 2;
+
+        await reader.load({
+            id: 'book-1',
+            name: 'sample.epub',
+            fileObj: {
+                arrayBuffer: vi.fn().mockResolvedValue(new Uint8Array([0x50, 0x4b, 0x03, 0x04]).buffer)
+            }
+        });
+
+        expect(activeHighlightManager.getHighlight('highlight-restore').location.page).toBe(3);
+
+        await reader.scrollToHighlight('highlight-restore');
+
+        expect(epubMockState.rendition.annotations.remove).toHaveBeenCalledWith('epubcfi(/6/22)', 'highlight');
+        expect(epubMockState.rendition.annotations.add).toHaveBeenCalledWith(
+            'highlight',
+            'epubcfi(/6/22)',
+            {},
+            null,
+            'epub-highlight-flash',
+            expect.any(Object)
+        );
+
+        vi.runAllTimers();
+        expect(reader.selectedHighlightId).toBe('highlight-restore');
+
+        vi.useRealTimers();
+    });
+
+    it('does not crash if the reader is destroyed before flash restoration runs', async () => {
+        vi.useFakeTimers();
+
+        const container = document.createElement('div');
+        document.body.appendChild(container);
+        const reader = new EpubReader(container);
+
+        activeHighlightManager.upsertHighlight({
+            id: 'highlight-1',
+            text: 'Selected text',
+            sourceId: 'book-1',
+            location: { cfi: 'epubcfi(/6/10)' },
+            color: '#FFE234'
+        });
+
+        await reader.load({
+            id: 'book-1',
+            name: 'sample.epub',
+            fileObj: {
+                arrayBuffer: vi.fn().mockResolvedValue(new Uint8Array([0x50, 0x4b, 0x03, 0x04]).buffer)
+            }
+        });
+
+        await reader.scrollToHighlight('highlight-1');
+        reader.destroy();
+
+        expect(() => {
+            vi.runAllTimers();
+        }).not.toThrow();
+
+        vi.useRealTimers();
     });
 });

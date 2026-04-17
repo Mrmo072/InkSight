@@ -9,6 +9,7 @@ import {
     createReaderHighlightToolbar,
     deleteSelectedReaderHighlight,
     findCardIdByHighlightId,
+    handleReaderHighlightClick,
     removeHighlightFromStores,
     registerBasicReaderListeners,
     updateHighlightModelColor
@@ -31,7 +32,10 @@ export class EpubReader {
         this.pendingSelection = null;
         this.lastKnownPage = 1;
         this.lastKnownPageCount = 0;
+        this.locationsGenerated = false;
         this.layoutChangePromise = Promise.resolve();
+        this.locationsReadyPromise = null;
+        this.flashRestoreTimeout = null;
         this.touchSelectionScheduler = createTouchSelectionScheduler(
             () => {
                 if (!this.pendingSelection) {
@@ -175,11 +179,6 @@ export class EpubReader {
             });
 
 
-            await this.book.locations.generate(1000);
-
-            this.lastKnownPageCount = this.getPageCount();
-            this.onPageCountChange?.(this.lastKnownPageCount);
-
             // Trigger initial page update
             const currentLocation = this.rendition.currentLocation();
             if (currentLocation && currentLocation.start) {
@@ -188,6 +187,33 @@ export class EpubReader {
 
             // Restore existing highlights
             this.restoreHighlights();
+
+            this.locationsGenerated = false;
+            this.locationsReadyPromise = this.book.locations.generate(1000)
+                .then(() => {
+                    this.locationsGenerated = true;
+                    this.lastKnownPageCount = this.getPageCount();
+                    this.onPageCountChange?.(this.lastKnownPageCount);
+
+                    const latestLocation = this.rendition?.currentLocation?.();
+                    if (latestLocation?.start) {
+                        this.emitPageChange(latestLocation);
+                    }
+
+                    const highlights = highlightManager.getHighlightsBySource(this.fileId);
+                    highlights.forEach((highlight) => {
+                        if (highlight?.location?.cfi && !Number.isFinite(highlight.location.page)) {
+                            const page = this.resolvePageFromCfi(highlight.location.cfi);
+                            if (page) {
+                                highlight.location.page = page;
+                            }
+                        }
+                    });
+                    getAppContext().annotationList?.refresh?.();
+                })
+                .catch((error) => {
+                    console.warn('[EpubReader] Failed to generate EPUB locations:', error);
+                });
 
             return this.book;
         } catch (error) {
@@ -208,9 +234,30 @@ export class EpubReader {
 
         highlights.forEach(h => {
             if (h.location && h.location.cfi) {
+                const page = this.resolvePageFromCfi(h.location.cfi);
+                if (page && h.location.page !== page) {
+                    h.location.page = page;
+                }
                 this.addAnnotation(h.id, h.location.cfi, h.color);
             }
         });
+    }
+
+    resolvePageFromCfi(cfi) {
+        if (!cfi || !this.locationsGenerated) {
+            return null;
+        }
+
+        const rawLocation = this.book?.locations?.locationFromCfi?.(cfi);
+        if (!Number.isFinite(rawLocation)) {
+            return null;
+        }
+
+        const totalPages = this.getPageCount() || this.lastKnownPageCount;
+        const resolved = rawLocation + 1;
+        return totalPages > 0
+            ? Math.min(totalPages, Math.max(1, resolved))
+            : Math.max(1, resolved);
     }
 
     addAnnotation(highlightId, cfiRange, color = '#FFE234') {
@@ -228,18 +275,14 @@ export class EpubReader {
         this.annotations.set(highlightId, cfiRange);
 
         this.rendition.annotations.add('highlight', cfiRange, { id: highlightId }, (e) => {
-
             if (e.stopPropagation) e.stopPropagation();
 
-            this.selectedHighlightId = highlightId;
-
-            // Find card
             const cardId = findCardIdByHighlightId(this.getCardSystem(), highlightId);
-
-
-            // Show toolbar
-            this.toolbar.handleHighlightClick(e, highlightId, cardId);
-
+            handleReaderHighlightClick(this, e, highlightId, cardId, () => {
+                window.dispatchEvent(new CustomEvent('highlight-clicked', {
+                    detail: { highlightId, cardId }
+                }));
+            });
         }, 'epub-highlight', { 'fill': color, 'fill-opacity': '0.3', 'mix-blend-mode': 'multiply' });
     }
 
@@ -326,8 +369,24 @@ export class EpubReader {
 
         const highlight = highlightManager.getHighlight(highlightId);
         if (highlight && highlight.location && highlight.location.cfi) {
+            const page = this.resolvePageFromCfi(highlight.location.cfi);
+            if (page && highlight.location.page !== page) {
+                highlight.location.page = page;
+            }
+
+            if (!this.annotations.has(highlightId)) {
+                this.addAnnotation(highlightId, highlight.location.cfi, highlight.color || this.defaultColor);
+            }
+
+            if (!this.rendition) {
+                return;
+            }
 
             await this.rendition.display(highlight.location.cfi);
+
+            if (!this.rendition?.annotations) {
+                return;
+            }
 
             // Flash effect
             const originalColor = highlight.color || '#FFE234';
@@ -342,9 +401,20 @@ export class EpubReader {
             });
 
             // Restore after delay
-            setTimeout(() => {
+            if (this.flashRestoreTimeout) {
+                clearTimeout(this.flashRestoreTimeout);
+            }
+
+            this.flashRestoreTimeout = setTimeout(() => {
+                if (!this.rendition?.annotations) {
+                    this.flashRestoreTimeout = null;
+                    return;
+                }
+
                 this.rendition.annotations.remove(highlight.location.cfi, 'highlight');
                 this.addAnnotation(highlightId, highlight.location.cfi, originalColor);
+                this.selectedHighlightId = highlightId;
+                this.flashRestoreTimeout = null;
             }, 800);
         } else {
             console.warn('[EpubReader] Highlight not found or missing CFI:', highlightId);
@@ -405,6 +475,10 @@ export class EpubReader {
     }
 
     resolveLocationPage(location) {
+        if (!this.locationsGenerated) {
+            return null;
+        }
+
         const totalPages = this.getPageCount() || this.lastKnownPageCount;
         const rawLocation = location?.start?.location;
         if (Number.isFinite(rawLocation)) {
@@ -428,12 +502,14 @@ export class EpubReader {
             return Math.min(totalPages, Math.max(1, Math.floor(percentage * totalPages) + 1));
         }
 
-        return this.lastKnownPage || 1;
+        return this.lastKnownPage || null;
     }
 
     emitPageChange(location) {
         const page = this.resolveLocationPage(location);
-        this.lastKnownPage = page;
+        if (Number.isFinite(page)) {
+            this.lastKnownPage = page;
+        }
         this.onPageChange?.({
             ...location,
             start: {
@@ -493,9 +569,11 @@ export class EpubReader {
 
         this.book.getRange(cfiRange).then(range => {
             const text = range.toString();
+            const page = this.resolvePageFromCfi(cfiRange);
 
             const highlight = highlightManager.createHighlight(text, {
-                cfi: cfiRange
+                cfi: cfiRange,
+                ...(page ? { page } : {})
             }, this.fileId, 'epub', this.defaultColor);
 
             this.addAnnotation(highlight.id, cfiRange, highlight.color);
@@ -507,6 +585,10 @@ export class EpubReader {
     destroy() {
         this.touchSelectionScheduler?.cancel?.();
         this.pendingSelection = null;
+        if (this.flashRestoreTimeout) {
+            clearTimeout(this.flashRestoreTimeout);
+            this.flashRestoreTimeout = null;
+        }
         this.cleanupListeners?.();
         this.cleanupListeners = null;
         if (this.toolbar) {
@@ -520,6 +602,8 @@ export class EpubReader {
             URL.revokeObjectURL(this.bookUrl);
             this.bookUrl = null;
         }
+        this.locationsGenerated = false;
+        this.locationsReadyPromise = null;
         this.rendition = null;
         this.container.innerHTML = '';
         this.annotations.clear();

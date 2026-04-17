@@ -74,10 +74,12 @@ export class AnnotationList {
         const highlightedCards = cards.map(card => {
             const highlight = highlightMap.get(card.highlightId) ?? null;
             const location = highlight?.location || card.location || null;
+            const lineNum = location?.lineStart || 9999;
             return {
                 card,
                 highlight,
                 pageNum: location?.page || location?.rects?.[0]?.page || 9999, // Sort end if unknown
+                lineNum,
                 y: location?.rects?.[0]?.top || 0
             };
         });
@@ -85,6 +87,7 @@ export class AnnotationList {
         // Sort: Page ASC, then Top Y ASC
         highlightedCards.sort((a, b) => {
             if (a.pageNum !== b.pageNum) return a.pageNum - b.pageNum;
+            if (a.lineNum !== b.lineNum) return a.lineNum - b.lineNum;
             return a.y - b.y;
         });
 
@@ -311,7 +314,14 @@ export class AnnotationList {
 
         const pageSpan = document.createElement('span');
         pageSpan.className = 'page-tag';
-        pageSpan.innerHTML = `<span class="material-icons-round">article</span><span>${pageNum === 9999 ? 'Page ?' : `Page ${pageNum}`}</span>`;
+        const location = highlight?.location || card.location || null;
+        let locationLabel = pageNum === 9999 ? 'Page ?' : `Page ${pageNum}`;
+        if (Number.isFinite(location?.lineStart)) {
+            locationLabel = Number.isFinite(location?.lineEnd) && location.lineEnd > location.lineStart
+                ? `Lines ${location.lineStart}-${location.lineEnd}`
+                : `Line ${location.lineStart}`;
+        }
+        pageSpan.innerHTML = `<span class="material-icons-round">article</span><span>${locationLabel}</span>`;
 
         if (highlight?.color) {
             const dot = document.createElement('span');
@@ -437,7 +447,11 @@ export class AnnotationList {
         delBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             if (confirm('Delete this annotation?')) {
-                this.cardSystem.removeCard(card.id);
+                if (typeof this.cardSystem.deleteCard === 'function') {
+                    this.cardSystem.deleteCard(card.id);
+                } else {
+                    this.cardSystem.removeCard(card.id);
+                }
             }
         });
         actionDanger.appendChild(delBtn);

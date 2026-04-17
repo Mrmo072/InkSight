@@ -39,6 +39,8 @@ function buildLocationOrder(location) {
     }
 
     const page = typeof location.page === 'number' ? location.page : Number.POSITIVE_INFINITY;
+    const lineStart = typeof location.lineStart === 'number' ? location.lineStart : Number.POSITIVE_INFINITY;
+    const lineEnd = typeof location.lineEnd === 'number' ? location.lineEnd : Number.POSITIVE_INFINITY;
     const firstRect = Array.isArray(location.rects) && location.rects.length > 0 ? location.rects[0] : null;
     const rectPage = typeof firstRect?.page === 'number' ? firstRect.page : page;
     const rectTop = typeof firstRect?.top === 'number' ? firstRect.top : Number.POSITIVE_INFINITY;
@@ -46,8 +48,8 @@ function buildLocationOrder(location) {
     const index = typeof location.index === 'number' ? location.index : Number.POSITIVE_INFINITY;
     const cfi = typeof location.cfi === 'string' ? location.cfi : '';
 
-    if (Number.isFinite(rectPage) || Number.isFinite(rectTop) || Number.isFinite(index) || cfi) {
-        return [rectPage, rectTop, rectLeft, index, cfi];
+    if (Number.isFinite(rectPage) || Number.isFinite(rectTop) || Number.isFinite(lineStart) || Number.isFinite(index) || cfi) {
+        return [rectPage, rectTop, rectLeft, lineStart, lineEnd, index, cfi];
     }
 
     return null;
@@ -211,12 +213,24 @@ export const DrawnixBoardComponent = () => {
             }
         };
 
+        const handleCardRemoved = (e) => {
+            const { id } = e.detail;
+            const node = board.children.find(c => c.data?.cardId === id);
+            if (!node) {
+                return;
+            }
+
+            const path = [board.children.indexOf(node)];
+            Transforms.removeNode(board, path);
+        };
+
         const cleanupListeners = registerEventListeners([
             { target: window, event: 'drop', handler: globalDropHandler, options: true },
             { target: window, event: 'dragover', handler: globalDragOverHandler, options: true },
             { target: window, event: 'add-card-to-board', handler: handleAddCardToBoard },
             { target: window, event: 'card-soft-deleted', handler: handleCardSoftDeleted },
-            { target: window, event: 'card-restored', handler: handleCardRestored }
+            { target: window, event: 'card-restored', handler: handleCardRestored },
+            { target: window, event: 'card-removed', handler: handleCardRemoved }
         ]);
 
         return () => {
@@ -343,7 +357,9 @@ export const DrawnixBoardComponent = () => {
         // Add click listener for jump-to-source
         const container = PlaitBoard.getBoardContainer(b);
         const handleBoardClick = () => {
-            dispatchJumpToSourceFromSelection(b, cardSystem);
+            window.requestAnimationFrame(() => {
+                dispatchJumpToSourceFromSelection(b, cardSystem);
+            });
         };
         container.addEventListener('click', handleBoardClick);
         b.__inksightCleanup = () => {

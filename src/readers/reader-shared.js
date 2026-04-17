@@ -60,7 +60,11 @@ export function clearSelectedHighlightState(reader, highlightId = reader.selecte
 
 export function removeHighlightFromStores(cardSystem, highlightId, cardId) {
     if (cardId && cardSystem) {
-        cardSystem.removeCard(cardId);
+        if (typeof cardSystem.deleteCard === 'function') {
+            cardSystem.deleteCard(cardId);
+        } else {
+            cardSystem.removeCard(cardId);
+        }
         return;
     }
 
@@ -148,6 +152,7 @@ export function registerBasicReaderListeners(reader, { onCardDeleted }) {
     reader.cleanupListeners = registerEventListeners([
         { target: window, event: 'mindmap-node-updated', handler: reader.handleMindmapNodeUpdated },
         { target: window, event: 'card-soft-deleted', handler: reader.handleCardDeleted },
+        { target: window, event: 'card-removed', handler: reader.handleCardDeleted },
         { target: document, event: 'keydown', handler: reader.handleKeyDown }
     ]);
 }

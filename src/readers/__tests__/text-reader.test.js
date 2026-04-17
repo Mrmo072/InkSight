@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { highlightManager } from '../../core/highlight-manager.js';
 
 const toolbarInstances = [];
 
@@ -15,11 +14,11 @@ vi.mock('../pdf-highlight-toolbar.jsx', () => ({
 
 describe('TextReader', () => {
     let TextReader;
+    let activeHighlightManager;
 
     beforeEach(async () => {
         vi.resetModules();
         toolbarInstances.length = 0;
-        highlightManager.clearAll();
         window.inksight = {
             currentBook: { md5: null, name: null, id: null },
             cardSystem: {
@@ -28,6 +27,8 @@ describe('TextReader', () => {
             }
         };
 
+        ({ highlightManager: activeHighlightManager } = await import('../../core/highlight-manager.js'));
+        activeHighlightManager.clearAll();
         ({ TextReader } = await import('../text-reader.js'));
     });
 
@@ -98,7 +99,7 @@ describe('TextReader', () => {
             }
         });
 
-        const highlight = highlightManager.createHighlight('hello', { index: 0, length: 5 }, 'doc-1', 'text', '#FFE234');
+        const highlight = activeHighlightManager.createHighlight('hello', { index: 0, length: 5 }, 'doc-1', 'text', '#FFE234');
         window.inksight.cardSystem.cards.set('card-1', {
             id: 'card-1',
             highlightId: highlight.id
@@ -127,11 +128,42 @@ describe('TextReader', () => {
             }
         });
 
-        const highlight = highlightManager.createHighlight('world', { index: 6, length: 5 }, 'doc-1', 'text', '#FFE234');
+        const highlight = activeHighlightManager.createHighlight('world', { index: 6, length: 5 }, 'doc-1', 'text', '#FFE234');
         reader.restoreHighlightVisual(highlight);
 
         expect(reader.content.querySelector(`[data-highlight-id="${highlight.id}"]`)?.textContent).toBe('world');
         expect(highlight.needsValidation).toBe(false);
+    });
+
+    it('stores line numbers for plain text highlights and backfills them on restore', async () => {
+        const container = document.createElement('div');
+        document.body.appendChild(container);
+        const reader = new TextReader(container);
+
+        await reader.load({
+            id: 'doc-1',
+            name: 'notes.txt',
+            type: 'text/plain',
+            fileObj: {
+                text: vi.fn().mockResolvedValue('alpha\nbeta\ngamma')
+            }
+        });
+
+        const location = reader.buildTextLocation(6, 4);
+        expect(location).toEqual(expect.objectContaining({
+            index: 6,
+            length: 4,
+            lineStart: 2,
+            lineEnd: 2
+        }));
+
+        const highlight = activeHighlightManager.createHighlight('beta', { index: 6, length: 4 }, 'doc-1', 'text', '#FFE234');
+        reader.restoreHighlightVisual(highlight);
+
+        expect(highlight.location).toEqual(expect.objectContaining({
+            lineStart: 2,
+            lineEnd: 2
+        }));
     });
 
     it('tracks and restores scroll location', async () => {

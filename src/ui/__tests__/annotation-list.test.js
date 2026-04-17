@@ -70,4 +70,18 @@ describe('annotation-list', () => {
         expect(cardSystem.updateCard).toHaveBeenCalledWith('card-1', { isOnBoard: true });
         expect(cardSystem.updateCard).toHaveBeenCalledWith('card-2', { isOnBoard: true });
     });
+
+    it('renders line-based labels for text highlights', () => {
+        highlightManager.highlights = [
+            { id: 'hl-1', sourceId: 'doc-1', text: 'Alpha', location: { lineStart: 8, lineEnd: 8 } },
+            { id: 'hl-2', sourceId: 'doc-1', text: 'Beta', location: { lineStart: 12, lineEnd: 14 } }
+        ];
+
+        const list = new AnnotationList('annotation-list', cardSystem);
+        list.load('doc-1');
+
+        const labels = Array.from(document.querySelectorAll('.page-tag')).map((node) => node.textContent);
+        expect(labels[0]).toContain('Line 8');
+        expect(labels[1]).toContain('Lines 12-14');
+    });
 });

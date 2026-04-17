@@ -789,6 +789,7 @@ function setupMainEventListeners() {
         selectionSync: {
             findCardById,
             findCardByHighlightId,
+            getCurrentReader: () => currentReader,
             isCompactLayout,
             collapseNotesPanel: () => {
                 splitView?.setRightCollapsed(true);

@@ -57,6 +57,7 @@ describe('CardSystem', () => {
 
         expect(card.type).toBe('image');
         expect(card.highlightId).toBeTruthy();
+        expect(card.isOnBoard).toBe(false);
         expect(highlightManager.getHighlight(card.highlightId)).toEqual(expect.objectContaining({
             sourceId: 'doc-1',
             type: 'ellipse',
@@ -81,6 +82,29 @@ describe('CardSystem', () => {
 
         window.removeEventListener('request-save', saveListener);
         window.removeEventListener('card-soft-deleted', deletedListener);
+    });
+
+    it('hard deletes cards, removes linked highlights, and prunes connections', () => {
+        const removedListener = vi.fn();
+        window.addEventListener('card-removed', removedListener);
+
+        highlightManager.highlights = [{ id: 'h-1', sourceId: 'doc-1' }];
+        cardSystem.cards.set('c-1', { id: 'c-1', highlightId: 'h-1', sourceId: 'doc-1' });
+        cardSystem.cards.set('c-2', { id: 'c-2', sourceId: 'doc-1' });
+        cardSystem.connections = [
+            { id: 'link-1', sourceId: 'c-1', targetId: 'c-2' }
+        ];
+
+        cardSystem.deleteCard('c-1');
+
+        expect(cardSystem.cards.has('c-1')).toBe(false);
+        expect(cardSystem.connections).toEqual([]);
+        expect(highlightManager.getHighlight('h-1')).toBeUndefined();
+        expect(removedListener).toHaveBeenCalledWith(expect.objectContaining({
+            detail: expect.objectContaining({ id: 'c-1', highlightId: 'h-1', hardDeleted: true })
+        }));
+
+        window.removeEventListener('card-removed', removedListener);
     });
 
     it('cleans up deleted cards, orphan connections, and linked highlights before persisting', () => {

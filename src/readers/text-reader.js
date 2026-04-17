@@ -97,6 +97,29 @@ export class TextReader {
         return range;
     }
 
+    buildTextLocation(startIndex, length) {
+        const location = {
+            index: startIndex,
+            length
+        };
+
+        if (!this.content || !Number.isFinite(startIndex) || !Number.isFinite(length) || length <= 0) {
+            return location;
+        }
+
+        const textContent = this.content.textContent || '';
+        const safeStart = Math.max(0, Math.min(startIndex, textContent.length));
+        const safeEnd = Math.max(safeStart, Math.min(startIndex + length, textContent.length));
+        const beforeSelection = textContent.slice(0, safeStart);
+        const selectedText = textContent.slice(safeStart, safeEnd);
+        const lineStart = beforeSelection.split('\n').length;
+        const lineBreakCount = (selectedText.match(/\n/g) || []).length;
+
+        location.lineStart = lineStart;
+        location.lineEnd = lineStart + lineBreakCount;
+        return location;
+    }
+
     async load(fileData) {
         try {
             this.fileId = fileData.id;
@@ -201,6 +224,16 @@ export class TextReader {
         }
 
         highlight.needsValidation = restoredWithFallback;
+        if ((!Number.isFinite(highlight.location?.lineStart) || !Number.isFinite(highlight.location?.lineEnd))
+            && Number.isFinite(highlight.location?.index)) {
+            highlight.location = {
+                ...highlight.location,
+                ...this.buildTextLocation(
+                    highlight.location.index,
+                    highlight.location.length || textToFind.length
+                )
+            };
+        }
 
         try {
             const span = document.createElement('span');
@@ -247,10 +280,13 @@ export class TextReader {
 
                 selection.removeAllRanges();
 
-                const highlight = highlightManager.createHighlight(text, {
-                    index: start,
-                    length: text.length
-                }, this.fileId, 'text', this.defaultColor);
+                const highlight = highlightManager.createHighlight(
+                    text,
+                    this.buildTextLocation(start, text.length),
+                    this.fileId,
+                    'text',
+                    this.defaultColor
+                );
 
                 span.dataset.highlightId = highlight.id;
 
@@ -265,10 +301,13 @@ export class TextReader {
 
             } catch (err) {
                 console.warn('[TextReader] Could not visually highlight selection:', err);
-                highlightManager.createHighlight(text, {
-                    index: start,
-                    length: text.length
-                }, this.fileId, 'text', this.defaultColor);
+                highlightManager.createHighlight(
+                    text,
+                    this.buildTextLocation(start, text.length),
+                    this.fileId,
+                    'text',
+                    this.defaultColor
+                );
             }
         }
     }

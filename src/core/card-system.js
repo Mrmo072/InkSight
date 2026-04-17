@@ -73,7 +73,8 @@ export class CardSystem {
             highlightType: type,
             position: { x: 100, y: 100 },
             createdAt: new Date().toISOString(),
-            color: color // Store color
+            color: color, // Store color
+            isOnBoard: false
         };
 
         this.addCard(card);
@@ -123,6 +124,29 @@ export class CardSystem {
     removeCard(id) {
 
         this.markCardAsDeleted(id, true);
+    }
+
+    deleteCard(id) {
+        const card = this.cards.get(id);
+        if (!card) {
+            console.warn('[CardSystem] deleteCard called with unknown ID:', id);
+            return;
+        }
+
+        this.cards.delete(id);
+        this.connections = this.connections.filter((connection) =>
+            connection.sourceId !== id && connection.targetId !== id
+        );
+        this.save();
+
+        window.dispatchEvent(new CustomEvent('card-removed', {
+            detail: {
+                id,
+                highlightId: card.highlightId,
+                deleted: true,
+                hardDeleted: true
+            }
+        }));
     }
 
     addConnection(sourceId, targetId) {

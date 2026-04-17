@@ -168,17 +168,26 @@ describe('PDFReader', () => {
         const container = document.createElement('div');
         document.body.appendChild(container);
         const reader = new PDFReader(container);
+        const textLayer = document.createElement('div');
+        textLayer.className = 'textLayer';
+        container.appendChild(textLayer);
 
         reader.setSelectionMode('highlighter');
         expect(areaSelectorInstances[0].setSelectionMode).toHaveBeenCalledWith('highlighter');
         expect(highlighterToolInstances[0].setIsActive).toHaveBeenLastCalledWith(true);
         expect(highlighterToolInstances[0].setColor).toHaveBeenCalled();
         expect(container.style.cursor).toBe('default');
+        expect(textLayer.style.userSelect).toBe('none');
+
+        reader.setSelectionMode('text');
+        expect(textLayer.style.userSelect).toBe('text');
+        expect(container.classList.contains('disable-selection')).toBe(false);
 
         reader.setSelectionMode('pan');
         expect(areaSelectorInstances[0].setSelectionMode).toHaveBeenCalledWith('pan');
         expect(highlighterToolInstances[0].setIsActive).toHaveBeenLastCalledWith(false);
         expect(container.style.cursor).toBe('grab');
+        expect(textLayer.style.userSelect).toBe('none');
     });
 
     it('routes highlight clicks through the toolbar and emits highlight-clicked', () => {

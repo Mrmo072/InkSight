@@ -205,7 +205,9 @@ export async function bundleProjectData({
 
     for (const card of bundledPayload.cards || []) {
         if (card?.type === 'image' && typeof card.imageData === 'string') {
-            card.imageData = await registerAsset(card.imageData, `card-${card.id}`, 'image/png');
+            const projectAssetPath = await registerAsset(card.imageData, `card-${card.id}`, 'image/png');
+            card.projectAssetPath = projectAssetPath;
+            card.imageData = projectAssetPath;
         }
     }
 
@@ -301,6 +303,9 @@ export async function hydrateProjectData({
 
     for (const card of payload.cards || []) {
         if (card?.type === 'image' && typeof card.imageData === 'string') {
+            if (card.imageData.startsWith(`${PROJECT_ASSETS_DIR}/`) && !card.projectAssetPath) {
+                card.projectAssetPath = card.imageData;
+            }
             card.imageData = await materializeAsset(card.imageData);
         }
     }

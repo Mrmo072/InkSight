@@ -7,12 +7,17 @@ function sanitizeFileNameSegment(value, fallback = 'workspace') {
     return collapsed || fallback;
 }
 
+function stripDocumentExtension(value) {
+    const normalized = String(value || '').trim();
+    return normalized.replace(/\.(pdf|epub|md|markdown|txt)$/i, '');
+}
+
 function getCardsCollection(cardSystem) {
     if (cardSystem?.cards instanceof Map) {
-        return Array.from(cardSystem.cards.values());
+        return Array.from(cardSystem.cards.values()).filter((card) => !card?.deleted);
     }
 
-    return Object.values(cardSystem?.cards || {});
+    return Object.values(cardSystem?.cards || {}).filter((card) => !card?.deleted);
 }
 
 function getDocumentsCollection(appContext) {
@@ -30,6 +35,12 @@ function formatLocation(highlight = {}) {
     if (Number.isFinite(location.page)) {
         return `Page ${location.page}`;
     }
+    if (Number.isFinite(location.lineStart)) {
+        if (Number.isFinite(location.lineEnd) && location.lineEnd > location.lineStart) {
+            return `Lines ${location.lineStart}-${location.lineEnd}`;
+        }
+        return `Line ${location.lineStart}`;
+    }
     if (location.cfi) {
         return `CFI ${location.cfi}`;
     }
@@ -39,10 +50,66 @@ function formatLocation(highlight = {}) {
     return 'Location unavailable';
 }
 
+function getUnsavedImageCards(appContext) {
+    return getCardsCollection(appContext.cardSystem).filter((card) => (
+        card?.type === 'image' &&
+        typeof card.imageData === 'string' &&
+        card.imageData &&
+        !(typeof card.projectAssetPath === 'string' && card.projectAssetPath)
+    ));
+}
+
 function deriveCardTitle(card) {
+    if (card?.type === 'image') {
+        const shapeLabel = card.highlightType === 'ellipse' ? 'Ellipse capture' : 'Rectangle capture';
+        const pageLabel = Number.isFinite(card.location?.page) ? ` (Page ${card.location.page})` : '';
+        const sourceLabel = stripDocumentExtension(card.sourceName || '');
+        return sourceLabel
+            ? `${shapeLabel}${pageLabel} - ${sourceLabel}`
+            : `${shapeLabel}${pageLabel}`;
+    }
+
     const source = String(card.note || card.content || 'Untitled card').trim();
     const firstLine = source.split(/\r?\n/, 1)[0].trim();
     return firstLine.length > 72 ? `${firstLine.slice(0, 69)}...` : firstLine;
+}
+
+function isCitationCard(card) {
+    return Boolean(card?.highlightId && card?.sourceName && card?.content?.trim());
+}
+
+function getCitationSummaryLines(card, indent = '') {
+    const quote = card.content.trim();
+    const sourceName = stripDocumentExtension(card.sourceName);
+    const lines = [
+        `${indent}- ${quote}`,
+        `${indent}  --《${sourceName}》`
+    ];
+
+    if (card.note?.trim()) {
+        lines.push(`${indent}  - Note: ${card.note.trim()}`);
+    }
+
+    return lines;
+}
+
+function getImageCardLines(card, indent = '') {
+    const lines = [`${indent}- ${deriveCardTitle(card)}`];
+
+    if (typeof card.projectAssetPath === 'string' && card.projectAssetPath) {
+        lines.push(`${indent}  ![](.\/${card.projectAssetPath})`);
+        lines.push(`${indent}  - Image link works when this Markdown file is placed in the project root folder.`);
+    } else {
+        lines.push(`${indent}  - Image omitted from Markdown export to keep the file compact.`);
+    }
+    if (card.note?.trim()) {
+        lines.push(`${indent}  - Note: ${card.note.trim()}`);
+    }
+    if (card.sourceName) {
+        lines.push(`${indent}  - Source: ${stripDocumentExtension(card.sourceName)}`);
+    }
+
+    return lines;
 }
 
 function buildGraphData(cards, connections = []) {
@@ -74,16 +141,22 @@ function renderCardTree(card, cardMap, adjacency, depth = 0, visited = new Set()
     visited.add(card.id);
     const lines = [];
     const indent = '  '.repeat(depth);
-    lines.push(`${indent}- ${deriveCardTitle(card)}`);
+    if (isCitationCard(card)) {
+        lines.push(...getCitationSummaryLines(card, indent));
+    } else if (card?.type === 'image') {
+        lines.push(...getImageCardLines(card, indent));
+    } else {
+        lines.push(`${indent}- ${deriveCardTitle(card)}`);
 
-    if (card.content && card.content.trim() && card.content.trim() !== deriveCardTitle(card)) {
-        lines.push(`${indent}  - Excerpt: ${card.content.trim()}`);
-    }
-    if (card.note?.trim()) {
-        lines.push(`${indent}  - Note: ${card.note.trim()}`);
-    }
-    if (card.sourceName) {
-        lines.push(`${indent}  - Source: ${card.sourceName}`);
+        if (card.content && card.content.trim() && card.content.trim() !== deriveCardTitle(card)) {
+            lines.push(`${indent}  - Excerpt: ${card.content.trim()}`);
+        }
+        if (card.note?.trim()) {
+            lines.push(`${indent}  - Note: ${card.note.trim()}`);
+        }
+        if (card.sourceName) {
+            lines.push(`${indent}  - Source: ${card.sourceName}`);
+        }
     }
 
     (adjacency.get(card.id) || []).forEach((childId) => {
@@ -99,18 +172,23 @@ function renderCardTree(card, cardMap, adjacency, depth = 0, visited = new Set()
 function buildCitationEntries(appContext = getAppContext()) {
     const cards = getCardsCollection(appContext.cardSystem);
     const cardsByHighlightId = new Map(cards.filter((card) => card.highlightId).map((card) => [card.highlightId, card]));
+    const activeHighlightIds = new Set(cards.map((card) => card.highlightId).filter(Boolean));
 
-    return (appContext.highlightManager?.highlights || []).map((highlight) => {
+    return (appContext.highlightManager?.highlights || [])
+        .filter((highlight) => activeHighlightIds.has(highlight.id))
+        .map((highlight) => {
         const linkedCard = cardsByHighlightId.get(highlight.id) || null;
         return {
             id: highlight.id,
-            text: highlight.text || '',
-            sourceName: highlight.sourceName || appContext.documentManager?.getDocumentInfo?.(highlight.sourceId)?.name || 'Unknown source',
+            text: (highlight.text || linkedCard?.content || '').trim(),
+            sourceName: stripDocumentExtension(
+                highlight.sourceName || appContext.documentManager?.getDocumentInfo?.(highlight.sourceId)?.name || 'Unknown source'
+            ),
             locationLabel: formatLocation(highlight),
             cardTitle: linkedCard ? deriveCardTitle(linkedCard) : null,
             needsValidation: Boolean(highlight.needsValidation)
         };
-    });
+        });
 }
 
 export function buildMarkdownOutline(appContext = getAppContext()) {
@@ -136,15 +214,21 @@ export function buildMarkdownOutline(appContext = getAppContext()) {
     if (unresolvedLoose.length) {
         lines.push('', '## Loose Cards', '');
         unresolvedLoose.forEach((card) => {
-            lines.push(`- ${deriveCardTitle(card)}`);
-            if (card.content?.trim()) {
-                lines.push(`  - Excerpt: ${card.content.trim()}`);
-            }
-            if (card.note?.trim()) {
-                lines.push(`  - Note: ${card.note.trim()}`);
-            }
-            if (card.sourceName) {
-                lines.push(`  - Source: ${card.sourceName}`);
+            if (isCitationCard(card)) {
+                lines.push(...getCitationSummaryLines(card));
+            } else if (card?.type === 'image') {
+                lines.push(...getImageCardLines(card));
+            } else {
+                lines.push(`- ${deriveCardTitle(card)}`);
+                if (card.content?.trim()) {
+                    lines.push(`  - Excerpt: ${card.content.trim()}`);
+                }
+                if (card.note?.trim()) {
+                    lines.push(`  - Note: ${card.note.trim()}`);
+                }
+                if (card.sourceName) {
+                    lines.push(`  - Source: ${card.sourceName}`);
+                }
             }
         });
     }
@@ -163,17 +247,14 @@ export function buildCitationList(appContext = getAppContext()) {
 
     entries.forEach((entry, index) => {
         lines.push(`${index + 1}. ${entry.text || '[Empty highlight]'}`);
-        lines.push(`   - Source: ${entry.sourceName}`);
-        lines.push(`   - Location: ${entry.locationLabel}`);
-        if (entry.cardTitle) {
-            lines.push(`   - Linked card: ${entry.cardTitle}`);
-        }
+        lines.push(`   --《${entry.sourceName}》`);
         if (entry.needsValidation) {
-            lines.push(`   - Status: Needs validation`);
+            lines.push(`   - Status: Needs validation (${entry.locationLabel})`);
         }
+        lines.push('');
     });
 
-    return lines.join('\n');
+    return lines.join('\n').trimEnd();
 }
 
 export function buildReadingNotesPackage(appContext = getAppContext()) {
@@ -201,12 +282,18 @@ export function buildReadingNotesPackage(appContext = getAppContext()) {
     lines.push('', buildMarkdownOutline(appContext), '', buildCitationList(appContext), '', '## Unmapped Notes', '');
     if (unmappedCards.length) {
         unmappedCards.forEach((card) => {
-            lines.push(`- ${deriveCardTitle(card)}`);
-            if (card.note?.trim()) {
-                lines.push(`  - Note: ${card.note.trim()}`);
-            }
-            if (card.sourceName) {
-                lines.push(`  - Source: ${card.sourceName}`);
+            if (isCitationCard(card)) {
+                lines.push(...getCitationSummaryLines(card));
+            } else if (card?.type === 'image') {
+                lines.push(...getImageCardLines(card));
+            } else {
+                lines.push(`- ${deriveCardTitle(card)}`);
+                if (card.note?.trim()) {
+                    lines.push(`  - Note: ${card.note.trim()}`);
+                }
+                if (card.sourceName) {
+                    lines.push(`  - Source: ${card.sourceName}`);
+                }
             }
         });
     } else {
@@ -273,6 +360,16 @@ export function exportWorkspaceArtifact({
 
     const artifact = artifactBuilders[type];
     if (!artifact) {
+        return false;
+    }
+
+    const unsavedImageCards = getUnsavedImageCards(appContext);
+    if (unsavedImageCards.length) {
+        notify?.({
+            title: 'Save Project Before Export',
+            message: 'This Markdown export includes image cards that have not been saved into the project folder yet. Save the project first, then export again.',
+            level: 'warning'
+        });
         return false;
     }
 

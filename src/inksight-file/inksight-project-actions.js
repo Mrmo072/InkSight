@@ -19,6 +19,30 @@ function summarizePayload(payload) {
     return { elements, cards, highlights, documents };
 }
 
+function syncSavedImageCardPaths(appContext, payload) {
+    const cardEntries = Array.isArray(payload?.cards) ? payload.cards : [];
+    const savedCards = cardEntries.length > 0 && Array.isArray(cardEntries[0])
+        ? cardEntries.map(([, card]) => card)
+        : cardEntries;
+
+    const savedPathByCardId = new Map(
+        savedCards
+            .filter((card) => card?.type === 'image' && typeof card.projectAssetPath === 'string')
+            .map((card) => [card.id, card.projectAssetPath])
+    );
+
+    if (!savedPathByCardId.size || !(appContext.cardSystem?.cards instanceof Map)) {
+        return;
+    }
+
+    for (const [cardId, assetPath] of savedPathByCardId.entries()) {
+        const card = appContext.cardSystem.cards.get(cardId);
+        if (card) {
+            card.projectAssetPath = assetPath;
+        }
+    }
+}
+
 export async function saveCurrentProject(board, options = {}) {
     const appContext = getAppContext();
     const fileName = getBaseBookName(appContext.currentBook?.name) || undefined;
@@ -64,6 +88,8 @@ export async function saveCurrentProject(board, options = {}) {
     if (!payload) {
         return null;
     }
+
+    syncSavedImageCardPaths(appContext, payload);
 
     const summary = summarizePayload(payload);
     if (notify) {
