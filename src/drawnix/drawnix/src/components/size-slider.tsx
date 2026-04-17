@@ -89,6 +89,15 @@ export const SizeSlider: React.FC<SliderProps> = ({
     document.addEventListener('pointerup', handleMouseUp);
   }, [handleSliderChange]);
 
+  const updateValue = useCallback(
+    (nextValue: number) => {
+      const clampedValue = Math.min(max, Math.max(min, nextValue));
+      setValue(clampedValue);
+      onChange && onChange(clampedValue);
+    },
+    [max, min, onChange]
+  );
+
   let percentage = ((value - min) / (max - min)) * 100;
   if (percentage >= 100 - thumbPercentageRef.current) {
     percentage = 100 - thumbPercentageRef.current;
@@ -106,6 +115,12 @@ export const SizeSlider: React.FC<SliderProps> = ({
       <div
         ref={sliderRef}
         className="slider-track"
+        role="slider"
+        tabIndex={disabled ? -1 : 0}
+        aria-valuemin={min}
+        aria-valuemax={max}
+        aria-valuenow={value}
+        aria-valuetext={title || String(value)}
         onClick={(event) => {
           if (disabled || isDragging) {
             return;
@@ -119,6 +134,45 @@ export const SizeSlider: React.FC<SliderProps> = ({
           }
           beforeStart && beforeStart();
           handlePointerDown();
+        }}
+        onKeyDown={(event) => {
+          if (disabled) {
+            return;
+          }
+
+          const isHandledKey =
+            event.key === 'ArrowLeft' ||
+            event.key === 'ArrowDown' ||
+            event.key === 'ArrowRight' ||
+            event.key === 'ArrowUp' ||
+            event.key === 'Home' ||
+            event.key === 'End';
+
+          if (!isHandledKey) {
+            return;
+          }
+
+          event.preventDefault();
+          event.stopPropagation();
+
+          let nextValue = value;
+
+          if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
+            nextValue = value - step;
+          }
+          if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
+            nextValue = value + step;
+          }
+          if (event.key === 'Home') {
+            nextValue = min;
+          }
+          if (event.key === 'End') {
+            nextValue = max;
+          }
+
+          if (nextValue !== value) {
+            updateValue(nextValue);
+          }
         }}
       >
         <div

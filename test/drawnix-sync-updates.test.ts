@@ -1,3 +1,5 @@
+import { fireEvent, render } from '@testing-library/react';
+import React from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 const boardToImage = vi.fn();
@@ -29,6 +31,7 @@ vi.mock('../src/drawnix/drawnix/src/utils/color', () => ({
 vi.mock('@plait/core', () => ({
   DEFAULT_COLOR: '#000000',
   getSelectedElements,
+  toFixed: (value: number) => Number(value.toFixed(2)),
   ThemeColorMode: {
     default: 'default',
   },
@@ -197,5 +200,31 @@ describe('Drawnix synced updates', () => {
     await Promise.resolve();
 
     expect(saveCurrentProject).toHaveBeenCalledWith(board);
+  });
+
+  it('stops handled slider keyboard events from bubbling', async () => {
+    const onChange = vi.fn();
+    const parentKeyDown = vi.fn();
+    const { SizeSlider } = await import('../src/drawnix/drawnix/src/components/size-slider.tsx');
+
+    const { getByRole } = render(
+      React.createElement(
+        'div',
+        { onKeyDown: parentKeyDown },
+        React.createElement(SizeSlider, {
+          min: 0,
+          max: 100,
+          step: 5,
+          defaultValue: 50,
+          onChange,
+        })
+      )
+    );
+
+    const slider = getByRole('slider');
+    fireEvent.keyDown(slider, { key: 'ArrowRight' });
+
+    expect(onChange).toHaveBeenCalledWith(55);
+    expect(parentKeyDown).not.toHaveBeenCalled();
   });
 });
