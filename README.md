@@ -4,7 +4,7 @@
 > A modern Web application integrating deep reading, mind mapping, and knowledge management.
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.0-green.svg)](https://github.com/Mrmo072/InkSight/releases)
+[![Version](https://img.shields.io/badge/version-0.1.0-green.svg)](https://github.com/MrmoLabs/InkSight/releases)
 
 [中文](./README_ZH.md) | **English**
 
@@ -24,7 +24,7 @@ InkSight aims to solve the pain point of separation between "reading" and "think
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/Mrmo072/inksight.git
+git clone https://github.com/MrmoLabs/InkSight.git
 
 # 2. Enter the directory
 cd inksight
@@ -80,14 +80,5 @@ npm run dist:win
 
 - **[Drawnix](https://github.com/plait-board/drawnix)**: The core whiteboard engine of InkSight is built upon Drawnix. Special thanks to the Plait Board team for their excellent work.
 
-## ☕ Support
-
-If you find InkSight helpful, please consider buying me a coffee to support the development!
-
-<div align="center">
-  <img src="./docs/images/wechat.png" alt="WeChat Pay" width="200" style="margin-right: 20px;" />
-  <img src="./docs/images/Alipay.png" alt="Alipay" width="200" />
-</div>
-
 ---
-*Created by the Mrmo072.*
+*Created by MrmoLabs.*

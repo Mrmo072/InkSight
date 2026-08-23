@@ -189,7 +189,7 @@ export const Socials = () => {
   return (
     <MenuItemLink
       icon={GithubIcon}
-      href="https://github.com/Mrmo072/InkSight"
+      href="https://github.com/MrmoLabs/InkSight"
       aria-label="GitHub"
     >
       GitHub

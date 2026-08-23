@@ -7,7 +7,7 @@
 > 一个集成了深度阅读、思维导图与知识管理的现代化 Web 应用。
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.0-green.svg)](https://github.com/Mrmo072/InkSight/releases)
+[![Version](https://img.shields.io/badge/version-0.1.0-green.svg)](https://github.com/MrmoLabs/InkSight/releases)
 
 ## 📖 简介 (Introduction)
 
@@ -25,7 +25,7 @@ InkSight 旨在解决传统阅读工具“读”与“思”分离的痛点。�
 
 ```bash
 # 1. 克隆项目
-git clone https://github.com/Mrmo072/inksight.git
+git clone https://github.com/MrmoLabs/InkSight.git
 
 # 2. 进入目录
 cd inksight
@@ -81,14 +81,5 @@ npm run dist:win
 
 - **[Drawnix](https://github.com/plait-board/drawnix)**: InkSight 的核心白板引擎基于 Drawnix 构建。特别感谢 Plait Board 团队的杰出工作。
 
-## ☕ 请我喝杯咖啡 (Buy me a coffee)
-
-如果 InkSight 对你有帮助，欢迎请我喝杯咖啡，支持项目的持续开发！
-
-<div align="center">
-  <img src="./docs/images/wechat.png" alt="WeChat Pay" width="200" style="margin-right: 20px;" />
-  <img src="./docs/images/Alipay.png" alt="Alipay" width="200" />
-</div>
-
 ---
-*Created by the Mrmo072.*
+*Created by MrmoLabs.*
