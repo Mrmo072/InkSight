@@ -239,7 +239,9 @@ export class PDFHighlightRenderer {
                 : borderColor.replace('rgb', 'rgba').replace(')', ', 0.1)');
         }
 
-        borderDiv.style.zIndex = '5';
+        // Above the text layer (z-index 10) so text spans don't swallow
+        // clicks aimed at this border - same level as text overlays/hitboxes.
+        borderDiv.style.zIndex = '100';
         borderDiv.dataset.highlightId = highlight.id;
 
         this.attachHighlightInteraction(borderDiv, highlight.id, cardId);

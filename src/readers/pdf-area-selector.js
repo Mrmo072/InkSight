@@ -231,7 +231,10 @@ export class PDFAreaSelector {
                 borderDiv.style.backgroundColor = this.color.startsWith('#') ? this.color + '1A' : this.color.replace(')', ', 0.1)').replace('rgb', 'rgba');
                 borderDiv.style.pointerEvents = 'auto'; // Enable interactions
                 borderDiv.style.cursor = 'pointer';
-                borderDiv.style.zIndex = '5';
+                // Above the text layer (z-index 10) so text spans don't
+                // swallow clicks aimed at this border — same level as the
+                // text highlight overlays and highlighter hitboxes.
+                borderDiv.style.zIndex = '100';
                 borderDiv.style.borderRadius = this.selectionMode === 'ellipse' ? '50%' : '4px';
                 borderDiv.dataset.highlightId = card.highlightId;
 

@@ -63,6 +63,11 @@ export class PDFHighlightToolbar {
         // So setting top to (y - 12) gives a 12px gap.
         toolbar.style.top = `${y - 12}px`;
         toolbar.style.transform = 'translate(-50%, -100%)';
+        // The `drawnix` class pulls in the canvas stylesheet's `.drawnix { height: 100% }`,
+        // which stretches the toolbar over the whole viewer so the -100% translateY
+        // pushes it above the viewport. Pin it to content size.
+        toolbar.style.height = 'auto';
+        toolbar.style.display = 'flex';
 
         // Prevent mousedown from bubbling to document (prevents auto-close)
         toolbar.addEventListener('mousedown', (e) => e.stopPropagation());
