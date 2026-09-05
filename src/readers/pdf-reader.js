@@ -53,6 +53,7 @@ export class PDFReader {
     static currentSelectionMode = 'pan';
 
     constructor(container) {
+        this.destroyed = false;
         this.container = container;
         // Make container focusable to receive keyboard events
         this.container.setAttribute('tabindex', '0');
@@ -598,6 +599,7 @@ export class PDFReader {
         }
 
         const { pageStack, pages } = await this.createPageStack();
+        if (this.destroyed) return;
         this.pageStack = pageStack;
         this.pages.length = 0;
         this.pages.push(...pages);
@@ -625,6 +627,7 @@ export class PDFReader {
         const pages = [];
         for (let num = 1; num <= this.pdfDoc.numPages; num++) {
             const page = await this.pdfDoc.getPage(num);
+            if (this.destroyed) return { pageStack, pages };
             const viewport = page.getViewport({ scale: this.scale });
             const wrapper = createPageWrapper(num, viewport);
 
@@ -756,6 +759,7 @@ export class PDFReader {
             transform: [devicePixelRatio, 0, 0, devicePixelRatio, 0, 0]
         };
 
+        if (this.destroyed) return Promise.resolve();
         pageInfo.wrapper.appendChild(canvas);
 
         // Setup tool listeners on wrapper
@@ -1043,6 +1047,9 @@ export class PDFReader {
      * Clean up all event listeners and resources
      */
     destroy() {
+        // Block in-flight async render callbacks from touching the DOM
+        // after teardown (they used to re-append page stacks).
+        this.destroyed = true;
 
         if (this.zoomFeedbackTimeout) {
             clearTimeout(this.zoomFeedbackTimeout);

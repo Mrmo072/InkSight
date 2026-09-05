@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Drawnix } from '@drawnix/drawnix';
-import { Transforms, PlaitBoard } from '@plait/core';
+import { Transforms, PlaitBoard,
+    BoardTransforms
+} from '@plait/core';
 import { getAppContext, setAppService } from '../app/app-context.js';
 import { registerEventListeners } from '../app/event-listeners.js';
 import { cardSystem } from '../core/card-system.js';
+import { sanitizeViewport } from './drawnix-board-state.js';
 import { themeManager } from '../core/theme-manager.js';
 import { createLogger } from '../core/logger.js';
 import { openProjectFile } from '../inksight-file/inksight-project-actions.js';
@@ -429,6 +432,37 @@ export const DrawnixBoardComponent = () => {
         e.stopPropagation();
     };
 
+    // Sync the app-level theme (top-bar switcher) into the board canvas
+    useEffect(() => {
+        const appThemeToBoard = {
+            'default': 'default',
+            'colorful': 'colorful',
+            'soft': 'soft',
+            'retro': 'retro',
+            'dark': 'dark',
+            'starry': 'starry'
+        };
+        const applyAppTheme = (themeName) => {
+            const board = boardRef.current;
+            if (!board) return;
+            const mode = appThemeToBoard[themeName] || 'default';
+            if (board.theme?.themeColorMode === mode) return;
+            try {
+                BoardTransforms.updateThemeColor(board, mode);
+            } catch (e) {
+                logger.warn('Failed to sync app theme to board', e);
+            }
+        };
+        const onBoardReady = () => applyAppTheme(themeManager.getTheme());
+        window.addEventListener(APP_EVENTS.BOARD_READY, onBoardReady);
+        applyAppTheme(themeManager.getTheme());
+        const unsubscribe = themeManager.subscribe(applyAppTheme);
+        return () => {
+            unsubscribe();
+            window.removeEventListener(APP_EVENTS.BOARD_READY, onBoardReady);
+        };
+    }, []);
+
     // Auto-Restore Listener
     useEffect(() => {
         const handleRestore = (e) => {
@@ -437,7 +471,10 @@ export const DrawnixBoardComponent = () => {
                 logger.debug('Restoring board state from event');
                 setValue(data.elements);
                 if (data.viewport) {
-                    setViewport(data.viewport);
+                    const safeViewport = sanitizeViewport(data.viewport);
+                    if (safeViewport) {
+                        setViewport(safeViewport);
+                    }
                 }
                 if (data.theme && boardRef.current) {
                     boardRef.current.theme = data.theme;

@@ -2,6 +2,7 @@ import { getAppContext } from '../app/app-context.js';
 import { registerEventListeners } from '../app/event-listeners.js';
 import { createLogger } from '../core/logger.js';
 import { APP_EVENTS } from '../core/event-names.js';
+import { modalManager } from './modal-manager.js';
 
 const logger = createLogger('AnnotationList');
 
@@ -447,13 +448,19 @@ export class AnnotationList {
         delBtn.setAttribute('aria-label', 'Delete annotation');
         delBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (confirm('Delete this annotation?')) {
+            void modalManager.confirm({
+                title: 'Delete Annotation',
+                message: 'Delete this annotation? The linked mind map card will be removed as well.',
+                confirmLabel: 'Delete',
+                danger: true
+            }).then((confirmed) => {
+                if (!confirmed) return;
                 if (typeof this.cardSystem.deleteCard === 'function') {
                     this.cardSystem.deleteCard(card.id);
                 } else {
                     this.cardSystem.removeCard(card.id);
                 }
-            }
+            });
         });
         actionDanger.appendChild(delBtn);
 

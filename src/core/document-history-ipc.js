@@ -1,4 +1,5 @@
 import { createLogger } from './logger.js';
+import { createIdbFallbackIpc } from './document-history-idb.js';
 
 const logger = createLogger('DocumentHistoryIPC');
 
@@ -33,25 +34,33 @@ export function resolveDocumentHistoryIpc() {
 
         if (window.require) {
             const electron = window.require('electron');
-            logger.debug('IPC initialized via window.require (wrapped)');
-            return createWrappedIpcRenderer(electron.ipcRenderer);
+            const wrapped = createWrappedIpcRenderer(electron?.ipcRenderer);
+            if (wrapped) {
+                logger.debug('IPC initialized via window.require (wrapped)');
+                return wrapped;
+            }
         }
 
         if (typeof require !== 'undefined') {
             try {
                 const electron = require('electron');
-                logger.debug('IPC initialized via global require (wrapped)');
-                return createWrappedIpcRenderer(electron.ipcRenderer);
+                const wrapped = createWrappedIpcRenderer(electron?.ipcRenderer);
+                if (wrapped) {
+                    logger.debug('IPC initialized via global require (wrapped)');
+                    return wrapped;
+                }
+                logger.warn('global require loaded electron without ipcRenderer');
             } catch (err) {
                 logger.warn('global require found but failed to load electron', err);
-                return null;
             }
         }
 
-        logger.warn('IPC not available. Auto-save disabled. (Retries may occur)');
-        return null;
+        // No Electron bridge: fall back to IndexedDB so the pure-browser
+        // build still persists auto-saves, snapshots and MD5 recovery data.
+        logger.debug('IPC not available. Using IndexedDB persistence fallback.');
+        return createIdbFallbackIpc();
     } catch (error) {
         logger.error('Failed to init IPC', error);
-        return null;
+        return createIdbFallbackIpc();
     }
 }

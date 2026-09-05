@@ -154,7 +154,8 @@ describe('project-workspace', () => {
             savedAt: '2026-04-16T10:20:00.000Z',
             snapshotId: 'snapshot-1'
         });
-        window.confirm = vi.fn(() => true);
+        const { modalManager } = await import('../../ui/modal-manager.js');
+        vi.spyOn(modalManager, 'confirm').mockResolvedValue(true);
         const controller = createController();
 
         await controller.refreshProjectSnapshotHistory();

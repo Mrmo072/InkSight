@@ -1,4 +1,5 @@
 import { VERSIONS } from '../drawnix/drawnix/src/constants.ts';
+import { sanitizeViewport } from '../mindmap/drawnix-board-state.js';
 import { isInksightPayload } from './inksight-file-types.js';
 
 export function buildInksightPersistenceSnapshot(appContext = {}) {
@@ -35,7 +36,7 @@ export function buildInksightFilePayload({ appContext = {}, board, lastPage } = 
         version: VERSIONS.drawnix,
         source: 'web',
         elements: board?.children || [],
-        viewport: board?.viewport || { zoom: 1 },
+        viewport: sanitizeViewport(board?.viewport) || { zoom: 1 },
         theme: board?.theme,
         ...buildInksightPersistenceSnapshot(appContext),
         ...(lastPage ? { lastPage } : {})

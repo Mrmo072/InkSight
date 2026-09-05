@@ -56,6 +56,134 @@ export class ModalManager {
         this.show();
     }
 
+    /**
+     * In-app replacement for window.confirm. Resolves true only when the
+     * confirm button is pressed; cancel, backdrop click and Escape all
+     * resolve false.
+     */
+    confirm({ title = '', message = '', confirmLabel = 'Confirm', cancelLabel = 'Cancel', danger = false } = {}) {
+        return new Promise((resolve) => {
+            this.body.innerHTML = '';
+
+            if (title) {
+                const heading = document.createElement('h3');
+                heading.className = 'modal-title';
+                heading.textContent = title;
+                this.body.appendChild(heading);
+            }
+
+            if (message) {
+                const text = document.createElement('p');
+                text.className = 'modal-message';
+                text.textContent = message;
+                this.body.appendChild(text);
+            }
+
+            const actions = document.createElement('div');
+            actions.className = 'modal-actions';
+
+            const cancelBtn = document.createElement('button');
+            cancelBtn.type = 'button';
+            cancelBtn.className = 'modal-btn';
+            cancelBtn.textContent = cancelLabel;
+
+            const confirmBtn = document.createElement('button');
+            confirmBtn.type = 'button';
+            confirmBtn.className = `modal-btn modal-btn-primary${danger ? ' danger' : ''}`;
+            confirmBtn.textContent = confirmLabel;
+
+            actions.appendChild(cancelBtn);
+            actions.appendChild(confirmBtn);
+            this.body.appendChild(actions);
+
+            let settled = false;
+            const finish = (value) => {
+                if (settled) return;
+                settled = true;
+                this._confirmFinish = null;
+                resolve(value);
+                this.hide();
+            };
+
+            cancelBtn.onclick = () => finish(false);
+            confirmBtn.onclick = () => finish(true);
+            this._confirmFinish = finish;
+
+            this.show();
+            confirmBtn.focus();
+        });
+    }
+
+    /**
+     * Single-line text input dialog. Resolves the trimmed input (possibly an
+     * empty string) on confirm, or null on cancel.
+     */
+    prompt({ title = '', message = '', placeholder = '', initialValue = '', confirmLabel = 'OK', cancelLabel = 'Cancel' } = {}) {
+        return new Promise((resolve) => {
+            this.body.innerHTML = '';
+
+            if (title) {
+                const heading = document.createElement('h3');
+                heading.className = 'modal-title';
+                heading.textContent = title;
+                this.body.appendChild(heading);
+            }
+
+            if (message) {
+                const text = document.createElement('p');
+                text.className = 'modal-message';
+                text.textContent = message;
+                this.body.appendChild(text);
+            }
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'modal-input';
+            input.placeholder = placeholder;
+            input.value = initialValue || '';
+
+            const actions = document.createElement('div');
+            actions.className = 'modal-actions';
+
+            const cancelBtn = document.createElement('button');
+            cancelBtn.type = 'button';
+            cancelBtn.className = 'modal-btn';
+            cancelBtn.textContent = cancelLabel;
+
+            const confirmBtn = document.createElement('button');
+            confirmBtn.type = 'button';
+            confirmBtn.className = 'modal-btn modal-btn-primary';
+            confirmBtn.textContent = confirmLabel;
+
+            actions.appendChild(cancelBtn);
+            actions.appendChild(confirmBtn);
+            this.body.appendChild(input);
+            this.body.appendChild(actions);
+
+            let settled = false;
+            const finish = (value) => {
+                if (settled) return;
+                settled = true;
+                this._confirmFinish = null;
+                resolve(value);
+                this.hide();
+            };
+
+            cancelBtn.onclick = () => finish(null);
+            confirmBtn.onclick = () => finish(input.value.trim());
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    finish(input.value.trim());
+                }
+            });
+            this._confirmFinish = finish;
+
+            this.show();
+            input.focus();
+        });
+    }
+
     show() {
         this.isVisible = true;
         this.overlay.classList.add('active');
@@ -64,6 +192,11 @@ export class ModalManager {
     hide() {
         this.isVisible = false;
         this.overlay.classList.remove('active');
+        if (this._confirmFinish) {
+            const finish = this._confirmFinish;
+            this._confirmFinish = null;
+            finish(false);
+        }
     }
 }
 

@@ -408,6 +408,7 @@ ipcMain.handle('save-runtime-project', async (event, payload = {}) => {
             sessionId,
             projectId,
             projectName,
+            note: payload.note || null,
             savedAt: new Date().toISOString(),
             assetCount: assetEntries.length,
             documentCount: documentEntries.length

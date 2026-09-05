@@ -1,4 +1,5 @@
 import { emitAppNotification } from '../ui/app-notifications.js';
+import { modalManager } from '../ui/modal-manager.js';
 import { getAppContext, setAppService, updateCurrentBook } from './app-context.js';
 import { chooseDocumentTarget } from './document-relink.js';
 import { buildDocumentRemovalPrompt, reorderFilesById } from './file-list-helpers.js';
@@ -294,12 +295,12 @@ export function createWorkspaceDocumentsController({
         const appContext = getAppContext();
         const { cardCount, highlightCount, referenceCount } = getDocumentReferenceDetails(fileId);
         const isCurrentDocument = appContext.currentBook?.id === fileId;
-        const confirmed = window.confirm(buildDocumentRemovalPrompt({
-            name: fileToRemove.name,
-            cardCount,
-            highlightCount,
-            isCurrentDocument
-        }));
+        const confirmed = await modalManager.confirm({
+            title: 'Remove Document',
+            message: buildDocumentRemovalPrompt({ name: fileToRemove.name, cardCount, highlightCount, isCurrentDocument }),
+            confirmLabel: 'Remove',
+            danger: true
+        });
 
         if (!confirmed) {
             return;
@@ -307,11 +308,10 @@ export function createWorkspaceDocumentsController({
 
         const [removedFile] = workspace.state.files.splice(fileIndex, 1);
 
-        if (referenceCount > 0 || isCurrentDocument) {
-            appContext.documentManager?.markDocumentLoaded?.(fileId, false);
-        } else {
-            appContext.documentManager?.unregisterDocument?.(fileId);
-        }
+        // Always unregister so the library list drops the entry immediately.
+        // Keeping it registered would render an undeletable "Missing" ghost
+        // item; linked cards/highlights stay intact and show as missing links.
+        appContext.documentManager?.unregisterDocument?.(fileId);
 
         if (workspace.state.currentFile?.id === fileId) {
             const fallbackFile = workspace.state.files[fileIndex] || workspace.state.files[fileIndex - 1] || null;

@@ -48,6 +48,7 @@ export async function saveRuntimeProjectSnapshot({
     projectFiles = [],
     runtimeIdentity = {},
     projectName,
+    note,
     lastPage
 } = {}) {
     const ipc = resolveDocumentHistoryIpc();
@@ -64,6 +65,7 @@ export async function saveRuntimeProjectSnapshot({
     const result = await ipc.saveRuntimeProject({
         ...runtimeIdentity,
         projectName: projectName || appContext.currentBook?.name || 'workspace',
+        note: note || null,
         manifest,
         assetEntries: await serializeBinaryEntries(assetEntries, 'blob'),
         documentEntries: await serializeBinaryEntries(documentEntries, 'file')

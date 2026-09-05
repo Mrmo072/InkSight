@@ -1654,3 +1654,31 @@ span.material-icons-round.project-home-card-icon {
   width: 40px;
   height: 40px;
 }
+
+/* Empty mind map canvas guidance — rendered via ::after so it survives
+   React/Plait managing the container's DOM. */
+.mindmap-container.mindmap-empty::after {
+  content: "Start your mind map\A Double-click the canvas to create a node\A or drag a highlight in from the document.";
+  white-space: pre-line;
+  max-width: min(90%, 360px);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 22px 30px;
+  border-radius: 16px;
+  border: 1px dashed var(--surface-border-strong);
+  background: var(--surface-soft);
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.7;
+  font-weight: 600;
+  color: var(--text-muted);
+  pointer-events: none;
+  z-index: 3;
+  opacity: 0.9;
+}

@@ -7,11 +7,20 @@ class ThemeManager {
     constructor() {
         this.currentTheme = 'default'; // default, colorful, soft, retro, dark, starry
         this.listeners = new Set();
+        this.STORAGE_KEY = 'inksight:theme';
         this.init();
     }
 
     init() {
-        // Set initial theme on document
+        // Restore the persisted choice so the toolbar select stays in sync.
+        try {
+            const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(this.STORAGE_KEY) : null;
+            if (stored && stored !== this.currentTheme) {
+                this.currentTheme = stored;
+            }
+        } catch {
+            // localStorage unavailable (private mode) — keep default.
+        }
         document.documentElement.dataset.theme = this.currentTheme;
     }
 
@@ -20,6 +29,12 @@ class ThemeManager {
 
         this.currentTheme = themeName;
         document.documentElement.dataset.theme = themeName;
+
+        try {
+            localStorage.setItem(this.STORAGE_KEY, themeName);
+        } catch {
+            // Ignore persistence failures — the session theme still applies.
+        }
 
         // Notify all listeners
         this.listeners.forEach(fn => fn(themeName));

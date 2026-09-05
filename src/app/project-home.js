@@ -106,7 +106,7 @@ export function renderProjectHome(model = {}) {
                     <span class="material-icons-round project-home-list-icon">restore</span>
                     <span class="project-home-list-copy">
                       <span class="text-two-line">${escapeHtml(snapshot.projectName || 'Workspace snapshot')}</span>
-                      <span class="text-two-line">${escapeHtml(snapshot.bookName || 'Workspace')} · ${formatTimestamp(Date.parse(snapshot.savedAt || 0))}</span>
+                      <span class="text-two-line">${escapeHtml(snapshot.note ? `${snapshot.note} · ` : '')}${escapeHtml(snapshot.bookName || 'Workspace')} · ${formatTimestamp(Date.parse(snapshot.savedAt || 0))}</span>
                     </span>
                     <span class="material-icons-round project-home-list-arrow">arrow_forward</span>
                   </button>

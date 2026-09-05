@@ -89,6 +89,8 @@ export function createWorkspaceEventListeners({
                         void projectWorkspace.promptOpenProject();
                     } else if (action === 'save-project') {
                         void projectWorkspace.promptSaveProject();
+                    } else if (action === 'snapshot') {
+                        void projectWorkspace.createProjectSnapshot();
                     } else if (action === 'export-notes') {
                         projectWorkspace.promptExportArtifact('notes-package');
                     }
@@ -165,7 +167,9 @@ export function createWorkspaceEventListeners({
                     event.stopPropagation();
                     const action = projectActionButton.getAttribute('data-project-action');
 
-                    if (action === 'open') {
+                    if (action === 'snapshot') {
+                        void projectWorkspace.createProjectSnapshot();
+                    } else if (action === 'open') {
                         void projectWorkspace.promptOpenProject();
                     } else if (action === 'save') {
                         void projectWorkspace.promptSaveProject();

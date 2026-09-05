@@ -79,9 +79,14 @@ describe('document-history-ipc', () => {
         expect(invoke).toHaveBeenCalledWith('load-file', 'Recovered.inksight');
     });
 
-    it('returns null when no IPC bridge is available', async () => {
+    it('falls back to the IndexedDB adapter when no IPC bridge is available', async () => {
         const { resolveDocumentHistoryIpc } = await import('../document-history-ipc.js');
+        const ipc = resolveDocumentHistoryIpc();
 
-        expect(resolveDocumentHistoryIpc()).toBeNull();
+        expect(ipc).not.toBeNull();
+        expect(ipc.storageType).toBe('indexeddb');
+        for (const method of ['saveFile', 'loadFile', 'ensureSaveDir', 'findSaveByMd5', 'getRuntimeStorageInfo', 'saveRuntimeProject', 'listRuntimeProjectSnapshots', 'loadRuntimeProject']) {
+            expect(typeof ipc[method]).toBe('function');
+        }
     });
 });

@@ -2369,3 +2369,80 @@ body.compact-layout .annotation-item {
     display: flex;
   }
 }
+
+/* Confirm dialog (ModalManager.confirm) */
+.modal-title {
+  margin: 0 24px 10px 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.modal-message {
+  margin: 0 0 16px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.modal-btn {
+  min-height: 34px;
+  padding: 0 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-main);
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.modal-btn:hover {
+  background: var(--bg-tertiary);
+}
+
+.modal-btn-primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.modal-btn-primary:hover {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+}
+
+.modal-btn-primary.danger {
+  background: #dc2626;
+  border-color: #dc2626;
+}
+
+.modal-btn-primary.danger:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+}
+
+.modal-input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 36px;
+  margin-bottom: 14px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-main);
+  color: var(--text-main);
+  font-size: 13px;
+}
+
+.modal-input:focus {
+  outline: none;
+  border-color: var(--primary);
+}

@@ -1,5 +1,6 @@
 import { cardSystem } from '../core/card-system.js';
 import { createLogger } from '../core/logger.js';
+import { emitAppNotification } from '../ui/app-notifications.js';
 
 const logger = createLogger('PDFAreaSelector');
 
@@ -177,6 +178,15 @@ export class PDFAreaSelector {
 
         // Ignore clicks or tiny drags (must be at least 20px in each dimension AND 30px euclidean distance)
         if (isNaN(width) || isNaN(height) || width < 20 || height < 20 || dragDistance < 30) {
+            // Deliberate drags that fall short deserve feedback; pure
+            // mis-clicks (tiny overall movement) stay silent.
+            if (dragDistance >= 10) {
+                emitAppNotification({
+                    message: 'Selection too small — drag a larger rectangle to capture an area.',
+                    level: 'info',
+                    duration: 2200
+                });
+            }
             return;
         }
 

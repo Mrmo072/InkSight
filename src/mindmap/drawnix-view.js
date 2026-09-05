@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { DrawnixBoardComponent } from './DrawnixBoard.jsx';
+import { mountCanvasEmptyHint } from './canvas-empty-hint.js';
 
 export class DrawnixView {
     constructor(container) {
@@ -17,5 +18,7 @@ export class DrawnixView {
 
         const root = createRoot(this.container);
         root.render(React.createElement(DrawnixBoardComponent));
+
+        mountCanvasEmptyHint(this.container);
     }
 }

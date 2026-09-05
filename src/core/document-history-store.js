@@ -15,7 +15,13 @@ export function loadDocumentHistory(storage = localStorage, key = DOCUMENT_HISTO
 }
 
 export function saveDocumentHistory(history, storage = localStorage, key = DOCUMENT_HISTORY_STORAGE_KEY) {
-    storage.setItem(key, JSON.stringify(history));
+    try {
+        storage.setItem(key, JSON.stringify(history));
+    } catch (error) {
+        // Quota errors must not crash the autosave loop — history is a small
+        // index; the heavy payloads live in the runtime snapshot storage.
+        console.error('[DocumentHistoryManager] Failed to persist history', error);
+    }
 }
 
 function ensureHistoryEntry(history, md5) {

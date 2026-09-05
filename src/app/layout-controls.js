@@ -1,4 +1,5 @@
 import { registerEventListeners } from './event-listeners.js';
+import { themeManager } from '../core/theme-manager.js';
 
 export function setupLayoutToggles({
     elements,
@@ -94,6 +95,18 @@ export function setupLayoutToggles({
                     splitView?.toggleLeft();
                     setWorkspaceMode('reading');
                 }
+            }
+        ]));
+    }
+
+    const themeSelect = document.getElementById('app-theme-select');
+    if (themeSelect) {
+        themeSelect.value = themeManager.getTheme();
+        registerCleanup(registerEventListeners([
+            {
+                target: themeSelect,
+                event: 'change',
+                handler: () => themeManager.setTheme(themeSelect.value)
             }
         ]));
     }

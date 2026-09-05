@@ -96,6 +96,7 @@ export function createFileLibraryRenderer({
           </div>
           <div class="library-project-actions icon-row">
             ${latestSnapshot ? `<button type="button" class="library-project-btn icon-only-btn" data-project-history-id="${escapeHtml(latestSnapshot.snapshotId)}" title="Restore Latest Snapshot" aria-label="Restore Latest Snapshot"><span class="material-icons-round">restore</span></button>` : ''}
+            <button type="button" class="library-project-btn primary icon-only-btn" data-project-action="snapshot" title="Save Snapshot" aria-label="Save Snapshot"><span class="material-icons-round">bookmark_add</span></button>
             <button type="button" class="library-project-btn primary icon-only-btn" data-project-action="open" title="Open Project Folder" aria-label="Open Project Folder"><span class="material-icons-round">folder_open</span></button>
             <button type="button" class="library-project-btn icon-only-btn" data-project-action="save" title="Save Project Folder" aria-label="Save Project Folder"><span class="material-icons-round">save</span></button>
             <button type="button" class="library-project-btn icon-only-btn" data-project-action="import" title="Import Documents" aria-label="Import Documents"><span class="material-icons-round">library_add</span></button>

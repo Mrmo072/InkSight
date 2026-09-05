@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createWorkspaceDocumentsController } from '../workspace-documents.js';
+import { modalManager } from '../../ui/modal-manager.js';
 
 describe('workspace-documents', () => {
     let state;
@@ -27,7 +28,7 @@ describe('workspace-documents', () => {
         `;
         localStorage.clear();
         sessionStorage.clear();
-        window.confirm = vi.fn(() => true);
+        vi.spyOn(modalManager, 'confirm').mockResolvedValue(true);
 
         state = {
             files: [],
@@ -150,11 +151,11 @@ describe('workspace-documents', () => {
 
         expect(state.files.map((file) => file.id)).toEqual(['b']);
         expect(readerLoader.loadReaderForFile).toHaveBeenCalledWith(expect.objectContaining({ id: 'b' }));
-        expect(appContext.documentManager.markDocumentLoaded).toHaveBeenCalledWith('a', false);
+        expect(appContext.documentManager.unregisterDocument).toHaveBeenCalledWith('a');
     });
 
     it('does not remove a file when the confirmation is cancelled', async () => {
-        window.confirm = vi.fn(() => false);
+        modalManager.confirm.mockResolvedValue(false);
         const controller = createController();
         state.files = [{ id: 'a', name: 'A.pdf', type: 'application/pdf' }];
 

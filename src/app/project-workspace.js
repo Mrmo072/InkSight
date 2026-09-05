@@ -25,6 +25,7 @@ import { loadRuntimeProjectSnapshot, saveRuntimeProjectSnapshot } from '../inksi
 import { listRecentProjects, recordRecentProject } from './recent-projects.js';
 import { exportWorkspaceArtifact } from './workspace-export.js';
 import { APP_EVENTS } from '../core/event-names.js';
+import { modalManager } from '../ui/modal-manager.js';
 
 const logger = createLogger('ProjectWorkspace');
 
@@ -199,7 +200,7 @@ export function createProjectWorkspaceController({
         }, Math.max(1, projectStatusState.intervalMinutes) * 60 * 1000);
     }
 
-    async function persistRuntimeProjectSnapshot() {
+    async function persistRuntimeProjectSnapshot({ note = null } = {}) {
         const appContext = getAppContext();
         const board = appContext.board;
         if (!board) {
@@ -212,16 +213,21 @@ export function createProjectWorkspaceController({
             appContext,
             projectFiles: appContext.getProjectFiles?.() ?? [],
             runtimeIdentity,
-            projectName: appContext.currentBook?.name || 'workspace'
+            projectName: appContext.currentBook?.name || 'workspace',
+            note: note || null
         });
 
         if (!result?.success) {
             return false;
         }
 
-        localStorage.setItem(PROJECT_AUTOSAVE_SNAPSHOT_KEY, JSON.stringify({
-            savedAt: Date.now()
-        }));
+        try {
+            localStorage.setItem(PROJECT_AUTOSAVE_SNAPSHOT_KEY, JSON.stringify({
+                savedAt: Date.now()
+            }));
+        } catch (error) {
+            console.warn('[project-workspace] Failed to persist autosave meta', error);
+        }
         await recordProjectSnapshot({
             snapshotId: result.snapshotId,
             savedAt: result.savedAt,
@@ -314,7 +320,12 @@ export function createProjectWorkspaceController({
     async function restoreProjectHistorySnapshot(snapshotId) {
         const runtimeIdentity = ensureProjectIdentity();
         const snapshot = projectStatusState.snapshotHistory.find((entry) => entry.snapshotId === snapshotId);
-        const confirmed = window.confirm(`Restore snapshot from ${formatAutosaveTime(Date.parse(snapshot?.savedAt || Date.now()))}?`);
+        const confirmed = await modalManager.confirm({
+            title: 'Restore Snapshot',
+            message: `Restore the workspace snapshot from ${formatAutosaveTime(Date.parse(snapshot?.savedAt || Date.now()))}? The current unsaved state will be replaced.`,
+            confirmLabel: 'Restore',
+            danger: true
+        });
         if (!confirmed) {
             return false;
         }
@@ -339,7 +350,7 @@ export function createProjectWorkspaceController({
         });
     }
 
-    async function performProjectAutosave({ notify = false, forceExport = false } = {}) {
+    async function performProjectAutosave({ notify = false, forceExport = false, snapshotNote = null } = {}) {
         if (isProjectAutosaveRunning) {
             return false;
         }
@@ -384,12 +395,12 @@ export function createProjectWorkspaceController({
                 return true;
             }
 
-            showSaveStatus('saving', 'Saving workspace to server...', 0);
-            const saved = await persistRuntimeProjectSnapshot();
+            showSaveStatus('saving', 'Saving workspace snapshot...', 0);
+            const saved = await persistRuntimeProjectSnapshot({ note: snapshotNote || 'Auto snapshot' });
             if (saved) {
                 projectStatusState.lastSavedAt = Date.now();
                 projectStatusState.lastMode = 'Server workspace';
-                showSaveStatus('success', `Saved to server workspace at ${formatAutosaveTime(projectStatusState.lastSavedAt)}.`);
+                showSaveStatus('success', `Workspace snapshot saved at ${formatAutosaveTime(projectStatusState.lastSavedAt)}.`);
 
                 if (notify) {
                     emitAppNotification({
@@ -441,6 +452,31 @@ export function createProjectWorkspaceController({
             message: 'Project loading is not ready yet. Please wait for the workspace board to finish initializing.',
             level: 'warning'
         });
+    }
+
+    async function createProjectSnapshot() {
+        const board = getAppContext().board;
+        if (!board) {
+            emitAppNotification({
+                title: 'Snapshot',
+                message: 'Please wait for the workspace board to finish initializing before saving a snapshot.',
+                level: 'warning'
+            });
+            return false;
+        }
+
+        const note = await modalManager.prompt({
+            title: 'Save Snapshot',
+            message: 'Add an optional note so you can recognise this snapshot later.',
+            placeholder: 'e.g. before restructuring the map',
+            confirmLabel: 'Save Snapshot'
+        });
+        if (note === null) {
+            return false;
+        }
+
+        const saved = await performProjectAutosave({ notify: true, snapshotNote: note || 'Manual snapshot' });
+        return Boolean(saved);
     }
 
     async function promptSaveProject() {
@@ -517,6 +553,7 @@ export function createProjectWorkspaceController({
         restartProjectAutosave,
         restoreRuntimeWorkspace,
         performProjectAutosave,
+        createProjectSnapshot,
         applyProjectAutosavePrefs,
         promptOpenProject,
         promptProjectHistory,
