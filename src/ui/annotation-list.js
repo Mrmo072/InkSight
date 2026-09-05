@@ -340,18 +340,40 @@ export class AnnotationList {
 
         const statusTag = document.createElement('span');
         statusTag.className = 'annotation-status-tag';
+        // Icon-only status: the meaning travels via title/aria-label.
+        const statusIcon = document.createElement('span');
+        statusIcon.className = 'material-icons-round';
         if (this.getMissingSourceIds().has(card.sourceId)) {
-            statusTag.textContent = 'Missing link';
+            statusIcon.textContent = 'link_off';
+            statusTag.title = 'Missing link — re-import the source to relink';
         } else if (card.isOnBoard === false) {
-            statusTag.textContent = 'To map';
+            statusIcon.textContent = 'account_tree';
+            statusTag.title = 'Not on map yet';
         } else {
-            statusTag.textContent = 'On map';
+            statusIcon.textContent = 'check_circle';
+            statusTag.title = 'On map';
         }
+        statusTag.appendChild(statusIcon);
+        statusTag.setAttribute('role', 'img');
+        statusTag.setAttribute('aria-label', statusTag.title);
         headerMeta.appendChild(statusTag);
         header.appendChild(headerMeta);
 
         const headerActions = document.createElement('div');
         headerActions.className = 'annotation-header-actions';
+
+        const sourceToggleBtn = document.createElement('button');
+        sourceToggleBtn.className = 'action-btn annotation-source-toggle';
+        sourceToggleBtn.innerHTML = '<span class="material-icons-round">description</span>';
+        sourceToggleBtn.title = 'Show source document';
+        sourceToggleBtn.setAttribute('aria-label', 'Show source document');
+        sourceToggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const shown = div.classList.toggle('show-source');
+            sourceToggleBtn.classList.toggle('active', shown);
+            sourceToggleBtn.title = shown ? 'Hide source document' : 'Show source document';
+        });
+        headerActions.appendChild(sourceToggleBtn);
 
         const selectBtn = document.createElement('button');
         selectBtn.className = 'action-btn basket-btn annotation-select-btn';
@@ -381,6 +403,8 @@ export class AnnotationList {
             <span class="material-icons-round annotation-source-icon">description</span>
             <span>${card.sourceName || 'Unknown source'}</span>
         `;
+        // Hidden by default; the header source button reveals it so the card
+        // stays compact — most of the time the name is redundant context.
         div.appendChild(sourceMeta);
 
         // Quote (Content)
@@ -403,33 +427,37 @@ export class AnnotationList {
         }
         div.appendChild(quote);
 
-        // Note Input
-        const input = document.createElement('textarea');
-        input.className = 'annotation-note-input';
-        input.placeholder = 'Add a note...';
-        input.value = card.note || '';
-        input.rows = 1;
+        // Note area: cards without a note stay compact — a slim "add note"
+        // icon button sits in the action row and swaps in the textarea on
+        // demand, so empty notes never cost vertical space.
+        const buildNoteInput = () => {
+            const input = document.createElement('textarea');
+            input.className = 'annotation-note-input';
+            input.placeholder = 'Add a note...';
+            input.value = card.note || '';
+            input.rows = 1;
 
-        // Auto-resize
-        const autoResize = () => {
-            input.style.height = 'auto';
-            input.style.height = input.scrollHeight + 'px';
+            const autoResize = () => {
+                input.style.height = 'auto';
+                input.style.height = input.scrollHeight + 'px';
+            };
+            setTimeout(autoResize, 0);
+
+            input.addEventListener('click', (e) => e.stopPropagation());
+            input.addEventListener('input', autoResize);
+            input.addEventListener('change', (e) => {
+                this.cardSystem.updateCard(card.id, { note: e.target.value });
+            });
+            return input;
         };
-        // Initial resize
-        setTimeout(autoResize, 0);
 
-        // Stop propagation of click to prevent jump when just editing note
-        input.addEventListener('click', (e) => e.stopPropagation());
-
-        input.addEventListener('input', autoResize);
-
-        input.addEventListener('change', (e) => {
-            this.cardSystem.updateCard(card.id, { note: e.target.value });
-        });
-        const noteWrap = document.createElement('div');
-        noteWrap.className = 'annotation-note-wrap';
-        noteWrap.appendChild(input);
-        div.appendChild(noteWrap);
+        let noteWrap = null;
+        if (card.note) {
+            noteWrap = document.createElement('div');
+            noteWrap.className = 'annotation-note-wrap';
+            noteWrap.appendChild(buildNoteInput());
+            div.appendChild(noteWrap);
+        }
 
         // Actions (Delete)
         const actions = document.createElement('div');
@@ -437,6 +465,25 @@ export class AnnotationList {
 
         const actionMain = document.createElement('div');
         actionMain.className = 'annotation-actions-main';
+
+        if (!card.note) {
+            const addNoteBtn = document.createElement('button');
+            addNoteBtn.className = 'action-btn add-note-btn';
+            addNoteBtn.innerHTML = '<span class="material-icons-round">note_add</span>';
+            addNoteBtn.title = 'Add note';
+            addNoteBtn.setAttribute('aria-label', 'Add note');
+            addNoteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const input = buildNoteInput();
+                noteWrap = document.createElement('div');
+                noteWrap.className = 'annotation-note-wrap expanded';
+                noteWrap.appendChild(input);
+                div.insertBefore(noteWrap, div.querySelector('.annotation-actions'));
+                addNoteBtn.remove();
+                input.focus();
+            });
+            actionMain.appendChild(addNoteBtn);
+        }
 
         const actionDanger = document.createElement('div');
         actionDanger.className = 'annotation-actions-danger';

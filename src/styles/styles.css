@@ -1035,12 +1035,6 @@ body.split-resizing {
   box-shadow: none;
 }
 
-.project-home-list-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
 .project-home-list-item span:last-child,
 .project-home-list-empty {
   font-size: 13px;
@@ -2445,4 +2439,39 @@ body.compact-layout .annotation-item {
 .modal-input:focus {
   outline: none;
   border-color: var(--primary);
+}
+
+
+/* Keyboard focus visibility (a11y floor) */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.action-pill:focus-visible,
+.icon-btn:focus-visible,
+.workspace-mode-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+  border-radius: 8px;
+}
+
+/* Text selection carries the palette */
+::selection {
+  background: rgba(37, 99, 235, 0.28);
+  color: inherit;
+}
+
+.annotation-status-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+}
+
+.annotation-status-tag .material-icons-round {
+  font-size: 14px;
 }

@@ -130,8 +130,10 @@ export function setupLayoutToggles({
                 target: elements.toggleNotesBtn,
                 event: 'click',
                 handler: () => {
+                    // Pure visibility toggle. Forcing a mode switch here used to
+                    // re-apply the mode layout, which instantly re-expanded the
+                    // panel — the notes panel could never stay collapsed.
                     splitView?.toggleRight();
-                    setWorkspaceMode('capture');
                 }
             }
         ]));

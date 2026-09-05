@@ -455,11 +455,36 @@ export const DrawnixBoardComponent = () => {
         };
         const onBoardReady = () => applyAppTheme(themeManager.getTheme());
         window.addEventListener(APP_EVENTS.BOARD_READY, onBoardReady);
+
+        // Defensive board state repair: container resizes while the board is
+        // not fully laid out can leave viewport.zoom at Infinity, and late
+        // board initialization can reset themeColorMode after our earlier
+        // sync. Both are repaired idempotently until they stick.
+        const repairBoardState = () => {
+            const board = boardRef.current;
+            if (!board) return;
+            try {
+                if (Number.isFinite(board.viewport?.zoom) === false) {
+                    BoardTransforms.updateZoom(board, 1);
+                }
+                const mode = appThemeToBoard[themeManager.getTheme()] || 'default';
+                if (board.theme?.themeColorMode !== mode) {
+                    BoardTransforms.updateThemeColor(board, mode);
+                }
+            } catch (e) {
+                logger.warn('Failed to repair board state', e);
+            }
+        };
+        window.addEventListener('resize', repairBoardState);
+        const zoomInterval = setInterval(repairBoardState, 1500);
+
         applyAppTheme(themeManager.getTheme());
         const unsubscribe = themeManager.subscribe(applyAppTheme);
         return () => {
             unsubscribe();
             window.removeEventListener(APP_EVENTS.BOARD_READY, onBoardReady);
+            window.removeEventListener('resize', repairBoardState);
+            clearInterval(zoomInterval);
         };
     }, []);
 

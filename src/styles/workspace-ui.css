@@ -1613,7 +1613,9 @@ body:not(.mobile-layout) .selection-mode-floating .icon-btn:hover {
   container-type: inline-size;
 }
 
-@container (max-width: 620px) {
+/* Tier 1: reader pane below ~950px (incl. full window at 1280 viewport) —
+   icon-only mode tabs and tighter doc actions before anything overlaps. */
+@container (max-width: 950px) {
   body:not(.mobile-layout) .workspace-mode-group {
     grid-template-columns: repeat(3, minmax(40px, 1fr));
   }
@@ -1628,8 +1630,23 @@ body:not(.mobile-layout) .selection-mode-floating .icon-btn:hover {
     display: none;
   }
 
+  .toolbar-doc-actions {
+    gap: 0;
+  }
+
+  .toolbar-doc-actions .icon-btn {
+    min-width: 30px;
+  }
+}
+
+/* Tier 2: extremely tight split — also hide leading labels. */
+@container (max-width: 620px) {
   .toolbar-section-leading .action-pill-label {
     display: none;
+  }
+
+  #doc-title {
+    max-width: 110px;
   }
 }
 
@@ -1681,4 +1698,472 @@ span.material-icons-round.project-home-card-icon {
   pointer-events: none;
   z-index: 3;
   opacity: 0.9;
+}
+
+/* The Google Material Icons stylesheet loads after this file and resets
+   .material-icons-round to display: inline-block at equal specificity, which
+   breaks the icon badge centering above. Re-assert it with higher specificity. */
+span.material-icons-round.project-home-icon,
+span.material-icons-round.project-home-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  flex: 0 0 auto;
+}
+
+span.material-icons-round.project-home-icon {
+  width: 56px;
+  height: 56px;
+}
+
+span.material-icons-round.project-home-card-icon {
+  width: 40px;
+  height: 40px;
+}
+
+/* Top-bar theme switcher */
+.theme-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 34px;
+  padding: 0 4px 0 8px;
+  border-radius: 8px;
+  background: var(--surface-soft);
+  border: 1px solid var(--surface-border);
+  color: var(--text-main);
+  transition: background-color 0.16s ease, border-color 0.16s ease;
+}
+
+.theme-switcher:hover {
+  background: var(--surface-muted);
+}
+
+.theme-switcher__icon {
+  font-size: 18px;
+  color: var(--text-muted);
+}
+
+.theme-switcher select {
+  max-width: 74px;
+  border: none;
+  background: transparent;
+  color: var(--text-main);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 2px;
+  cursor: pointer;
+  outline: none;
+}
+
+.theme-switcher select option {
+  color: #0f172a;
+  background: #fff;
+}
+
+/* Single theme entry point: the top-bar switcher owns theme changes, so the
+   Drawnix canvas dropdown is hidden (app-side CSS only, fork untouched). */
+#mindmap-container .theme-toolbar {
+  display: none !important;
+}
+
+/* Icon-first toolbar: duplicate document summary and caption are removed —
+   the center doc block already shows the same information. */
+body:not(.mobile-layout) .toolbar-mobile-summary {
+  display: none;
+}
+
+.toolbar-doc-caption {
+  display: none;
+}
+
+/* ---- Minimal skin for the project home (icon-first, flat surfaces) ---- */
+
+.project-home {
+  background: var(--bg-secondary);
+  gap: 26px;
+}
+
+.project-home .project-home-hero {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 4px 4px 0;
+  border-radius: 0;
+}
+
+.project-home .project-home-icon {
+  background: none;
+  border-radius: 0;
+  color: var(--accent);
+}
+
+.project-home .project-home-hero .project-home-btn.primary {
+  margin-left: auto;
+}
+
+.project-home .project-home-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px 28px;
+}
+
+.project-home .project-home-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0;
+  min-height: 0;
+  border: none;
+  background: transparent;
+}
+
+.project-home .project-home-section h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.project-home .project-home-actions {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+}
+
+.project-home .project-home-btn,
+.project-home .project-home-list-item {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  border-radius: 10px;
+}
+
+.project-home .project-home-btn.icon-tile {
+  width: 46px;
+  min-height: 46px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-main);
+  border: 1px solid var(--surface-border);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.project-home .project-home-btn.icon-tile:hover {
+  background: var(--surface-muted);
+  border-color: var(--surface-border-strong);
+  transform: none;
+  box-shadow: none;
+}
+
+.project-home .project-home-btn.primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 18px;
+  border-radius: 10px;
+  background: var(--primary);
+  border: 1px solid var(--primary);
+  color: #fff;
+}
+
+.project-home .project-home-btn.primary:hover {
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
+}
+
+.project-home .project-home-btn.primary:disabled {
+  opacity: 0.45;
+}
+
+.project-home .project-home-list-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.project-home .project-home-list-item:hover {
+  background: var(--surface-muted);
+  border: none;
+  transform: none;
+  box-shadow: none;
+}
+
+.project-home .project-home-list-icon {
+  color: var(--text-subtle);
+  font-size: 20px;
+}
+
+.project-home .project-home-list-arrow {
+  color: var(--text-subtle);
+  font-size: 18px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.project-home .project-home-list-item:hover .project-home-list-arrow {
+  opacity: 1;
+}
+
+.project-home .project-home-list-empty {
+  color: var(--text-subtle);
+  font-size: 13px;
+  padding: 4px 2px;
+}
+
+/* Flatten the shell: hairline borders carry structure, shadows step aside. */
+.sidebar,
+.notes-panel,
+.outline-sidebar {
+  box-shadow: none;
+}
+
+/* Collapsed panels must win over inline widths set by panel presets. */
+.sidebar.collapsed,
+.notes-panel.collapsed,
+.outline-sidebar.collapsed {
+  width: 0 !important;
+  min-width: 0 !important;
+  flex-basis: 0 !important;
+  overflow: hidden;
+}
+
+
+/* Sidebar brand: one quiet wordmark, no competing subtitle */
+.brand-wordmark {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-strong);
+}
+
+/* Notes panel view switcher (Notes | Map) — matches the app's tab language.
+   Its original styles live in styles-premium.css, which is not loaded. */
+.notes-view-btn {
+  min-height: 26px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.notes-view-btn:hover {
+  color: var(--text-strong);
+}
+
+.notes-view-btn.active,
+.notes-view-btn[aria-selected="true"] {
+  background: var(--surface-muted);
+  color: var(--text-strong);
+}
+
+/* Bridge the Drawnix canvas toolbars (islands) to the app theme. Upstream
+   only themes the board svg via .theme-dark; the island variables stay light. */
+html[data-theme="dark"] #mindmap-container,
+html[data-theme="starry"] #mindmap-container,
+html[data-theme="dark"] #mindmap-container .drawnix,
+html[data-theme="starry"] #mindmap-container .drawnix {
+  --island-bg-color: #1e1e1e;
+  --island-border-color: #3d3d3d;
+  --shadow-island: 0 0 16px rgba(0, 0, 0, 0.45);
+  --dialog-border-color: #3d3d3d;
+  --keybinding-color: #5c5c5c;
+  --color-surface-high: #2a2a2a;
+  --color-surface-mid: #242424;
+  --color-surface-low: #1e1e1e;
+  --color-surface-lowest: #141414;
+  --color-surface-secondary-container: #223247;
+  --color-on-surface: #b8c0cc;
+  --default-border-color: #3d3d3d;
+  --button-hover-bg: #2f2f2f;
+  --button-active-bg: #2f2f2f;
+  --color-primary-light: rgba(102, 152, 255, 0.16);
+  --color-primary-light-darker: rgba(102, 152, 255, 0.24);
+  --color-gray-10: #242424;
+  --color-gray-20: #2f2f2f;
+  --color-gray-30: #3d3d3d;
+  --color-gray-40: #5c5c5c;
+}
+
+/* Notes panel = annotations + canvas side by side. Below ~430px of panel
+   content width the canvas collapses to zero (annotations keep full width);
+   widening the panel brings it back — plait's resize observer re-renders it. */
+.panel-content {
+  container-type: inline-size;
+}
+
+@container (max-width: 430px) {
+  .panel-content .notes-inner-resizer,
+  .panel-content .mindmap-container {
+    width: 0 !important;
+    min-width: 0 !important;
+    flex: 0 0 0 !important;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .panel-content .annotation-list {
+    flex: 1 1 auto;
+    max-width: none;
+  }
+}
+
+/* Compact annotation cards when the list gets narrow: shrink chips, action
+   buttons and type so nothing overlaps before the single-column fallback. */
+@container (max-width: 280px) {
+  .annotation-item {
+    padding: 9px 10px;
+  }
+
+  .annotation-header {
+    gap: 5px;
+  }
+
+  .page-tag {
+    font-size: 10px;
+    padding: 1px 5px;
+  }
+
+  .annotation-status-tag {
+    width: 18px;
+    height: 18px;
+  }
+
+  .annotation-status-tag .material-icons-round {
+    font-size: 12px;
+  }
+
+  .annotation-header .action-btn,
+  .item-actions .action-btn,
+  .annotation-actions .action-btn {
+    min-width: 26px;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+  }
+
+  .annotation-header .action-btn .material-icons-round,
+  .annotation-actions .action-btn .material-icons-round {
+    font-size: 16px;
+  }
+
+  .annotation-quote {
+    font-size: 12px;
+  }
+
+  .annotation-source-meta {
+    font-size: 10px;
+  }
+
+  .annotation-note-input {
+    font-size: 12px;
+  }
+}
+
+/* Source document row is opt-in: revealed by the header source button. */
+.annotation-item .annotation-source-meta {
+  display: none;
+}
+
+.annotation-item.show-source .annotation-source-meta {
+  display: flex;
+}
+
+.annotation-source-toggle.active {
+  background: var(--surface-muted);
+  color: var(--text-strong);
+}
+
+/* ---- Reader floating tools: selection toolbar + highlight palette ---- */
+
+/* Area-selection toolbar: flat hairline card, quiet icons, accent active. */
+body:not(.mobile-layout) .selection-mode-floating {
+  gap: 3px;
+  padding: 5px;
+  border-radius: 12px;
+  border: 1px solid var(--surface-border);
+  background: var(--surface-base);
+  backdrop-filter: none;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
+}
+
+body:not(.mobile-layout) .selection-mode-floating .icon-btn {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  transition: background-color 0.14s ease, color 0.14s ease;
+}
+
+body:not(.mobile-layout) .selection-mode-floating .selection-mode-drag-handle {
+  color: var(--text-subtle);
+  margin-bottom: 2px;
+  cursor: grab;
+}
+
+body:not(.mobile-layout) .selection-mode-floating .icon-btn:hover {
+  background: var(--surface-muted);
+  color: var(--text-strong);
+}
+
+body:not(.mobile-layout) .selection-mode-floating .mode-btn.active {
+  background: var(--accent-soft);
+  border: none;
+  color: var(--accent-strong);
+}
+
+/* Highlight palette: compact swatch grid, ring-style selection. */
+.modern-highlight-toolbar {
+  background: var(--surface-base);
+  border: 1px solid var(--surface-border);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
+  border-radius: 12px;
+  padding: 10px;
+  gap: 0;
+}
+
+.pdf-color-picker-wrapper .color-select-item {
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--surface-border-strong);
+  border-radius: 50%;
+  position: relative;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.pdf-color-picker-wrapper .color-select-item:hover {
+  transform: scale(1.12);
+}
+
+.pdf-color-picker-wrapper .color-select-item.active {
+  border-color: transparent;
+  box-shadow:
+    0 0 0 2px var(--surface-base),
+    0 0 0 4px var(--accent);
+}
+
+.pdf-color-picker-wrapper .color-select-item.no-color {
+  border: 1px dashed var(--surface-border-strong);
+  background:
+    linear-gradient(45deg, transparent 44%, var(--surface-border-strong) 44%, var(--surface-border-strong) 56%, transparent 56%);
+}
+
+.pdf-color-picker-wrapper .color-select-item .selected-icon {
+  color: var(--text-strong);
 }
