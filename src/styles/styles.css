@@ -2441,6 +2441,76 @@ body.compact-layout .annotation-item {
   border-color: var(--primary);
 }
 
+/* Settings dialog (SettingsModal) */
+.settings-modal {
+  width: 360px;
+}
+
+.settings-modal .modal-title {
+  margin-bottom: 16px;
+}
+
+.settings-modal__group {
+  margin-bottom: 18px;
+}
+
+.settings-modal__group-title {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+.settings-modal__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.settings-modal__row:last-child {
+  margin-bottom: 0;
+}
+
+.settings-modal__label {
+  flex: 0 0 48px;
+  font-size: 13px;
+  color: var(--text-main);
+}
+
+.settings-modal__select {
+  flex: 1;
+  min-height: 34px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-main);
+  color: var(--text-main);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.settings-modal__slider {
+  flex: 1;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.settings-modal__value {
+  flex: 0 0 44px;
+  text-align: right;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.settings-modal__actions {
+  justify-content: space-between;
+  margin-top: 20px;
+}
+
 
 /* Keyboard focus visibility (a11y floor) */
 :focus-visible {

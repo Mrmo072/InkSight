@@ -1,5 +1,5 @@
 import { registerEventListeners } from './event-listeners.js';
-import { themeManager } from '../core/theme-manager.js';
+import { settingsModal } from '../ui/settings-modal.js';
 
 export function setupLayoutToggles({
     elements,
@@ -99,14 +99,13 @@ export function setupLayoutToggles({
         ]));
     }
 
-    const themeSelect = document.getElementById('app-theme-select');
-    if (themeSelect) {
-        themeSelect.value = themeManager.getTheme();
+    const settingsBtn = document.getElementById('toolbar-settings');
+    if (settingsBtn) {
         registerCleanup(registerEventListeners([
             {
-                target: themeSelect,
-                event: 'change',
-                handler: () => themeManager.setTheme(themeSelect.value)
+                target: settingsBtn,
+                event: 'click',
+                handler: () => settingsModal.open()
             }
         ]));
     }

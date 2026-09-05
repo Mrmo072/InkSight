@@ -135,8 +135,8 @@ export class TextReader {
             this.content.style.backgroundColor = 'white';
             this.content.style.minHeight = '100%';
             this.content.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
-            this.content.style.lineHeight = '1.6';
-            this.content.style.fontSize = '16px';
+            this.content.style.lineHeight = 'var(--reading-line-height, 1.6)';
+            this.content.style.fontSize = 'var(--reading-font-size, 16px)';
             this.content.style.color = '#333';
 
             if (isMarkdown) {
