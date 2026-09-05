@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { highlightManager } from '../highlight-manager.js';
+import { APP_EVENTS } from '../event-names.js';
 
 describe('HighlightManager', () => {
     beforeEach(() => {
@@ -9,7 +10,7 @@ describe('HighlightManager', () => {
 
     it('creates trimmed highlights and dispatches creation events', () => {
         const listener = vi.fn();
-        window.addEventListener('highlight-created', listener);
+        window.addEventListener(APP_EVENTS.HIGHLIGHT_CREATED, listener);
 
         const highlight = highlightManager.createHighlight('  hello world  ', { page: 1 }, 'doc-1', 'text', '#fff000', 'Book.pdf');
 
@@ -21,12 +22,12 @@ describe('HighlightManager', () => {
             detail: highlight
         }));
 
-        window.removeEventListener('highlight-created', listener);
+        window.removeEventListener(APP_EVENTS.HIGHLIGHT_CREATED, listener);
     });
 
     it('restores highlights, remaps source IDs, and emits restore events', () => {
         const listener = vi.fn();
-        window.addEventListener('highlights-restored', listener);
+        window.addEventListener(APP_EVENTS.HIGHLIGHTS_RESTORED, listener);
 
         highlightManager.restorePersistenceData({
             highlights: [
@@ -40,7 +41,7 @@ describe('HighlightManager', () => {
             detail: { highlights: highlightManager.highlights }
         }));
 
-        window.removeEventListener('highlights-restored', listener);
+        window.removeEventListener(APP_EVENTS.HIGHLIGHTS_RESTORED, listener);
     });
 
     it('remaps only matching source IDs and warns if old source id is missing', () => {
@@ -72,7 +73,7 @@ describe('HighlightManager', () => {
 
     it('can upsert a highlight by its existing id and notify the UI', () => {
         const listener = vi.fn();
-        window.addEventListener('highlights-restored', listener);
+        window.addEventListener(APP_EVENTS.HIGHLIGHTS_RESTORED, listener);
 
         highlightManager.upsertHighlight({
             id: 'h-9',
@@ -91,14 +92,14 @@ describe('HighlightManager', () => {
         }));
         expect(listener).toHaveBeenCalled();
 
-        window.removeEventListener('highlights-restored', listener);
+        window.removeEventListener(APP_EVENTS.HIGHLIGHTS_RESTORED, listener);
     });
 
     it('removes and clears highlights while notifying the UI', () => {
         const removedListener = vi.fn();
         const clearedListener = vi.fn();
-        window.addEventListener('highlight-removed', removedListener);
-        window.addEventListener('highlights-cleared', clearedListener);
+        window.addEventListener(APP_EVENTS.HIGHLIGHT_REMOVED, removedListener);
+        window.addEventListener(APP_EVENTS.HIGHLIGHTS_CLEARED, clearedListener);
 
         const highlight = highlightManager.createHighlight('hello', { page: 1 }, 'doc-1');
         highlightManager.removeHighlight(highlight.id);
@@ -108,7 +109,7 @@ describe('HighlightManager', () => {
         expect(removedListener).toHaveBeenCalledWith(expect.objectContaining({ detail: highlight.id }));
         expect(clearedListener).toHaveBeenCalled();
 
-        window.removeEventListener('highlight-removed', removedListener);
-        window.removeEventListener('highlights-cleared', clearedListener);
+        window.removeEventListener(APP_EVENTS.HIGHLIGHT_REMOVED, removedListener);
+        window.removeEventListener(APP_EVENTS.HIGHLIGHTS_CLEARED, clearedListener);
     });
 });

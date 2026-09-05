@@ -1,6 +1,7 @@
 import { getAppContext } from './app-context.js';
 import { registerEventListeners } from './event-listeners.js';
 import { createLogger } from '../core/logger.js';
+import { APP_EVENTS } from '../core/event-names.js';
 
 const logger = createLogger('SelectionSync');
 
@@ -31,7 +32,7 @@ export function setupSelectionSync({
                 : itemId;
 
             if (cardId) {
-                window.dispatchEvent(new CustomEvent('highlight-selected', {
+                window.dispatchEvent(new CustomEvent(APP_EVENTS.HIGHLIGHT_SELECTED, {
                     detail: { cardId }
                 }));
             }
@@ -43,7 +44,7 @@ export function setupSelectionSync({
                 : itemId;
 
             if (cardId) {
-                window.dispatchEvent(new CustomEvent('card-selected', {
+                window.dispatchEvent(new CustomEvent(APP_EVENTS.CARD_SELECTED, {
                     detail: cardId
                 }));
             }
@@ -53,7 +54,7 @@ export function setupSelectionSync({
     return registerEventListeners([
         {
             target: window,
-            event: 'jump-to-source',
+            event: APP_EVENTS.JUMP_TO_SOURCE,
             handler: (e) => {
                 const { highlightId, cardId } = e.detail;
                 handleSelectionSync(cardId || highlightId, 'mindmap');
@@ -61,7 +62,7 @@ export function setupSelectionSync({
         },
         {
             target: window,
-            event: 'annotation-selected',
+            event: APP_EVENTS.ANNOTATION_SELECTED,
             handler: (e) => {
                 handleSelectionSync(e.detail.cardId, 'annotation');
                 if (isCompactLayout()) {
@@ -71,7 +72,7 @@ export function setupSelectionSync({
         },
         {
             target: window,
-            event: 'highlight-clicked',
+            event: APP_EVENTS.HIGHLIGHT_CLICKED,
             handler: (e) => {
                 handleSelectionSync(e.detail.highlightId, 'highlight');
                 if (isCompactLayout()) {

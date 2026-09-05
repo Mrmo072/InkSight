@@ -1,3 +1,4 @@
+import { APP_EVENTS } from '../core/event-names.js';
 /**
  * PDFHighlighterTool - 荧光笔涂抹工具
  * 用于在PDF上绘制固定高度的荧光笔标记
@@ -303,7 +304,7 @@ export class PDFHighlighterTool {
                         }
 
                         // 触发Mind Map定位
-                        window.dispatchEvent(new CustomEvent('highlight-selected', {
+                        window.dispatchEvent(new CustomEvent(APP_EVENTS.HIGHLIGHT_SELECTED, {
                             detail: { cardId: card.id }
                         }));
                     });

@@ -1,10 +1,11 @@
+import { APP_EVENTS } from '../core/event-names.js';
 export function registerPdfReaderGlobalListeners(reader) {
     const globalListeners = [
-        [window, 'card-soft-deleted', reader.handleCardSoftDeleted],
-        [window, 'card-restored', reader.handleCardRestored],
-        [window, 'highlights-restored', reader.handleHighlightsRestored],
-        [window, 'mindmap-node-updated', reader.handleMindmapNodeUpdated],
-        [window, 'highlight-removed', reader.handleHighlightRemoved],
+        [window, APP_EVENTS.CARD_SOFT_DELETED, reader.handleCardSoftDeleted],
+        [window, APP_EVENTS.CARD_RESTORED, reader.handleCardRestored],
+        [window, APP_EVENTS.HIGHLIGHTS_RESTORED, reader.handleHighlightsRestored],
+        [window, APP_EVENTS.MINDMAP_NODE_UPDATED, reader.handleMindmapNodeUpdated],
+        [window, APP_EVENTS.HIGHLIGHT_REMOVED, reader.handleHighlightRemoved],
         [document, 'keydown', reader.handleKeyDown]
     ];
 

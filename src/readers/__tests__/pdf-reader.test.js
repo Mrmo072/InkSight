@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { APP_EVENTS } from '../../core/event-names.js';
 
 const toolbarInstances = [];
 const rendererInstances = [];
@@ -195,7 +196,7 @@ describe('PDFReader', () => {
         document.body.appendChild(container);
         const reader = new PDFReader(container);
         const clickEvents = [];
-        window.addEventListener('highlight-clicked', (event) => {
+        window.addEventListener(APP_EVENTS.HIGHLIGHT_CLICKED, (event) => {
             clickEvents.push(event.detail);
         });
 
@@ -258,7 +259,7 @@ describe('PDFReader', () => {
         const pageTwo = { num: 2, wrapper: document.createElement('div'), rendered: false };
         reader.pages.push(pageOne, pageTwo);
 
-        window.dispatchEvent(new CustomEvent('highlights-restored', {
+        window.dispatchEvent(new CustomEvent(APP_EVENTS.HIGHLIGHTS_RESTORED, {
             detail: { highlights: [highlight] }
         }));
 
@@ -284,7 +285,7 @@ describe('PDFReader', () => {
             rendered: true
         });
 
-        window.dispatchEvent(new CustomEvent('card-restored', {
+        window.dispatchEvent(new CustomEvent(APP_EVENTS.CARD_RESTORED, {
             detail: { highlightId: highlight.id, deleted: false }
         }));
 
@@ -298,7 +299,7 @@ describe('PDFReader', () => {
         const reader = new PDFReader(container);
         const removeSpy = vi.spyOn(reader, 'removeHighlightOverlays');
 
-        window.dispatchEvent(new CustomEvent('card-soft-deleted', {
+        window.dispatchEvent(new CustomEvent(APP_EVENTS.CARD_SOFT_DELETED, {
             detail: { highlightId: 'highlight-restore-1', deleted: true }
         }));
 

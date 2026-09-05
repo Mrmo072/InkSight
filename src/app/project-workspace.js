@@ -24,6 +24,7 @@ import { restoreInksightPersistence } from '../inksight-file/inksight-file-resto
 import { loadRuntimeProjectSnapshot, saveRuntimeProjectSnapshot } from '../inksight-file/inksight-runtime-project-io.js';
 import { listRecentProjects, recordRecentProject } from './recent-projects.js';
 import { exportWorkspaceArtifact } from './workspace-export.js';
+import { APP_EVENTS } from '../core/event-names.js';
 
 const logger = createLogger('ProjectWorkspace');
 
@@ -119,7 +120,7 @@ export function createProjectWorkspaceController({
         setAppService('currentProjectDirectoryHandle', null);
         setAppService('currentProjectId', result.projectId || appContext.currentProjectId);
 
-        window.dispatchEvent(new CustomEvent('restore-board-state', {
+        window.dispatchEvent(new CustomEvent(APP_EVENTS.RESTORE_BOARD_STATE, {
             detail: {
                 elements: result.payload.elements,
                 viewport: result.payload.viewport,

@@ -2,6 +2,7 @@ import { createRoot } from 'react-dom/client';
 import React from 'react';
 import { PDFColorPicker } from './pdf-color-picker.jsx';
 import { createLogger } from '../core/logger.js';
+import { APP_EVENTS } from '../core/event-names.js';
 
 const logger = createLogger('PDFHighlightToolbar');
 
@@ -26,7 +27,7 @@ export class PDFHighlightToolbar {
     handleHighlightClick(e, highlightId, cardId) {
         // Dispatch event to jump to card in mindmap
         logger.debug('Highlight clicked', { highlightId, cardId });
-        window.dispatchEvent(new CustomEvent('highlight-selected', {
+        window.dispatchEvent(new CustomEvent(APP_EVENTS.HIGHLIGHT_SELECTED, {
             detail: { cardId }
         }));
 

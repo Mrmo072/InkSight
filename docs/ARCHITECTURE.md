@@ -30,7 +30,7 @@ src/
 │   ├── text-reader.js      # 文本/MD 阅读器封装
 │   └── pdf-*.js            # PDF 相关工具 (高亮、工具栏等)
 ├── mindmap/            # 思维导图模块
-│   ├── mindmap-view.js     # 导图视图控制器
+│   ├── drawnix-view.js     # 导图视图控制器 (Drawnix)
 │   ├── DrawnixBoard.jsx    # Drawnix 画板集成
 │   └── PlaitBoard.jsx      # Plait 画板组件
 ├── ui/                 # 通用 UI 组件

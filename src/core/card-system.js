@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { highlightManager } from './highlight-manager.js';
+import { APP_EVENTS } from './event-names.js';
 
 function cloneLocation(location) {
     if (!location) {
@@ -16,7 +17,7 @@ export class CardSystem {
 
         // Listen for highlights
         // Listen for highlights
-        window.addEventListener('highlight-created', (e) => {
+        window.addEventListener(APP_EVENTS.HIGHLIGHT_CREATED, (e) => {
             const highlight = e.detail;
 
             // Ignore highlights created for image selections to avoid duplicate cards
@@ -28,7 +29,7 @@ export class CardSystem {
         });
 
         // Listen for card removal to sync deletions
-        window.addEventListener('card-removed', (e) => {
+        window.addEventListener(APP_EVENTS.CARD_REMOVED, (e) => {
             const { highlightId } = e.detail;
             if (highlightId) {
                 highlightManager.removeHighlight(highlightId);
@@ -85,7 +86,7 @@ export class CardSystem {
         this.cards.set(card.id, card); // Changed to use Map.set
 
         // Dispatch event for UI update
-        const event = new CustomEvent('card-added', {
+        const event = new CustomEvent(APP_EVENTS.CARD_ADDED, {
             detail: card
         });
         window.dispatchEvent(event);
@@ -112,7 +113,7 @@ export class CardSystem {
         this.save();
 
         // Dispatch event to update UI visibility
-        const eventType = deleted ? 'card-soft-deleted' : 'card-restored';
+        const eventType = deleted ? APP_EVENTS.CARD_SOFT_DELETED : APP_EVENTS.CARD_RESTORED;
         const event = new CustomEvent(eventType, {
             detail: { id, highlightId: card.highlightId, deleted }
         });
@@ -139,7 +140,7 @@ export class CardSystem {
         );
         this.save();
 
-        window.dispatchEvent(new CustomEvent('card-removed', {
+        window.dispatchEvent(new CustomEvent(APP_EVENTS.CARD_REMOVED, {
             detail: {
                 id,
                 highlightId: card.highlightId,
@@ -190,7 +191,7 @@ export class CardSystem {
         if (card) {
             Object.assign(card, updates);
             // Dispatch event for UI update
-            const event = new CustomEvent('card-updated', {
+            const event = new CustomEvent(APP_EVENTS.CARD_UPDATED, {
                 detail: { id, updates }
             });
             window.dispatchEvent(event);
@@ -246,7 +247,7 @@ export class CardSystem {
 
 
         // Notify UI
-        window.dispatchEvent(new CustomEvent('cards-restored', {
+        window.dispatchEvent(new CustomEvent(APP_EVENTS.CARDS_RESTORED, {
             detail: {
                 cards: Array.from(this.cards.values()),
                 connections: this.connections
@@ -270,7 +271,7 @@ export class CardSystem {
 
         if (updated) {
             // Notify UI
-            window.dispatchEvent(new CustomEvent('cards-restored', {
+            window.dispatchEvent(new CustomEvent(APP_EVENTS.CARDS_RESTORED, {
                 detail: { cards: Array.from(this.cards.values()), connections: this.connections }
             }));
         }
@@ -301,13 +302,13 @@ export class CardSystem {
         this.connections = [];
 
         // Dispatch event to notify that all cards have been cleared
-        window.dispatchEvent(new CustomEvent('cards-cleared'));
+        window.dispatchEvent(new CustomEvent(APP_EVENTS.CARDS_CLEARED));
     }
 
     save() {
 
         // Trigger a global save event if needed, or just rely on the external system polling getPersistenceData
-        window.dispatchEvent(new CustomEvent('request-save'));
+        window.dispatchEvent(new CustomEvent(APP_EVENTS.REQUEST_SAVE));
     }
 }
 

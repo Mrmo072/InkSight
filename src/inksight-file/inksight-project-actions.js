@@ -9,6 +9,7 @@ import {
     openInksightProjectDirectory,
     saveInksightProjectDirectory
 } from './inksight-project-directory-io.js';
+import { APP_EVENTS } from '../core/event-names.js';
 
 function summarizePayload(payload) {
     const elements = Array.isArray(payload?.elements) ? payload.elements.length : 0;
@@ -100,7 +101,7 @@ export async function saveCurrentProject(board, options = {}) {
         });
     }
 
-    window.dispatchEvent(new CustomEvent('project-save-completed', {
+    window.dispatchEvent(new CustomEvent(APP_EVENTS.PROJECT_SAVE_COMPLETED, {
         detail: {
             savedAt: Date.now(),
             mode: 'Local project export',
@@ -162,7 +163,7 @@ export async function openProjectFile(board, listRender = null) {
         board.history.undos = [];
         board.history.redos = [];
     } else {
-        window.dispatchEvent(new CustomEvent('restore-board-state', {
+        window.dispatchEvent(new CustomEvent(APP_EVENTS.RESTORE_BOARD_STATE, {
             detail: {
                 elements: data.elements,
                 viewport: data.viewport,
@@ -193,11 +194,11 @@ export async function openProjectFile(board, listRender = null) {
         message: `Loaded ${summary.elements} board items, ${summary.cards} cards, ${summary.highlights} highlights, ${summary.documents} document references, and restored ${projectFiles.length} bundled source files from the project folder.`,
         level: 'success',
         actions: [
-            { label: 'Validate', onClick: () => window.dispatchEvent(new CustomEvent('recovery-validate-requested')) }
+            { label: 'Validate', onClick: () => window.dispatchEvent(new CustomEvent(APP_EVENTS.RECOVERY_VALIDATE_REQUESTED)) }
         ]
     });
 
-    window.dispatchEvent(new CustomEvent('project-opened', {
+    window.dispatchEvent(new CustomEvent(APP_EVENTS.PROJECT_OPENED, {
         detail: {
             openedAt: Date.now(),
             mode: 'Local project export',

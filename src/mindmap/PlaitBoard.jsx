@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createBoard, Transforms } from '@plait/core';
 import rough from 'roughjs';
 import { cardSystem } from '../core/card-system.js';
+import { APP_EVENTS } from '../core/event-names.js';
 
 export const PlaitBoardComponent = () => {
     const containerRef = useRef(null);
@@ -38,9 +39,9 @@ export const PlaitBoardComponent = () => {
             renderBoard(newBoard);
         };
 
-        window.addEventListener('card-added', handleCardAdded);
+        window.addEventListener(APP_EVENTS.CARD_ADDED, handleCardAdded);
         return () => {
-            window.removeEventListener('card-added', handleCardAdded);
+            window.removeEventListener(APP_EVENTS.CARD_ADDED, handleCardAdded);
         };
     }, []);
 
@@ -258,7 +259,7 @@ export const PlaitBoardComponent = () => {
         if (node && node.data && node.data.cardId) {
             const card = cardSystem.cards.get(node.data.cardId);
             if (card && card.highlightId) {
-                const event = new CustomEvent('jump-to-source', {
+                const event = new CustomEvent(APP_EVENTS.JUMP_TO_SOURCE, {
                     detail: {
                         sourceId: card.sourceId,
                         highlightId: card.highlightId

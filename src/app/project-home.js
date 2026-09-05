@@ -59,6 +59,7 @@ export function renderProjectHome(model = {}) {
               </div>
               <button type="button" class="project-home-btn primary" data-home-action="continue-workspace" ${model.canContinueWorkspace ? '' : 'disabled'}>
                 <span class="material-icons-round">play_arrow</span>
+                <span class="project-home-btn-label">Resume</span>
               </button>
             </section>
             <section class="project-home-card">
@@ -68,17 +69,17 @@ export function renderProjectHome(model = {}) {
                 <p class="text-two-line">Core workspace actions.</p>
               </div>
               <div class="project-home-actions">
-                <button type="button" class="project-home-btn icon-tile" data-home-action="import" title="Import Documents" aria-label="Import Documents"><span class="material-icons-round">library_add</span></button>
-                <button type="button" class="project-home-btn icon-tile" data-home-action="open-project" title="Open Project Folder" aria-label="Open Project Folder"><span class="material-icons-round">folder_open</span></button>
-                <button type="button" class="project-home-btn icon-tile" data-home-action="save-project" title="Save Project Folder" aria-label="Save Project Folder"><span class="material-icons-round">save</span></button>
-                <button type="button" class="project-home-btn icon-tile" data-home-action="export-notes" title="Export Notes Package" aria-label="Export Notes Package"><span class="material-icons-round">note_add</span></button>
+                <button type="button" class="project-home-btn icon-tile" data-home-action="import" title="Import Documents" aria-label="Import Documents"><span class="material-icons-round">library_add</span><span class="project-home-btn-label">Import</span></button>
+                <button type="button" class="project-home-btn icon-tile" data-home-action="open-project" title="Open Project Folder" aria-label="Open Project Folder"><span class="material-icons-round">folder_open</span><span class="project-home-btn-label">Open</span></button>
+                <button type="button" class="project-home-btn icon-tile" data-home-action="save-project" title="Save Project Folder" aria-label="Save Project Folder"><span class="material-icons-round">save</span><span class="project-home-btn-label">Save</span></button>
+                <button type="button" class="project-home-btn icon-tile" data-home-action="export-notes" title="Export Notes Package" aria-label="Export Notes Package"><span class="material-icons-round">note_add</span><span class="project-home-btn-label">Export</span></button>
               </div>
             </section>
             <section class="project-home-card">
               <div class="project-home-card-copy">
                 <span class="material-icons-round project-home-card-icon">folder_copy</span>
                 <strong>Recent</strong>
-                <p class="text-two-line">${recentProjects.length ? 'Saved project records.' : 'No recent projects.'}</p>
+                <p class="text-two-line">Saved project records.</p>
               </div>
               <div class="project-home-list">
                 ${recentProjects.length ? recentProjects.map((project) => `

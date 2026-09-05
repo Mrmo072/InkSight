@@ -14,6 +14,7 @@ import {
     registerBasicReaderListeners,
     updateHighlightModelColor
 } from './reader-shared.js';
+import { APP_EVENTS } from '../core/event-names.js';
 
 export class EpubReader {
     constructor(container) {
@@ -279,7 +280,7 @@ export class EpubReader {
 
             const cardId = findCardIdByHighlightId(this.getCardSystem(), highlightId);
             handleReaderHighlightClick(this, e, highlightId, cardId, () => {
-                window.dispatchEvent(new CustomEvent('highlight-clicked', {
+                window.dispatchEvent(new CustomEvent(APP_EVENTS.HIGHLIGHT_CLICKED, {
                     detail: { highlightId, cardId }
                 }));
             });
@@ -577,6 +578,10 @@ export class EpubReader {
             }, this.fileId, 'epub', this.defaultColor);
 
             this.addAnnotation(highlight.id, cfiRange, highlight.color);
+            contents.window.getSelection().removeAllRanges();
+            this.pendingSelection = null;
+        }).catch(error => {
+            console.error('[EpubReader] Failed to resolve selection range:', cfiRange, error);
             contents.window.getSelection().removeAllRanges();
             this.pendingSelection = null;
         });

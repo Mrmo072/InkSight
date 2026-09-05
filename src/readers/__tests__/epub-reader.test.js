@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { APP_EVENTS } from '../../core/event-names.js';
 
 const toolbarInstances = [];
 const epubMockState = {
@@ -143,7 +144,7 @@ describe('EpubReader', () => {
         document.body.appendChild(container);
         const reader = new EpubReader(container);
         const clickEvents = [];
-        window.addEventListener('highlight-clicked', (event) => {
+        window.addEventListener(APP_EVENTS.HIGHLIGHT_CLICKED, (event) => {
             clickEvents.push(event.detail);
         });
 

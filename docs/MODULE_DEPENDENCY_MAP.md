@@ -229,3 +229,11 @@ project-workspace
 - [project-workspace.test.js](/D:/Projects/InkSight/src/app/__tests__/project-workspace.test.js)
 
 后续新增模块时，建议同步新增对应模块级测试，而不是只依赖全量回归。
+
+## 事件总线约定
+
+模块间通过 window CustomEvent 通信的事件名统一收敛在 `src/core/event-names.js` 的 `APP_EVENTS` 常量表中。新增或重命名事件时：
+
+1. 先在 `APP_EVENTS` 中注册常量，再在发射/监听两端引用它；
+2. 禁止在业务代码中书写裸的事件名字符串字面量（测试断言中可以，因为值不变）；
+3. DOM 原生事件（click、keydown 等）不属于该表。

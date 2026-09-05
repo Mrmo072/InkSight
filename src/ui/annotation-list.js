@@ -1,6 +1,7 @@
 import { getAppContext } from '../app/app-context.js';
 import { registerEventListeners } from '../app/event-listeners.js';
 import { createLogger } from '../core/logger.js';
+import { APP_EVENTS } from '../core/event-names.js';
 
 const logger = createLogger('AnnotationList');
 
@@ -27,15 +28,15 @@ export class AnnotationList {
         };
 
         this.cleanupListeners = registerEventListeners([
-            { target: window, event: 'highlight-clicked', handler: this.handleHighlightClicked },
-            { target: window, event: 'highlight-updated', handler: (e) => this.handleHighlightUpdate(e.detail) },
-            { target: window, event: 'highlight-removed', handler: (e) => this.removeCard(e.detail) },
-            { target: window, event: 'card-added', handler: this.handleRefreshRequested },
-            { target: window, event: 'card-updated', handler: this.handleRefreshRequested },
-            { target: window, event: 'card-removed', handler: this.handleRefreshRequested },
-            { target: window, event: 'card-soft-deleted', handler: this.handleRefreshRequested },
-            { target: window, event: 'cards-restored', handler: this.handleRefreshRequested },
-            { target: window, event: 'card-selected', handler: this.handleCardSelected }
+            { target: window, event: APP_EVENTS.HIGHLIGHT_CLICKED, handler: this.handleHighlightClicked },
+            { target: window, event: APP_EVENTS.HIGHLIGHT_UPDATED, handler: (e) => this.handleHighlightUpdate(e.detail) },
+            { target: window, event: APP_EVENTS.HIGHLIGHT_REMOVED, handler: (e) => this.removeCard(e.detail) },
+            { target: window, event: APP_EVENTS.CARD_ADDED, handler: this.handleRefreshRequested },
+            { target: window, event: APP_EVENTS.CARD_UPDATED, handler: this.handleRefreshRequested },
+            { target: window, event: APP_EVENTS.CARD_REMOVED, handler: this.handleRefreshRequested },
+            { target: window, event: APP_EVENTS.CARD_SOFT_DELETED, handler: this.handleRefreshRequested },
+            { target: window, event: APP_EVENTS.CARDS_RESTORED, handler: this.handleRefreshRequested },
+            { target: window, event: APP_EVENTS.CARD_SELECTED, handler: this.handleCardSelected }
         ]);
     }
 
@@ -261,7 +262,7 @@ export class AnnotationList {
     }
 
     addCardToMindMap(card, highlight) {
-        window.dispatchEvent(new CustomEvent('add-card-to-board', {
+        window.dispatchEvent(new CustomEvent(APP_EVENTS.ADD_CARD_TO_BOARD, {
             detail: this.buildTransferData(card, highlight)
         }));
         this.cardSystem.updateCard(card.id, { isOnBoard: true });
@@ -498,7 +499,7 @@ export class AnnotationList {
         this.highlightItem(cardId);
 
         // Dispatch event for sync (handled in main.js)
-        window.dispatchEvent(new CustomEvent('annotation-selected', {
+        window.dispatchEvent(new CustomEvent(APP_EVENTS.ANNOTATION_SELECTED, {
             detail: { cardId, highlightId }
         }));
     }

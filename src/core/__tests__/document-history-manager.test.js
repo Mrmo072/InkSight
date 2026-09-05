@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { APP_EVENTS } from '../event-names.js';
 
 function createInksightState(overrides = {}) {
     return {
@@ -176,8 +177,8 @@ describe('DocumentHistoryManager', () => {
         it('restores page position, cards, highlights, and board state when board is ready', async () => {
             const restorePageListener = vi.fn();
             const restoreBoardListener = vi.fn();
-            window.addEventListener('restore-page-position', restorePageListener);
-            window.addEventListener('restore-board-state', restoreBoardListener);
+            window.addEventListener(APP_EVENTS.RESTORE_PAGE_POSITION, restorePageListener);
+            window.addEventListener(APP_EVENTS.RESTORE_BOARD_STATE, restoreBoardListener);
 
             mockIpc.loadFile.mockResolvedValue({
                 success: true,
@@ -207,8 +208,8 @@ describe('DocumentHistoryManager', () => {
             expect(manager.isStatsRestored).toBe(true);
             expect(manager.hasPendingRestore).toBe(false);
 
-            window.removeEventListener('restore-page-position', restorePageListener);
-            window.removeEventListener('restore-board-state', restoreBoardListener);
+            window.removeEventListener(APP_EVENTS.RESTORE_PAGE_POSITION, restorePageListener);
+            window.removeEventListener(APP_EVENTS.RESTORE_BOARD_STATE, restoreBoardListener);
         });
 
         it('waits for board-ready before dispatching board restore when board is unavailable', async () => {
@@ -216,7 +217,7 @@ describe('DocumentHistoryManager', () => {
             window.inksight.board = null;
 
             const restoreBoardListener = vi.fn();
-            window.addEventListener('restore-board-state', restoreBoardListener);
+            window.addEventListener(APP_EVENTS.RESTORE_BOARD_STATE, restoreBoardListener);
 
             mockIpc.loadFile.mockResolvedValue({
                 success: true,
@@ -229,14 +230,14 @@ describe('DocumentHistoryManager', () => {
             await manager.restoreState('book-md5');
             expect(restoreBoardListener).not.toHaveBeenCalled();
 
-            window.dispatchEvent(new CustomEvent('board-ready'));
+            window.dispatchEvent(new CustomEvent(APP_EVENTS.BOARD_READY));
             await Promise.resolve();
 
             expect(restoreBoardListener).toHaveBeenCalled();
             expect(manager.isStatsRestored).toBe(true);
             expect(manager.hasPendingRestore).toBe(false);
 
-            window.removeEventListener('restore-board-state', restoreBoardListener);
+            window.removeEventListener(APP_EVENTS.RESTORE_BOARD_STATE, restoreBoardListener);
         });
     });
 });

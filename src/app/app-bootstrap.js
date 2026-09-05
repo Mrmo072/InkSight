@@ -9,6 +9,7 @@ import { setupSelectionSync } from './selection-sync.js';
 import { setupLayoutToggles as setupLayoutControls } from './layout-controls.js';
 import { setupReaderToolbarEvents } from './reader-toolbar-events.js';
 import { createWorkspaceEventListeners } from './workspace-events.js';
+import { APP_EVENTS } from '../core/event-names.js';
 
 export function setupAppEventListeners({
     registerCleanup,
@@ -99,7 +100,7 @@ export async function initAppBootstrap({
         registerCleanup(registerEventListeners([
             {
                 target: window,
-                event: 'restore-page-position',
+                event: APP_EVENTS.RESTORE_PAGE_POSITION,
                 handler: hooks.handleRestorePagePosition
             }
         ]));

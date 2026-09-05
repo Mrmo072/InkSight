@@ -14,6 +14,7 @@ import {
     clearSelectedHighlightState,
     createTouchSelectionScheduler,
     createReaderHighlightToolbar,
+    findCardIdByHighlightId,
     handleReaderHighlightClick,
     registerHighlightToolbarDeletionHandler,
     removeHighlightFromStores,
@@ -29,6 +30,7 @@ import {
     syncDefaultHighlightColor
 } from './pdf-reader-utils.js';
 import { createLogger } from '../core/logger.js';
+import { APP_EVENTS } from '../core/event-names.js';
 
 const logger = createLogger('PDFReader');
 
@@ -475,20 +477,16 @@ export class PDFReader {
             div.style.pointerEvents = 'auto';
             div.style.cursor = 'pointer';
 
-            // Wait for card creation
-            setTimeout(() => {
-                let cardId = null;
-                if (getAppContext().cardSystem) {
-                    const card = Array.from(getAppContext().cardSystem.cards.values()).find(c => c.highlightId === highlight.id);
-                    if (card) {
-                        cardId = card.id;
-                        div.addEventListener('click', (e) => {
-                            e.stopPropagation();
-                            this.handleHighlightClick(e, highlight.id, cardId);
-                        });
-                    }
+            // The linked card may not be registered yet when the drag flow
+            // lands here, so resolve the card id at click time instead of
+            // after a fixed delay.
+            div.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const cardId = findCardIdByHighlightId(getAppContext().cardSystem, highlight.id);
+                if (cardId) {
+                    this.handleHighlightClick(e, highlight.id, cardId);
                 }
-            }, 100);
+            });
         });
 
         selection.removeAllRanges();
@@ -889,7 +887,7 @@ export class PDFReader {
         // Focus the container to ensure keyboard events are captured here
         this.container.focus();
         handleReaderHighlightClick(this, e, highlightId, cardId, ({ highlightId: selectedId, cardId: selectedCardId }) => {
-            window.dispatchEvent(new CustomEvent('highlight-clicked', {
+            window.dispatchEvent(new CustomEvent(APP_EVENTS.HIGHLIGHT_CLICKED, {
                 detail: { highlightId: selectedId, cardId: selectedCardId }
             }));
         });

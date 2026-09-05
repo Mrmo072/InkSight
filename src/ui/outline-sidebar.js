@@ -1,5 +1,6 @@
 import { getAppContext } from '../app/app-context.js';
 import { createLogger } from '../core/logger.js';
+import { APP_EVENTS } from '../core/event-names.js';
 
 const logger = createLogger('OutlineSidebar');
 
@@ -105,7 +106,7 @@ export class OutlineSidebar {
             if (this.toggleBtn) this.toggleBtn.classList.remove('active');
         }
 
-        window.dispatchEvent(new CustomEvent('outline-visibility-changed', {
+        window.dispatchEvent(new CustomEvent(APP_EVENTS.OUTLINE_VISIBILITY_CHANGED, {
             detail: { visible: this.isVisible }
         }));
     }

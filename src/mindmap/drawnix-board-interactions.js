@@ -1,6 +1,7 @@
 import { BoardTransforms, PlaitBoard, Transforms, getSelectedElements, toHostPoint, toViewBoxPoint } from '@plait/core';
 import { v4 as uuidv4 } from 'uuid';
 import { calculateNodeSize, createCenteredPoints } from './drawnix-board-utils.js';
+import { APP_EVENTS } from '../core/event-names.js';
 
 export function createViewportCenterResolver(boardRef, board, containerRef) {
     return () => {
@@ -217,7 +218,7 @@ export function dispatchJumpToSourceFromSelection(board, cardSystem) {
         return;
     }
 
-    window.dispatchEvent(new CustomEvent('jump-to-source', {
+    window.dispatchEvent(new CustomEvent(APP_EVENTS.JUMP_TO_SOURCE, {
         detail: {
             sourceId: card.sourceId,
             highlightId: card.highlightId,

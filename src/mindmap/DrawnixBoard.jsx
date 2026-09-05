@@ -21,6 +21,7 @@ import {
     handleGlobalBoardDrop,
     insertCardIntoBoard
 } from './drawnix-board-interactions.js';
+import { APP_EVENTS } from '../core/event-names.js';
 
 const logger = createLogger('DrawnixBoard');
 
@@ -140,11 +141,11 @@ export const DrawnixBoardComponent = () => {
     useEffect(() => {
         if (!board) return;
 
-        // REMOVED auto-listener for 'card-added' to prevent automatic node creation.
+        // REMOVED auto-listener for APP_EVENTS.CARD_ADDED to prevent automatic node creation.
         // Nodes are now ONLY created via Drag & Drop from the annotation list.
         /*
         const handleCardAdded = (e) => { ... }
-        window.addEventListener('card-added', handleCardAdded);
+        window.addEventListener(APP_EVENTS.CARD_ADDED, handleCardAdded);
         */
 
         // Premature return removed to allow handler initialization
@@ -227,10 +228,10 @@ export const DrawnixBoardComponent = () => {
         const cleanupListeners = registerEventListeners([
             { target: window, event: 'drop', handler: globalDropHandler, options: true },
             { target: window, event: 'dragover', handler: globalDragOverHandler, options: true },
-            { target: window, event: 'add-card-to-board', handler: handleAddCardToBoard },
-            { target: window, event: 'card-soft-deleted', handler: handleCardSoftDeleted },
-            { target: window, event: 'card-restored', handler: handleCardRestored },
-            { target: window, event: 'card-removed', handler: handleCardRemoved }
+            { target: window, event: APP_EVENTS.ADD_CARD_TO_BOARD, handler: handleAddCardToBoard },
+            { target: window, event: APP_EVENTS.CARD_SOFT_DELETED, handler: handleCardSoftDeleted },
+            { target: window, event: APP_EVENTS.CARD_RESTORED, handler: handleCardRestored },
+            { target: window, event: APP_EVENTS.CARD_REMOVED, handler: handleCardRemoved }
         ]);
 
         return () => {
@@ -267,8 +268,8 @@ export const DrawnixBoardComponent = () => {
             }
         };
         const cleanupListeners = registerEventListeners([
-            { target: window, event: 'highlight-selected', handler: handleHighlightSelected },
-            { target: window, event: 'highlight-updated', handler: handleHighlightUpdated }
+            { target: window, event: APP_EVENTS.HIGHLIGHT_SELECTED, handler: handleHighlightSelected },
+            { target: window, event: APP_EVENTS.HIGHLIGHT_UPDATED, handler: handleHighlightUpdated }
         ]);
 
         return () => {
@@ -352,7 +353,7 @@ export const DrawnixBoardComponent = () => {
 
         // Signal that board is ready for restoring data
         logger.debug('Board initialized and ready');
-        window.dispatchEvent(new CustomEvent('board-ready'));
+        window.dispatchEvent(new CustomEvent(APP_EVENTS.BOARD_READY));
 
         // Add click listener for jump-to-source
         const container = PlaitBoard.getBoardContainer(b);
@@ -446,7 +447,7 @@ export const DrawnixBoardComponent = () => {
             }
         };
         const cleanupListeners = registerEventListeners([
-            { target: window, event: 'restore-board-state', handler: handleRestore }
+            { target: window, event: APP_EVENTS.RESTORE_BOARD_STATE, handler: handleRestore }
         ]);
         return () => cleanupListeners();
     }, []);

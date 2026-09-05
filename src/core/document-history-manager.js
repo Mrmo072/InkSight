@@ -24,6 +24,7 @@ import {
     restoreInksightPersistence,
     validateInksightRestorePayload
 } from '../inksight-file/inksight-file-restore.js';
+import { APP_EVENTS } from './event-names.js';
 
 const logger = createLogger('DocumentHistoryManager');
 
@@ -244,7 +245,7 @@ export class DocumentHistoryManager {
     async restoreBoardWhenReady(data) {
         const performBoardRestore = () => {
             logger.debug('Dispatching restore-board-state', { elements: data.elements.length });
-            window.dispatchEvent(new CustomEvent('restore-board-state', {
+            window.dispatchEvent(new CustomEvent(APP_EVENTS.RESTORE_BOARD_STATE, {
                 detail: {
                     elements: data.elements,
                     viewport: data.viewport
@@ -265,7 +266,7 @@ export class DocumentHistoryManager {
             const finish = () => {
                 if (settled) return;
                 settled = true;
-                window.removeEventListener('board-ready', onBoardReady);
+                window.removeEventListener(APP_EVENTS.BOARD_READY, onBoardReady);
                 this.completeRestore({ restored: true });
                 resolve();
             };
@@ -276,7 +277,7 @@ export class DocumentHistoryManager {
                 finish();
             };
 
-            window.addEventListener('board-ready', onBoardReady);
+            window.addEventListener(APP_EVENTS.BOARD_READY, onBoardReady);
             setTimeout(() => {
                 if (!settled) {
                     logger.warn('Board restore timed out. FORCE ENABLING auto-save but checking element count.');
@@ -293,7 +294,7 @@ export class DocumentHistoryManager {
 
         logger.debug('Found lastPage in save file', data.lastPage);
         this.updatePage(md5, data.lastPage);
-        window.dispatchEvent(new CustomEvent('restore-page-position', {
+        window.dispatchEvent(new CustomEvent(APP_EVENTS.RESTORE_PAGE_POSITION, {
             detail: { page: data.lastPage }
         }));
     }

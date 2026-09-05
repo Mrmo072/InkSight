@@ -1,9 +1,10 @@
 import { Transforms, getSelectedElements } from '@plait/core';
 import { v4 as uuidv4 } from 'uuid';
 import { getAppContext } from '../app/app-context.js';
+import { APP_EVENTS } from '../core/event-names.js';
 
 export function emitMindmapSelectionChanged(detail) {
-    window.dispatchEvent(new CustomEvent('mindmap-selection-changed', {
+    window.dispatchEvent(new CustomEvent(APP_EVENTS.MINDMAP_SELECTION_CHANGED, {
         detail
     }));
 }
@@ -144,7 +145,7 @@ function handleUpdatedNode(data, op, cardSystem, logger) {
         return;
     }
 
-    window.dispatchEvent(new CustomEvent('mindmap-node-updated', {
+    window.dispatchEvent(new CustomEvent(APP_EVENTS.MINDMAP_NODE_UPDATED, {
         detail: {
             highlightId: card.highlightId,
             color: newColor

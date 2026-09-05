@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
+import { APP_EVENTS } from './event-names.js';
 
 export class HighlightManager {
     constructor() {
@@ -26,7 +27,7 @@ export class HighlightManager {
             this.highlights.push(highlight);
         }
 
-        window.dispatchEvent(new CustomEvent('highlights-restored', {
+        window.dispatchEvent(new CustomEvent(APP_EVENTS.HIGHLIGHTS_RESTORED, {
             detail: { highlights: this.highlights }
         }));
 
@@ -48,7 +49,7 @@ export class HighlightManager {
         this.highlights.push(highlight);
 
         // Dispatch event for card creation
-        const event = new CustomEvent('highlight-created', {
+        const event = new CustomEvent(APP_EVENTS.HIGHLIGHT_CREATED, {
             detail: highlight
         });
         window.dispatchEvent(event);
@@ -68,7 +69,7 @@ export class HighlightManager {
         this.highlights = this.highlights.filter(h => h.id !== id);
 
         // Dispatch event so UI can remove visual highlights
-        window.dispatchEvent(new CustomEvent('highlight-removed', { detail: id }));
+        window.dispatchEvent(new CustomEvent(APP_EVENTS.HIGHLIGHT_REMOVED, { detail: id }));
     }
 
     getPersistenceData() {
@@ -96,7 +97,7 @@ export class HighlightManager {
         }
 
         // Notify UI/PDF Reader to re-render highlights
-        window.dispatchEvent(new CustomEvent('highlights-restored', {
+        window.dispatchEvent(new CustomEvent(APP_EVENTS.HIGHLIGHTS_RESTORED, {
             detail: { highlights: this.highlights }
         }));
     }
@@ -117,7 +118,7 @@ export class HighlightManager {
 
         if (updated) {
             // Notify UI
-            window.dispatchEvent(new CustomEvent('highlights-restored', {
+            window.dispatchEvent(new CustomEvent(APP_EVENTS.HIGHLIGHTS_RESTORED, {
                 detail: { highlights: this.highlights }
             }));
         }
@@ -147,7 +148,7 @@ export class HighlightManager {
         this.highlights = [];
 
         // Dispatch event to notify that all highlights have been cleared
-        window.dispatchEvent(new CustomEvent('highlights-cleared'));
+        window.dispatchEvent(new CustomEvent(APP_EVENTS.HIGHLIGHTS_CLEARED));
     }
 }
 

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AnnotationList } from '../annotation-list.js';
+import { APP_EVENTS } from '../../core/event-names.js';
 
 describe('annotation-list', () => {
     let cardSystem;
@@ -64,7 +65,7 @@ describe('annotation-list', () => {
 
         const addEvents = dispatchSpy.mock.calls
             .map(([event]) => event)
-            .filter((event) => event.type === 'add-card-to-board');
+            .filter((event) => event.type === APP_EVENTS.ADD_CARD_TO_BOARD);
 
         expect(addEvents).toHaveLength(2);
         expect(cardSystem.updateCard).toHaveBeenCalledWith('card-1', { isOnBoard: true });

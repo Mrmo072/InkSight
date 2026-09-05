@@ -163,3 +163,17 @@ body,
     background-image: radial-gradient(circle, #d4cdb6 1px, transparent 1px) !important;
     background-color: var(--theme-bg-secondary) !important;
 }
+/* Dark-theme remapping for semantic tints & on-tint text used by styles.css */
+:root[data-theme="dark"],
+:root[data-theme="starry"] {
+    --accent-text: #93c5fd;
+    --info-strong: #bfdbfe;
+    --warn-text: #fcd34d;
+    --warn-text-alt: #fdba74;
+    --warn-text-deep: #fdba74;
+    --neutral-strong: #cbd5e1;
+    --neutral-text: #94a3b8;
+    --danger-text: #fca5a5;
+    --tint-warn-bg: #32250f;
+    --tint-info-bg: #16283f;
+}

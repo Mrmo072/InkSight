@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { cardSystem } from '../card-system.js';
 import { highlightManager } from '../highlight-manager.js';
+import { APP_EVENTS } from '../event-names.js';
 
 describe('CardSystem', () => {
     beforeEach(() => {
@@ -13,9 +14,9 @@ describe('CardSystem', () => {
 
     it('creates cards from text highlights via the global event bridge', () => {
         const addedListener = vi.fn();
-        window.addEventListener('card-added', addedListener);
+        window.addEventListener(APP_EVENTS.CARD_ADDED, addedListener);
 
-        window.dispatchEvent(new CustomEvent('highlight-created', {
+        window.dispatchEvent(new CustomEvent(APP_EVENTS.HIGHLIGHT_CREATED, {
             detail: {
                 id: 'h-1',
                 text: 'Important passage',
@@ -37,11 +38,11 @@ describe('CardSystem', () => {
         }));
         expect(addedListener).toHaveBeenCalled();
 
-        window.removeEventListener('card-added', addedListener);
+        window.removeEventListener(APP_EVENTS.CARD_ADDED, addedListener);
     });
 
     it('ignores synthetic image-selection highlights to avoid duplicate cards', () => {
-        window.dispatchEvent(new CustomEvent('highlight-created', {
+        window.dispatchEvent(new CustomEvent(APP_EVENTS.HIGHLIGHT_CREATED, {
             detail: {
                 id: 'h-1',
                 text: '[Image Selection]',
@@ -68,8 +69,8 @@ describe('CardSystem', () => {
     it('soft deletes cards and requests a save', () => {
         const saveListener = vi.fn();
         const deletedListener = vi.fn();
-        window.addEventListener('request-save', saveListener);
-        window.addEventListener('card-soft-deleted', deletedListener);
+        window.addEventListener(APP_EVENTS.REQUEST_SAVE, saveListener);
+        window.addEventListener(APP_EVENTS.CARD_SOFT_DELETED, deletedListener);
 
         cardSystem.addCard({ id: 'c-1', highlightId: 'h-1', sourceId: 'doc-1' });
         cardSystem.removeCard('c-1');
@@ -80,13 +81,13 @@ describe('CardSystem', () => {
             detail: { id: 'c-1', highlightId: 'h-1', deleted: true }
         }));
 
-        window.removeEventListener('request-save', saveListener);
-        window.removeEventListener('card-soft-deleted', deletedListener);
+        window.removeEventListener(APP_EVENTS.REQUEST_SAVE, saveListener);
+        window.removeEventListener(APP_EVENTS.CARD_SOFT_DELETED, deletedListener);
     });
 
     it('hard deletes cards, removes linked highlights, and prunes connections', () => {
         const removedListener = vi.fn();
-        window.addEventListener('card-removed', removedListener);
+        window.addEventListener(APP_EVENTS.CARD_REMOVED, removedListener);
 
         highlightManager.highlights = [{ id: 'h-1', sourceId: 'doc-1' }];
         cardSystem.cards.set('c-1', { id: 'c-1', highlightId: 'h-1', sourceId: 'doc-1' });
@@ -104,7 +105,7 @@ describe('CardSystem', () => {
             detail: expect.objectContaining({ id: 'c-1', highlightId: 'h-1', hardDeleted: true })
         }));
 
-        window.removeEventListener('card-removed', removedListener);
+        window.removeEventListener(APP_EVENTS.CARD_REMOVED, removedListener);
     });
 
     it('cleans up deleted cards, orphan connections, and linked highlights before persisting', () => {
@@ -125,7 +126,7 @@ describe('CardSystem', () => {
 
     it('restores cards from persisted arrays and can remap their source ids', () => {
         const restoredListener = vi.fn();
-        window.addEventListener('cards-restored', restoredListener);
+        window.addEventListener(APP_EVENTS.CARDS_RESTORED, restoredListener);
 
         cardSystem.restorePersistenceData({
             cards: [
@@ -145,12 +146,12 @@ describe('CardSystem', () => {
         ]);
         expect(restoredListener).toHaveBeenCalled();
 
-        window.removeEventListener('cards-restored', restoredListener);
+        window.removeEventListener(APP_EVENTS.CARDS_RESTORED, restoredListener);
     });
 
     it('updates missing source names and emits save requests only when data changes', () => {
         const saveListener = vi.fn();
-        window.addEventListener('request-save', saveListener);
+        window.addEventListener(APP_EVENTS.REQUEST_SAVE, saveListener);
 
         cardSystem.cards.set('c-1', { id: 'c-1', sourceId: 'doc-1', sourceName: null });
         cardSystem.cards.set('c-2', { id: 'c-2', sourceId: 'doc-1', sourceName: 'Preset.pdf' });
@@ -162,6 +163,6 @@ describe('CardSystem', () => {
         expect(cardSystem.cards.get('c-2').sourceName).toBe('Preset.pdf');
         expect(saveListener).toHaveBeenCalledTimes(1);
 
-        window.removeEventListener('request-save', saveListener);
+        window.removeEventListener(APP_EVENTS.REQUEST_SAVE, saveListener);
     });
 });

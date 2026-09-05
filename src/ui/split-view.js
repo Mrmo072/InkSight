@@ -1,4 +1,5 @@
 import { createLogger } from '../core/logger.js';
+import { APP_EVENTS } from '../core/event-names.js';
 
 const logger = createLogger('SplitView');
 
@@ -255,7 +256,7 @@ export class SplitView {
         const width = this.resolvePresetWidth(panel, presets[nextIndex]);
         const appliedWidth = this.setPanelWidth(panel, width);
 
-        window.dispatchEvent(new CustomEvent('layout-panel-preset-changed', {
+        window.dispatchEvent(new CustomEvent(APP_EVENTS.LAYOUT_PANEL_PRESET_CHANGED, {
             detail: {
                 panel,
                 index: nextIndex,
@@ -343,7 +344,7 @@ export class SplitView {
     }
 
     emitPanelState(panel, open) {
-        window.dispatchEvent(new CustomEvent('layout-panel-toggled', {
+        window.dispatchEvent(new CustomEvent(APP_EVENTS.LAYOUT_PANEL_TOGGLED, {
             detail: {
                 panel,
                 open,

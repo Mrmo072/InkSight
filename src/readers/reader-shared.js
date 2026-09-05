@@ -2,6 +2,7 @@ import { highlightManager } from '../core/highlight-manager.js';
 import { getAppContext } from '../app/app-context.js';
 import { PDFHighlightToolbar } from './pdf-highlight-toolbar.jsx';
 import { registerEventListeners } from '../app/event-listeners.js';
+import { APP_EVENTS } from '../core/event-names.js';
 
 export function findCardIdByHighlightId(cardSystem, highlightId) {
     if (!highlightId || !cardSystem?.cards) {
@@ -22,7 +23,7 @@ export function findCardIdByHighlightId(cardSystem, highlightId) {
 }
 
 export function emitHighlightColorUpdated(highlightId, color) {
-    window.dispatchEvent(new CustomEvent('highlight-updated', {
+    window.dispatchEvent(new CustomEvent(APP_EVENTS.HIGHLIGHT_UPDATED, {
         detail: { id: highlightId, color }
     }));
 }
@@ -150,9 +151,9 @@ export function registerBasicReaderListeners(reader, { onCardDeleted }) {
     };
 
     reader.cleanupListeners = registerEventListeners([
-        { target: window, event: 'mindmap-node-updated', handler: reader.handleMindmapNodeUpdated },
-        { target: window, event: 'card-soft-deleted', handler: reader.handleCardDeleted },
-        { target: window, event: 'card-removed', handler: reader.handleCardDeleted },
+        { target: window, event: APP_EVENTS.MINDMAP_NODE_UPDATED, handler: reader.handleMindmapNodeUpdated },
+        { target: window, event: APP_EVENTS.CARD_SOFT_DELETED, handler: reader.handleCardDeleted },
+        { target: window, event: APP_EVENTS.CARD_REMOVED, handler: reader.handleCardDeleted },
         { target: document, event: 'keydown', handler: reader.handleKeyDown }
     ]);
 }

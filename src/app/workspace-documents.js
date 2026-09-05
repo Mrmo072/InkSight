@@ -103,6 +103,89 @@ export function createWorkspaceDocumentsController({
         ui.renderFileList();
     }
 
+    async function importSingleFile(file, { pendingDocumentImport, reservedIds, importedFileData }) {
+        const appContext = getAppContext();
+        const decision = resolveImportDecision({
+            file,
+            pendingDocumentImport,
+            documentManager: appContext.documentManager,
+            currentFiles: workspace.state.files
+        });
+        const targetDocument = decision.mode === 'new'
+            ? null
+            : decision.targetDocumentId
+                ? appContext.documentManager?.getDocumentInfo?.(decision.targetDocumentId) ?? chooseDocumentTarget({
+                    file,
+                    pendingDocumentImport: { id: decision.targetDocumentId, type: file.type },
+                    documentManager: appContext.documentManager,
+                    reservedIds
+                })
+                : null;
+
+        if ((pendingDocumentImport?.id || decision.mode === 'relink-only') && !targetDocument) {
+            const relinkTargetName = pendingDocumentImport?.name || file.name;
+            emitAppNotification({
+                title: 'Relink Skipped',
+                message: `"${file.name}" does not match the expected file type for "${relinkTargetName}". Please choose a compatible source file.`,
+                level: 'warning'
+            });
+            return null;
+        }
+
+        const fileSignature = `${file.name}-${file.size}-${file.lastModified}`;
+        const fileId = targetDocument?.id || await generateHash(fileSignature, logger);
+
+        if (targetDocument?.id) {
+            reservedIds.add(targetDocument.id);
+        }
+
+        const fileData = {
+            id: fileId,
+            name: file.name,
+            type: file.type,
+            lastModified: file.lastModified,
+            fileObj: file,
+            restoredDocumentId: targetDocument?.id || null,
+            importMode: decision.mode
+        };
+
+        const existingIndex = workspace.state.files.findIndex((item) => item.id === fileId);
+        if (existingIndex >= 0) {
+            workspace.state.files[existingIndex] = fileData;
+        } else {
+            workspace.state.files.push(fileData);
+        }
+
+        appContext.documentManager?.registerDocument(
+            fileId,
+            file.name,
+            file.type,
+            true
+        );
+
+        appContext.cardSystem?.updateSourceNames?.(fileId, file.name);
+        appContext.highlightManager?.updateSourceNames?.(fileId, file.name);
+        importedFileData.push(fileData);
+        if (decision.mode === 'replace') {
+            emitAppNotification({
+                title: 'Document Replaced',
+                message: `"${file.name}" replaced the existing workspace source while preserving linked notes and cards.`,
+                level: 'success'
+            });
+        } else if (decision.mode === 'relink-only') {
+            emitAppNotification({
+                title: 'Source Relinked',
+                message: `"${file.name}" was imported as a recovery source for saved links.`,
+                level: 'success'
+            });
+        }
+
+        if (pendingDocumentImport?.id || decision.mode === 'relink-only') {
+            return null;
+        }
+        return fileData;
+    }
+
     async function importFiles(files, { openImportedFile = true } = {}) {
         const appContext = getAppContext();
         if (!appContext.currentProjectId) {
@@ -114,82 +197,19 @@ export function createWorkspaceDocumentsController({
         const importedFileData = [];
 
         for (const file of files) {
-            const decision = resolveImportDecision({
-                file,
-                pendingDocumentImport,
-                documentManager: appContext.documentManager,
-                currentFiles: workspace.state.files
-            });
-            const targetDocument = decision.mode === 'new'
-                ? null
-                : decision.targetDocumentId
-                    ? appContext.documentManager?.getDocumentInfo?.(decision.targetDocumentId) ?? chooseDocumentTarget({
-                        file,
-                        pendingDocumentImport: { id: decision.targetDocumentId, type: file.type },
-                        documentManager: appContext.documentManager,
-                        reservedIds
-                    })
-                    : null;
-
-            if ((pendingDocumentImport?.id || decision.mode === 'relink-only') && !targetDocument) {
-                const relinkTargetName = pendingDocumentImport?.name || file.name;
+            let fileData;
+            try {
+                fileData = await importSingleFile(file, { pendingDocumentImport, reservedIds, importedFileData });
+            } catch (error) {
+                logger?.warn?.('[workspace-documents] Failed to import file:', file?.name, error);
                 emitAppNotification({
-                    title: 'Relink Skipped',
-                    message: `"${file.name}" does not match the expected file type for "${relinkTargetName}". Please choose a compatible source file.`,
-                    level: 'warning'
+                    title: 'Import Failed',
+                    message: `"${file?.name || 'Unknown file'}" could not be imported. The remaining files were still processed.`,
+                    level: 'error'
                 });
-                break;
+                continue;
             }
-
-            const fileSignature = `${file.name}-${file.size}-${file.lastModified}`;
-            const fileId = targetDocument?.id || await generateHash(fileSignature, logger);
-
-            if (targetDocument?.id) {
-                reservedIds.add(targetDocument.id);
-            }
-
-            const fileData = {
-                id: fileId,
-                name: file.name,
-                type: file.type,
-                lastModified: file.lastModified,
-                fileObj: file,
-                restoredDocumentId: targetDocument?.id || null,
-                importMode: decision.mode
-            };
-
-            const existingIndex = workspace.state.files.findIndex((item) => item.id === fileId);
-            if (existingIndex >= 0) {
-                workspace.state.files[existingIndex] = fileData;
-            } else {
-                workspace.state.files.push(fileData);
-            }
-
-            appContext.documentManager?.registerDocument(
-                fileId,
-                file.name,
-                file.type,
-                true
-            );
-
-            appContext.cardSystem?.updateSourceNames?.(fileId, file.name);
-            appContext.highlightManager?.updateSourceNames?.(fileId, file.name);
-            importedFileData.push(fileData);
-            if (decision.mode === 'replace') {
-                emitAppNotification({
-                    title: 'Document Replaced',
-                    message: `"${file.name}" replaced the existing workspace source while preserving linked notes and cards.`,
-                    level: 'success'
-                });
-            } else if (decision.mode === 'relink-only') {
-                emitAppNotification({
-                    title: 'Source Relinked',
-                    message: `"${file.name}" was imported as a recovery source for saved links.`,
-                    level: 'success'
-                });
-            }
-
-            if (pendingDocumentImport?.id || decision.mode === 'relink-only') {
+            if (!fileData) {
                 break;
             }
         }
@@ -202,7 +222,16 @@ export function createWorkspaceDocumentsController({
         }
 
         if (openImportedFile) {
-            await openFile(importedFileData[0]);
+            try {
+                await openFile(importedFileData[0]);
+            } catch (error) {
+                logger?.warn?.('[workspace-documents] Failed to open imported file:', importedFileData[0]?.name, error);
+                emitAppNotification({
+                    title: 'Open Failed',
+                    message: `"${importedFileData[0]?.name || 'Document'}" was imported but could not be opened.`,
+                    level: 'error'
+                });
+            }
         }
 
         void projectWorkspace.performProjectAutosave({ notify: false });

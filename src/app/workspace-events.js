@@ -1,4 +1,5 @@
 import { handleRecoveryPanelClick } from './recovery-panel-actions.js';
+import { APP_EVENTS } from '../core/event-names.js';
 
 export function createWorkspaceEventListeners({
     elements,
@@ -29,12 +30,12 @@ export function createWorkspaceEventListeners({
         { target: elements.mobileNextBtn, event: 'click', handler: () => navigation.getCurrentReader()?.onNextPage() },
         {
             target: windowTarget,
-            event: 'add-card-to-board',
+            event: APP_EVENTS.ADD_CARD_TO_BOARD,
             handler: () => ui.setWorkspaceMode('map')
         },
         {
             target: windowTarget,
-            event: 'document-registered',
+            event: APP_EVENTS.DOCUMENT_REGISTERED,
             handler: () => {
                 ui.attemptAutoRelinkRecoveredDocuments();
                 ui.renderFileList();
@@ -42,7 +43,7 @@ export function createWorkspaceEventListeners({
         },
         {
             target: windowTarget,
-            event: 'document-loaded-changed',
+            event: APP_EVENTS.DOCUMENT_LOADED_CHANGED,
             handler: () => {
                 ui.attemptAutoRelinkRecoveredDocuments();
                 ui.renderFileList();
@@ -50,7 +51,7 @@ export function createWorkspaceEventListeners({
         },
         {
             target: windowTarget,
-            event: 'documents-restored',
+            event: APP_EVENTS.DOCUMENTS_RESTORED,
             handler: () => {
                 ui.attemptAutoRelinkRecoveredDocuments();
                 ui.renderFileList();
@@ -58,19 +59,19 @@ export function createWorkspaceEventListeners({
         },
         {
             target: windowTarget,
-            event: 'recovery-validate-requested',
+            event: APP_EVENTS.RECOVERY_VALIDATE_REQUESTED,
             handler: () => {
                 ui.showRecoveryValidation();
             }
         },
         {
             target: windowTarget,
-            event: 'project-save-completed',
+            event: APP_EVENTS.PROJECT_SAVE_COMPLETED,
             handler: (event) => projectWorkspace.handleProjectSaveCompleted(event)
         },
         {
             target: windowTarget,
-            event: 'project-opened',
+            event: APP_EVENTS.PROJECT_OPENED,
             handler: (event) => projectWorkspace.handleProjectOpened(event)
         },
         {
@@ -268,7 +269,7 @@ export function createWorkspaceEventListeners({
         },
         {
             target: windowTarget,
-            event: 'jump-to-source',
+            event: APP_EVENTS.JUMP_TO_SOURCE,
             handler: (e) => {
                 const { sourceId, highlightId } = e.detail;
                 navigation.handleJumpToSource(sourceId, highlightId);

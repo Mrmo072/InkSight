@@ -1,3 +1,4 @@
+import { APP_EVENTS } from '../core/event-names.js';
 /**
  * PDFHighlightRenderer - Manages rendering of highlights on PDF pages
  * Handles both text highlights and area selection borders
@@ -20,7 +21,7 @@ export class PDFHighlightRenderer {
             '.highlight-overlay, .area-highlight-border, .highlighter-hitbox'
         );
         allHighlights.forEach((el) => {
-            el.classList.toggle('highlight-selected', el.dataset.highlightId === highlightId);
+            el.classList.toggle(APP_EVENTS.HIGHLIGHT_SELECTED, el.dataset.highlightId === highlightId);
         });
     }
 

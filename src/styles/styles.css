@@ -10,6 +10,18 @@
   --text-secondary: #64748b;
   --highlight-color: rgba(255, 226, 52, 0.4);
 
+  /* Semantic tints & on-tint text (remapped by dark themes in themes.css) */
+  --accent-text: #1d4ed8;
+  --info-strong: #1e3a8a;
+  --warn-text: #92400e;
+  --warn-text-alt: #9a3412;
+  --warn-text-deep: #7c2d12;
+  --neutral-strong: #334155;
+  --neutral-text: #475569;
+  --danger-text: #b91c1c;
+  --tint-warn-bg: var(--tint-warn-bg);
+  --tint-info-bg: var(--tint-info-bg);
+
   /* Layout */
   --header-height: 50px;
 }
@@ -81,7 +93,7 @@ body {
   padding: 14px;
   border-radius: 12px;
   border: 1px solid rgba(245, 158, 11, 0.28);
-  background: linear-gradient(180deg, rgba(255, 251, 235, 0.95), rgba(255, 247, 237, 0.98));
+  background: var(--tint-warn-bg);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -92,7 +104,7 @@ body {
   padding: 14px;
   border-radius: 12px;
   border: 1px solid rgba(37, 99, 235, 0.18);
-  background: linear-gradient(180deg, rgba(239, 246, 255, 0.95), rgba(248, 250, 252, 0.98));
+  background: var(--tint-info-bg);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -102,7 +114,7 @@ body {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  color: #1d4ed8;
+  color: var(--accent-text);
 }
 
 .library-project-header .material-icons-round {
@@ -124,7 +136,7 @@ body {
   margin-top: 4px;
   font-size: 12px;
   line-height: 1.5;
-  color: #334155;
+  color: var(--neutral-strong);
 }
 
 .library-project-meta {
@@ -136,10 +148,10 @@ body {
 .library-project-meta span {
   padding: 4px 8px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--bg-secondary);
   border: 1px solid rgba(148, 163, 184, 0.2);
   font-size: 11px;
-  color: #1e3a8a;
+  color: var(--info-strong);
 }
 
 .library-project-actions {
@@ -156,7 +168,7 @@ body {
 
 .library-project-history strong {
   font-size: 12px;
-  color: #1e3a8a;
+  color: var(--info-strong);
 }
 
 .library-project-history-list {
@@ -172,7 +184,7 @@ body {
   gap: 10px;
   padding: 10px 12px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.78);
+  background: var(--bg-secondary);
   border: 1px solid rgba(148, 163, 184, 0.2);
 }
 
@@ -198,8 +210,8 @@ body {
   border: 1px solid rgba(37, 99, 235, 0.2);
   border-radius: 999px;
   padding: 7px 12px;
-  background: white;
-  color: #1d4ed8;
+  background: var(--bg-main);
+  color: var(--accent-text);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -209,8 +221,8 @@ body {
   border: 1px solid rgba(37, 99, 235, 0.18);
   border-radius: 999px;
   padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.86);
-  color: #1d4ed8;
+  background: var(--bg-secondary);
+  color: var(--accent-text);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -218,7 +230,7 @@ body {
 }
 
 .library-project-btn:hover {
-  background: rgba(255, 255, 255, 1);
+  background: var(--bg-main);
   transform: translateY(-1px);
 }
 
@@ -236,7 +248,7 @@ body {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  color: #92400e;
+  color: var(--warn-text);
 }
 
 .library-recovery-header .material-icons-round {
@@ -258,7 +270,7 @@ body {
   margin-top: 4px;
   font-size: 12px;
   line-height: 1.5;
-  color: #9a3412;
+  color: var(--warn-text-alt);
 }
 
 .library-recovery-list {
@@ -276,10 +288,10 @@ body {
 .library-recovery-stats span {
   padding: 4px 8px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--bg-secondary);
   border: 1px solid rgba(251, 191, 36, 0.2);
   font-size: 11px;
-  color: #92400e;
+  color: var(--warn-text);
 }
 
 .library-recovery-actions {
@@ -290,20 +302,20 @@ body {
 .library-recovery-summary {
   padding: 10px 12px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--bg-secondary);
   border: 1px dashed rgba(217, 119, 6, 0.25);
 }
 
 .library-recovery-summary strong {
   display: block;
   font-size: 12px;
-  color: #92400e;
+  color: var(--warn-text);
 }
 
 .library-recovery-summary p {
   margin-top: 4px;
   font-size: 11px;
-  color: #9a3412;
+  color: var(--warn-text-alt);
 }
 
 .library-recovery-item {
@@ -313,7 +325,7 @@ body {
   gap: 10px;
   padding: 10px 12px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--bg-secondary);
   border: 1px solid rgba(251, 191, 36, 0.22);
 }
 
@@ -342,10 +354,10 @@ body {
   max-width: 100%;
   padding: 3px 8px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.78);
+  background: var(--bg-secondary);
   border: 1px solid rgba(251, 191, 36, 0.15);
   font-size: 11px;
-  color: #7c2d12;
+  color: var(--warn-text-deep);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -361,10 +373,10 @@ body {
 .library-recovery-tags span {
   padding: 3px 8px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.78);
+  background: var(--bg-secondary);
   border: 1px solid rgba(251, 191, 36, 0.18);
   font-size: 11px;
-  color: #9a3412;
+  color: var(--warn-text-alt);
 }
 
 .library-recovery-name {
@@ -401,13 +413,13 @@ body {
 }
 
 .library-recovery-btn.secondary {
-  background: rgba(255, 255, 255, 0.9);
-  color: #9a3412;
+  background: var(--bg-secondary);
+  color: var(--warn-text-alt);
   border: 1px solid rgba(217, 119, 6, 0.2);
 }
 
 .library-recovery-btn.secondary:hover {
-  background: rgba(255, 255, 255, 1);
+  background: var(--bg-main);
   box-shadow: none;
 }
 
@@ -415,8 +427,8 @@ body {
   border: 1px solid rgba(217, 119, 6, 0.24);
   border-radius: 999px;
   padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.78);
-  color: #9a3412;
+  background: var(--bg-secondary);
+  color: var(--warn-text-alt);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -424,7 +436,7 @@ body {
 }
 
 .library-recovery-secondary-btn:hover {
-  background: rgba(255, 255, 255, 0.98);
+  background: var(--bg-secondary);
   transform: translateY(-1px);
 }
 
@@ -482,8 +494,8 @@ body {
   height: 30px;
   border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.84);
-  color: #475569;
+  background: var(--bg-secondary);
+  color: var(--neutral-text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -492,7 +504,7 @@ body {
 }
 
 .file-item-action-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 1);
+  background: var(--bg-main);
   transform: translateY(-1px);
 }
 
@@ -502,7 +514,7 @@ body {
 }
 
 .file-item-action-btn.danger {
-  color: #b91c1c;
+  color: var(--danger-text);
 }
 
 .file-item-action-btn .material-icons-round {
@@ -515,7 +527,7 @@ body {
 }
 
 .file-item.active {
-  background-color: #eff6ff;
+  background-color: var(--tint-info-bg);
   color: var(--primary);
   font-weight: 500;
 }
@@ -525,7 +537,7 @@ body {
 }
 
 .file-item.disabled .file-item-meta {
-  color: #b45309;
+  color: var(--warn-text-alt);
 }
 
 /* Resizers */
@@ -606,7 +618,7 @@ body.split-resizing {
   padding: 14px;
   border-radius: 16px;
   border: 1px solid rgba(148, 163, 184, 0.16);
-  background: rgba(255, 255, 255, 0.97);
+  background: var(--bg-secondary);
   box-shadow: 0 28px 70px rgba(15, 23, 42, 0.18);
   z-index: 40;
 }
@@ -653,7 +665,7 @@ body.split-resizing {
 .workspace-search-group-title {
   font-size: 12px;
   font-weight: 700;
-  color: #475569;
+  color: var(--neutral-text);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -765,7 +777,7 @@ body.split-resizing {
   min-height: 40px;
   border: 1px solid rgba(148, 163, 184, 0.24);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.94);
+  background: var(--bg-secondary);
   color: var(--text-main);
   font-size: 12px;
   font-weight: 600;
@@ -860,7 +872,7 @@ body.split-resizing {
 }
 
 .outline-item.active {
-  background-color: #eff6ff;
+  background-color: var(--tint-info-bg);
   color: var(--primary);
   border-left-color: var(--primary);
   font-weight: 500;
@@ -900,7 +912,7 @@ body.split-resizing {
 
 .empty-state-btn {
   border: 1px solid var(--border);
-  background: white;
+  background: var(--bg-main);
   color: var(--text-main);
   border-radius: 999px;
   padding: 10px 16px;
@@ -922,8 +934,8 @@ body.split-resizing {
   padding: 28px;
   min-height: 100%;
   background:
-    radial-gradient(circle at top right, rgba(43, 122, 120, 0.14), transparent 32%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 248, 250, 0.98));
+    radial-gradient(circle at top right, rgba(31, 111, 235, 0.12), transparent 32%),
+    var(--bg-secondary);
 }
 
 .project-home-hero {
@@ -932,14 +944,14 @@ body.split-resizing {
   gap: 16px;
   padding: 24px;
   border-radius: 24px;
-  background: rgba(255, 255, 255, 0.82);
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
   box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
 }
 
 .project-home-icon {
   font-size: 42px;
-  color: #0f766e;
+  color: var(--primary);
 }
 
 .project-home-copy h2 {
@@ -964,13 +976,13 @@ body.split-resizing {
   gap: 14px;
   padding: 20px;
   border-radius: 20px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
   min-height: 220px;
 }
 
 .project-home-card.accent {
-  background: linear-gradient(180deg, rgba(15, 118, 110, 0.1), rgba(255, 255, 255, 0.94));
+  background: linear-gradient(180deg, rgba(37, 99, 235, 0.18), var(--bg-secondary));
 }
 
 .project-home-card-copy {
@@ -994,7 +1006,7 @@ body.split-resizing {
 .project-home-btn,
 .project-home-list-item {
   border: 1px solid rgba(15, 23, 42, 0.12);
-  background: #fff;
+  background: var(--bg-main);
   color: var(--text-main);
   border-radius: 14px;
   padding: 11px 14px;
@@ -1004,15 +1016,15 @@ body.split-resizing {
 }
 
 .project-home-btn.primary {
-  background: #0f766e;
-  border-color: #0f766e;
+  background: var(--primary);
+  border-color: var(--primary);
   color: #fff;
 }
 
 .project-home-btn:hover,
 .project-home-list-item:hover {
   transform: translateY(-1px);
-  border-color: rgba(15, 118, 110, 0.45);
+  border-color: rgba(37, 99, 235, 0.45);
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
 }
 
@@ -1169,7 +1181,7 @@ body.split-resizing {
   border-radius: 8px;
   padding: 8px 10px;
   background: #dbeafe;
-  color: #1d4ed8;
+  color: var(--accent-text);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -1216,7 +1228,7 @@ body.split-resizing {
 .annotation-item.active {
   border-color: var(--primary);
   box-shadow: 0 0 0 1px var(--primary);
-  background-color: #eff6ff;
+  background-color: var(--tint-info-bg);
 }
 
 .annotation-item.selected {
@@ -1245,7 +1257,7 @@ body.split-resizing {
   padding: 2px 6px;
   border-radius: 999px;
   background: rgba(37, 99, 235, 0.08);
-  color: #1d4ed8;
+  color: var(--accent-text);
   font-weight: 600;
 }
 
@@ -1489,6 +1501,10 @@ body.split-resizing {
 
 .app-notification.warning {
   background: rgba(146, 64, 14, 0.96);
+}
+
+.app-notification.error {
+  background: rgba(185, 28, 28, 0.96);
 }
 
 .app-notification.success {

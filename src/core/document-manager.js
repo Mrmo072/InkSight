@@ -3,6 +3,7 @@
  * Tracks document names, types, and loaded status for multi-document support
  */
 import { createLogger } from './logger.js';
+import { APP_EVENTS } from './event-names.js';
 
 const logger = createLogger('DocumentManager');
 
@@ -44,7 +45,7 @@ export class DocumentManager {
         logger.debug('Document registered', { id, name, loaded });
 
         // Notify system of document registration
-        window.dispatchEvent(new CustomEvent('document-registered', {
+        window.dispatchEvent(new CustomEvent(APP_EVENTS.DOCUMENT_REGISTERED, {
             detail: docInfo
         }));
 
@@ -67,7 +68,7 @@ export class DocumentManager {
         logger.debug('Document unregistered', id);
 
         // Notify system of document removal
-        window.dispatchEvent(new CustomEvent('document-unregistered', {
+        window.dispatchEvent(new CustomEvent(APP_EVENTS.DOCUMENT_UNREGISTERED, {
             detail: { id }
         }));
     }
@@ -134,7 +135,7 @@ export class DocumentManager {
         logger.debug('Document loaded status updated', { id, loaded });
 
         // Notify system of status change
-        window.dispatchEvent(new CustomEvent('document-loaded-changed', {
+        window.dispatchEvent(new CustomEvent(APP_EVENTS.DOCUMENT_LOADED_CHANGED, {
             detail: { id, loaded }
         }));
     }
@@ -167,7 +168,7 @@ export class DocumentManager {
         logger.debug('Clearing all documents');
         this.documents.clear();
 
-        window.dispatchEvent(new CustomEvent('documents-cleared'));
+        window.dispatchEvent(new CustomEvent(APP_EVENTS.DOCUMENTS_CLEARED));
     }
 
     /**
@@ -208,7 +209,7 @@ export class DocumentManager {
         logger.debug(`Restored ${this.documents.size} document references`);
 
         // Notify system
-        window.dispatchEvent(new CustomEvent('documents-restored', {
+        window.dispatchEvent(new CustomEvent(APP_EVENTS.DOCUMENTS_RESTORED, {
             detail: { count: this.documents.size }
         }));
     }

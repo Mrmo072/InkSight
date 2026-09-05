@@ -1,5 +1,7 @@
 :root {
   --app-bg: #f3f5f7;
+  --app-bg-start: #f8fafc;
+  --app-bg-end: #f1f5f9;
   --surface-base: rgba(255, 255, 255, 0.96);
   --surface-soft: rgba(247, 249, 251, 0.94);
   --surface-muted: rgba(241, 245, 249, 0.92);
@@ -29,8 +31,8 @@
 html,
 body {
   background:
-    radial-gradient(circle at top left, rgba(31, 111, 235, 0.08), transparent 24%),
-    linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    radial-gradient(circle at top left, var(--accent-soft), transparent 24%),
+    linear-gradient(180deg, var(--app-bg-start) 0%, var(--app-bg-end) 100%);
 }
 
 body {
@@ -71,7 +73,7 @@ body {
 .notes-header,
 .outline-header,
 .toolbar {
-  background: rgba(255, 255, 255, 0.98);
+  background: var(--surface-base);
 }
 
 .sidebar-header,
@@ -89,7 +91,7 @@ body {
   padding: 0 12px;
   gap: 10px;
   align-items: center;
-  background: rgba(255, 255, 255, 0.96);
+  background: var(--surface-base);
 }
 
 .toolbar-section {
@@ -277,7 +279,7 @@ body {
 
 .workspace-mode-btn.active,
 .workspace-mode-btn[aria-selected="true"] {
-  background: #fff;
+  background: var(--surface-base);
   color: var(--text-strong);
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
@@ -404,7 +406,7 @@ body:not(.mobile-layout) .workspace-mode-group {
   margin: 8px 8px 0;
   padding: 8px 10px;
   border: 1px solid rgba(148, 163, 184, 0.12);
-  background: rgba(248, 250, 252, 0.72);
+  background: var(--surface-muted);
   box-shadow: none;
 }
 
@@ -491,7 +493,7 @@ body:not(.mobile-layout) .workspace-mode-group {
   border-radius: 999px;
   padding: 3px 8px;
   border: 1px solid rgba(148, 163, 184, 0.14);
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--surface-soft);
   color: var(--text-muted);
   font-size: 10px;
   font-weight: 700;
@@ -551,7 +553,7 @@ body:not(.mobile-layout) .workspace-mode-group {
   padding: 20px 12px;
   border-radius: 12px;
   border: 1px dashed rgba(148, 163, 184, 0.2);
-  background: rgba(248, 250, 252, 0.55);
+  background: var(--surface-muted);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -592,7 +594,7 @@ body:not(.mobile-layout) .workspace-mode-group {
 }
 
 .file-item:hover {
-  background: rgba(255, 255, 255, 0.74);
+  background: var(--surface-soft);
   border-color: rgba(148, 163, 184, 0.12);
   box-shadow: none;
 }
@@ -657,7 +659,7 @@ body:not(.mobile-layout) .workspace-mode-group {
   top: 18px;
   border-radius: 22px;
   border: 1px solid var(--surface-border);
-  background: rgba(255, 255, 255, 0.98);
+  background: var(--surface-base);
   box-shadow: 0 26px 56px rgba(15, 23, 42, 0.14);
   padding: 16px;
 }
@@ -674,7 +676,7 @@ body:not(.mobile-layout) .workspace-mode-group {
   align-items: start;
   border-radius: 16px;
   border: 1px solid rgba(148, 163, 184, 0.14);
-  background: rgba(247, 249, 251, 0.92);
+  background: var(--surface-soft);
   padding: 12px 14px;
   box-shadow: none;
 }
@@ -712,7 +714,7 @@ body:not(.mobile-layout) .workspace-mode-group {
 
 .workspace-search-result:hover {
   border-color: rgba(31, 111, 235, 0.2);
-  background: rgba(255, 255, 255, 0.98);
+  background: var(--surface-base);
 }
 
 .workspace-search-result-title {
@@ -732,13 +734,13 @@ body:not(.mobile-layout) .workspace-mode-group {
   padding: 28px;
   gap: 20px;
   background:
-    radial-gradient(circle at top right, rgba(31, 111, 235, 0.08), transparent 26%),
-    linear-gradient(180deg, rgba(252, 253, 255, 0.98), rgba(244, 247, 250, 0.98));
+    radial-gradient(circle at top right, var(--accent-soft), transparent 26%),
+    var(--surface-soft);
 }
 
 .project-home-hero,
 .project-home-card {
-  background: rgba(255, 255, 255, 0.94);
+  background: var(--surface-base);
   border: 1px solid var(--surface-border);
   box-shadow: var(--surface-shadow-soft);
 }
@@ -765,7 +767,7 @@ body:not(.mobile-layout) .workspace-mode-group {
 }
 
 .project-home-card.accent {
-  background: linear-gradient(180deg, rgba(31, 111, 235, 0.1), rgba(255, 255, 255, 0.96));
+  background: linear-gradient(180deg, rgba(31, 111, 235, 0.1), var(--surface-base));
   border-color: rgba(31, 111, 235, 0.16);
 }
 
@@ -817,14 +819,27 @@ body:not(.mobile-layout) .workspace-mode-group {
 
 .project-home-btn.icon-tile {
   min-height: 88px;
-  padding: 0;
+  padding: 10px 8px;
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 6px;
 }
 
 .project-home-btn.icon-tile .material-icons-round {
   font-size: 24px;
+}
+
+.project-home-btn .project-home-btn-label {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.project-home-btn.primary {
+  gap: 6px;
 }
 
 .project-home-list-item {
@@ -894,7 +909,7 @@ body:not(.mobile-layout) .workspace-mode-group {
 }
 
 .annotation-list {
-  background: linear-gradient(180deg, rgba(248, 250, 252, 0.86), rgba(255, 255, 255, 0.94));
+  background: linear-gradient(180deg, var(--surface-soft), var(--surface-base));
   border-right: 1px solid rgba(148, 163, 184, 0.12);
   max-width: none;
   transition: none;
@@ -934,7 +949,7 @@ body.notes-split-resizing .notes-inner-resizer::before {
   grid-template-columns: minmax(0, 1fr);
   gap: 8px;
   padding: 12px;
-  background: rgba(255, 255, 255, 0.88);
+  background: var(--surface-soft);
   border-bottom: 1px solid rgba(148, 163, 184, 0.12);
   backdrop-filter: blur(12px);
 }
@@ -1019,7 +1034,7 @@ body.notes-split-resizing .notes-inner-resizer::before {
 
 .annotation-basket-btn.secondary,
 .mobile-project-btn.subtle {
-  background: #fff;
+  background: var(--surface-base);
   border: 1px solid rgba(148, 163, 184, 0.18);
   color: var(--text-main);
 }
@@ -1028,7 +1043,7 @@ body.notes-split-resizing .notes-inner-resizer::before {
   margin: 10px 12px;
   padding: 14px;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.96);
+  background: var(--surface-base);
   border: 1px solid rgba(148, 163, 184, 0.14);
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
 }
@@ -1096,7 +1111,7 @@ body.notes-split-resizing .notes-inner-resizer::before {
   margin-top: 12px;
   border-radius: 14px;
   border: 1px solid rgba(148, 163, 184, 0.16);
-  background: rgba(248, 250, 252, 0.72);
+  background: var(--surface-muted);
 }
 
 .annotation-note-input {
@@ -1144,7 +1159,7 @@ body.notes-split-resizing .notes-inner-resizer::before {
   border-radius: 999px;
   padding: 0;
   border: 1px solid rgba(148, 163, 184, 0.14);
-  background: rgba(255, 255, 255, 0.96);
+  background: var(--surface-base);
   color: var(--text-main);
 }
 
@@ -1339,7 +1354,7 @@ body:not(.mobile-layout) .page-nav-floating {
   padding: 3px 6px;
   border-radius: 999px;
   border: 1px solid rgba(148, 163, 184, 0.14);
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--surface-muted);
   backdrop-filter: blur(10px);
   box-shadow: none;
   z-index: 4;
@@ -1352,7 +1367,7 @@ body:not(.mobile-layout) .page-nav-floating .icon-btn {
   min-height: 28px;
   border-radius: 999px;
   border: 1px solid rgba(148, 163, 184, 0.16);
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--surface-soft);
   color: var(--text-muted);
 }
 
@@ -1379,7 +1394,7 @@ body:not(.mobile-layout) .selection-mode-floating {
   padding: 4px;
   border-radius: 999px;
   border: 1px solid rgba(148, 163, 184, 0.14);
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--surface-muted);
   backdrop-filter: blur(10px);
   box-shadow: none;
   z-index: 4;
@@ -1392,7 +1407,7 @@ body:not(.mobile-layout) .selection-mode-floating .icon-btn {
   min-height: 30px;
   border-radius: 999px;
   border: 1px solid rgba(148, 163, 184, 0.16);
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--surface-soft);
   color: var(--text-muted);
 }
 
@@ -1561,4 +1576,81 @@ body:not(.mobile-layout) .selection-mode-floating .icon-btn:hover {
     margin: 8px 10px;
     padding: 14px;
   }
+}
+
+/* Dark & Starry themes: remap workspace shell variables so the whole
+   app (not just the mind map canvas) follows the selected theme. */
+:root[data-theme="dark"],
+:root[data-theme="starry"] {
+  --app-bg: #0d141d;
+  --app-bg-start: #0f1720;
+  --app-bg-end: #0b1118;
+  --surface-base: rgba(23, 32, 43, 0.96);
+  --surface-soft: rgba(18, 26, 36, 0.94);
+  --surface-muted: rgba(14, 21, 30, 0.92);
+  --surface-border: rgba(148, 163, 184, 0.18);
+  --surface-border-strong: rgba(148, 163, 184, 0.3);
+  --surface-shadow: 0 18px 42px rgba(0, 0, 0, 0.45);
+  --surface-shadow-soft: 0 10px 28px rgba(0, 0, 0, 0.35);
+  --accent-soft: rgba(102, 152, 255, 0.16);
+  --text-strong: #f1f5f9;
+  --text-main: #e2e8f0;
+  --text-muted: #9aaabc;
+  --text-subtle: #74859c;
+}
+
+:root[data-theme="dark"] .action-pill:hover,
+:root[data-theme="dark"] .action-pill:focus-visible,
+:root[data-theme="starry"] .action-pill:hover,
+:root[data-theme="starry"] .action-pill:focus-visible {
+  background: rgba(148, 163, 184, 0.14);
+}
+
+/* Narrow reader pane (e.g. tight split view): compress toolbar content so the
+   mode switcher never overlaps the trailing actions. Container queries respond
+   to the pane width, which viewport media queries cannot see. */
+.toolbar {
+  container-type: inline-size;
+}
+
+@container (max-width: 620px) {
+  body:not(.mobile-layout) .workspace-mode-group {
+    grid-template-columns: repeat(3, minmax(40px, 1fr));
+  }
+
+  body:not(.mobile-layout) .workspace-mode-btn {
+    padding: 0 6px;
+    font-size: 0;
+    gap: 0;
+  }
+
+  .toolbar-doc-caption {
+    display: none;
+  }
+
+  .toolbar-section-leading .action-pill-label {
+    display: none;
+  }
+}
+
+/* The Google Material Icons stylesheet loads after this file and resets
+   .material-icons-round to display: inline-block at equal specificity, which
+   breaks the icon badge centering above. Re-assert it with higher specificity. */
+span.material-icons-round.project-home-icon,
+span.material-icons-round.project-home-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  flex: 0 0 auto;
+}
+
+span.material-icons-round.project-home-icon {
+  width: 56px;
+  height: 56px;
+}
+
+span.material-icons-round.project-home-card-icon {
+  width: 40px;
+  height: 40px;
 }

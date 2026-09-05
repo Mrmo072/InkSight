@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { documentManager } from '../document-manager.js';
+import { APP_EVENTS } from '../event-names.js';
 
 function listenOnce(eventName) {
     const handler = vi.fn();
@@ -15,7 +16,7 @@ describe('DocumentManager', () => {
     });
 
     it('registers documents and emits registration events', () => {
-        const listener = listenOnce('document-registered');
+        const listener = listenOnce(APP_EVENTS.DOCUMENT_REGISTERED);
 
         const doc = documentManager.registerDocument('doc-1', 'Book.pdf', 'application/pdf');
 
@@ -26,7 +27,7 @@ describe('DocumentManager', () => {
     });
 
     it('updates loaded status and exposes query helpers', () => {
-        const listener = listenOnce('document-loaded-changed');
+        const listener = listenOnce(APP_EVENTS.DOCUMENT_LOADED_CHANGED);
         documentManager.registerDocument('doc-1', 'Book.pdf', 'application/pdf', false);
 
         documentManager.markDocumentLoaded('doc-1', true);
@@ -39,7 +40,7 @@ describe('DocumentManager', () => {
     });
 
     it('unregisters known documents and ignores unknown ones', () => {
-        const listener = listenOnce('document-unregistered');
+        const listener = listenOnce(APP_EVENTS.DOCUMENT_UNREGISTERED);
         documentManager.registerDocument('doc-1', 'Book.pdf', 'application/pdf');
 
         documentManager.unregisterDocument('doc-1');
@@ -51,7 +52,7 @@ describe('DocumentManager', () => {
     });
 
     it('restores persisted documents as unloaded references', () => {
-        const listener = listenOnce('documents-restored');
+        const listener = listenOnce(APP_EVENTS.DOCUMENTS_RESTORED);
         documentManager.restorePersistenceData({
             documents: [
                 ['doc-1', { id: 'doc-1', name: 'Book.pdf', type: 'application/pdf', loaded: true }],
@@ -87,7 +88,7 @@ describe('DocumentManager', () => {
     });
 
     it('clears all document registrations and exposes persistence payloads', () => {
-        const listener = listenOnce('documents-cleared');
+        const listener = listenOnce(APP_EVENTS.DOCUMENTS_CLEARED);
         documentManager.registerDocument('doc-1', 'Book.pdf', 'application/pdf');
 
         const payload = documentManager.getPersistenceData();

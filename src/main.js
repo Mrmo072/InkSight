@@ -26,6 +26,7 @@ initAppContext();
 // Import cardSystem (it's already imported by other modules, but we need it here)
 import { cardSystem } from './core/card-system.js';
 import { documentManager } from './core/document-manager.js';
+import { APP_EVENTS } from './core/event-names.js';
 setAppService('cardSystem', cardSystem);
 setAppService('highlightManager', highlightManager);
 setAppService('documentManager', documentManager);
@@ -345,7 +346,7 @@ function setupNotesInnerResizer() {
     window.addEventListener('pointerup', handlePointerUp);
     window.addEventListener('pointercancel', handlePointerUp);
     window.addEventListener('resize', applyStoredWidth);
-    window.addEventListener('layout-panel-toggled', applyStoredWidth);
+    window.addEventListener(APP_EVENTS.LAYOUT_PANEL_TOGGLED, applyStoredWidth);
 
     applyStoredWidth();
 }
@@ -741,8 +742,8 @@ function setupResponsiveLayout() {
                 closeCompactPanels();
             }
         },
-        { target: window, event: 'layout-panel-toggled', handler: updatePanelControls },
-        { target: window, event: 'outline-visibility-changed', handler: updatePanelControls },
+        { target: window, event: APP_EVENTS.LAYOUT_PANEL_TOGGLED, handler: updatePanelControls },
+        { target: window, event: APP_EVENTS.OUTLINE_VISIBILITY_CHANGED, handler: updatePanelControls },
         {
             target: window,
             event: 'resize',
@@ -824,7 +825,7 @@ function setupSearch() {
             }
 
             if (result.type === 'card') {
-                window.dispatchEvent(new CustomEvent('card-selected', {
+                window.dispatchEvent(new CustomEvent(APP_EVENTS.CARD_SELECTED, {
                     detail: result.actionPayload.cardId
                 }));
             }
