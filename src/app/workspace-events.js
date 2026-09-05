@@ -1,4 +1,7 @@
 import { handleRecoveryPanelClick } from './recovery-panel-actions.js';
+import { getAppContext } from './app-context.js';
+import { openGraphView } from '../mindmap/graph-view/graph-view.js';
+import { emitAppNotification } from '../ui/app-notifications.js';
 import { APP_EVENTS } from '../core/event-names.js';
 
 export function createWorkspaceEventListeners({
@@ -32,6 +35,26 @@ export function createWorkspaceEventListeners({
             target: windowTarget,
             event: APP_EVENTS.ADD_CARD_TO_BOARD,
             handler: () => ui.setWorkspaceMode('map')
+        },
+        {
+            target: windowTarget,
+            event: APP_EVENTS.OPEN_GRAPH_VIEW,
+            handler: (e) => {
+                const cardId = e.detail?.cardId;
+                if (!cardId) {
+                    return;
+                }
+
+                const context = getAppContext();
+                const onBoard = context?.board?.children?.some((child) => child.data?.cardId === cardId);
+                if (!onBoard) {
+                    emitAppNotification('该标注尚未加入脑图，请先拖入画布后再展开图谱');
+                    return;
+                }
+
+                ui.setWorkspaceMode('map');
+                openGraphView({ rootCardId: cardId });
+            }
         },
         {
             target: windowTarget,

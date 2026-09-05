@@ -192,9 +192,24 @@ export function focusBoardCard({ board, cardId, setFlashOverlay }) {
         height: screenHeight
     });
 
-    setTimeout(() => {
+    clearTimeout(board.__inksightFlashTimeout);
+    board.__inksightFlashTimeout = setTimeout(() => {
         setFlashOverlay(null);
+        board.__inksightFlashTimeout = null;
     }, 800);
+    board.__inksightFlashCancel = () => {
+        clearTimeout(board.__inksightFlashTimeout);
+        board.__inksightFlashTimeout = null;
+        setFlashOverlay(null);
+    };
+}
+
+/**
+ * Cancels an in-flight node flash (e.g. the graph view opening right after
+ * the annotation click that triggered it).
+ */
+export function cancelBoardCardFlash(board) {
+    board?.__inksightFlashCancel?.();
 }
 
 export function dispatchJumpToSourceFromSelection(board, cardSystem) {

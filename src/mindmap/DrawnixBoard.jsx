@@ -25,6 +25,7 @@ import {
     insertCardIntoBoard
 } from './drawnix-board-interactions.js';
 import { APP_EVENTS } from '../core/event-names.js';
+import { isGraphViewOpen } from './graph-view/graph-view.js';
 
 const logger = createLogger('DrawnixBoard');
 
@@ -248,6 +249,10 @@ export const DrawnixBoardComponent = () => {
 
         const handleHighlightSelected = (e) => {
             const { cardId } = e.detail;
+            // 图谱视图覆盖脑图时闪烁定位毫无意义，还会盖在视图上
+            if (isGraphViewOpen()) {
+                return;
+            }
             focusBoardCard({ board, cardId, setFlashOverlay });
         };
 
@@ -464,7 +469,8 @@ export const DrawnixBoardComponent = () => {
             const board = boardRef.current;
             if (!board) return;
             try {
-                if (Number.isFinite(board.viewport?.zoom) === false) {
+                const zoom = board.viewport?.zoom;
+                if (!Number.isFinite(zoom) || zoom < 0.01 || zoom > 50) {
                     BoardTransforms.updateZoom(board, 1);
                 }
                 const mode = appThemeToBoard[themeManager.getTheme()] || 'default';

@@ -199,7 +199,13 @@ export const Wrapper: React.FC<WrapperProps> = ({
         parent: board,
         parentG: PlaitBoard.getElementHost(board),
       });
-      BoardTransforms.fitViewport(board);
+      // Fitting against a hidden/collapsed container (reading mode) yields a
+      // near-zero zoom — the "0%" default. Only fit when the container is
+      // actually visible and has a real size.
+      const containerRect = PlaitBoard.getBoardContainer(board).getBoundingClientRect();
+      if (containerRect.width > 0 && containerRect.height > 0) {
+        BoardTransforms.fitViewport(board);
+      }
     }
   }, [value]);
 

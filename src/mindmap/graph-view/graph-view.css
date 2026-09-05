@@ -1,0 +1,376 @@
+/* Graph view overlay — tree exploration opened by double-clicking a card node.
+   Visual language follows the "Progressive Thought Graph" reference demo. */
+
+.graph-view {
+    position: absolute;
+    inset: 0;
+    z-index: 30;
+    display: none;
+    background-color: #0b0f19;
+    background-image:
+        radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.05) 0%, transparent 80%),
+        radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+    background-size: 100% 100%, 28px 28px;
+    color: #e2e8f0;
+    user-select: none;
+    overflow: hidden;
+}
+
+.graph-view.active {
+    display: block;
+}
+
+.graph-view__viewport {
+    position: absolute;
+    inset: 0;
+    cursor: default;
+}
+
+.graph-view__viewport.panning {
+    cursor: grabbing;
+}
+
+.graph-view__world {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-origin: 0 0;
+    will-change: transform;
+}
+
+.graph-view__svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1px;
+    height: 1px;
+    overflow: visible !important;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.graph-view__nodes {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    pointer-events: none;
+}
+
+/* ---- edges ---- */
+
+.graph-link {
+    fill: none;
+    stroke: rgba(99, 102, 241, 0.35);
+    stroke-width: 2.5px;
+    stroke-linecap: round;
+    transition: stroke 0.4s, stroke-width 0.4s;
+}
+
+.graph-link--active {
+    stroke: #38bdf8 !important;
+    stroke-width: 4.5px !important;
+}
+
+.graph-link-pulse {
+    fill: none;
+    stroke: #a5b4fc;
+    stroke-width: 3px;
+    stroke-dasharray: 6, 14;
+    animation: graphLinkFlow 1.6s linear infinite;
+    opacity: 0.85;
+    stroke-linecap: round;
+}
+
+@keyframes graphLinkFlow {
+    from { stroke-dashoffset: 20; }
+    to { stroke-dashoffset: 0; }
+}
+
+/* ---- bubbles ---- */
+
+.graph-bubble {
+    position: absolute;
+    width: 270px;
+    background: rgba(17, 24, 39, 0.92);
+    border: 1px solid rgba(99, 102, 241, 0.28);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-radius: 16px;
+    box-shadow:
+        0 20px 35px -8px rgba(0, 0, 0, 0.7),
+        0 0 0 1px rgba(255, 255, 255, 0.05),
+        0 0 20px rgba(99, 102, 241, 0.08);
+    transform: translate(-50%, -50%);
+    pointer-events: auto;
+    transition: border-color 0.25s, box-shadow 0.25s;
+}
+
+.graph-bubble:hover {
+    border-color: rgba(129, 140, 248, 0.65);
+    box-shadow:
+        0 24px 40px -6px rgba(0, 0, 0, 0.8),
+        0 0 25px rgba(99, 102, 241, 0.22);
+}
+
+.graph-bubble--targeted-child {
+    animation: graphTargetChildPulse 1.4s ease-out;
+}
+
+@keyframes graphTargetChildPulse {
+    0% {
+        border-color: #38bdf8;
+        box-shadow: 0 0 45px rgba(56, 189, 248, 0.9), 0 0 0 2px #38bdf8;
+        transform: translate(-50%, -50%) scale(1.08);
+    }
+    100% {
+        border-color: rgba(99, 102, 241, 0.28);
+        box-shadow: 0 20px 35px -8px rgba(0, 0, 0, 0.7);
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+.graph-bubble--targeted-self {
+    animation: graphTargetSelfPulse 1s ease-out;
+}
+
+@keyframes graphTargetSelfPulse {
+    0% {
+        border-color: #818cf8;
+        box-shadow: 0 0 35px rgba(129, 140, 248, 0.65);
+        transform: translate(-50%, -50%) scale(1.04);
+    }
+    100% {
+        border-color: rgba(99, 102, 241, 0.28);
+        box-shadow: 0 20px 35px -8px rgba(0, 0, 0, 0.7);
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+.graph-bubble__header {
+    padding: 12px 14px 8px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    cursor: grab;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    background: rgba(255, 255, 255, 0.015);
+    border-radius: 16px 16px 0 0;
+}
+
+.graph-bubble__header:active {
+    cursor: grabbing;
+}
+
+.graph-bubble__tag {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #818cf8;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.graph-bubble__color-dot {
+    flex: 0 0 8px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.graph-bubble__tag-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.graph-bubble__drag-icon {
+    flex: 0 0 auto;
+    font-size: 13px;
+    color: #475569;
+    transition: color 0.2s;
+}
+
+.graph-bubble__header:hover .graph-bubble__drag-icon {
+    color: #94a3b8;
+}
+
+.graph-bubble__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 14px 0 14px;
+}
+
+.graph-bubble__chip {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    background: rgba(99, 102, 241, 0.16);
+    border: 1px solid rgba(99, 102, 241, 0.35);
+    color: #c7d2fe;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s, transform 0.15s;
+}
+
+.graph-bubble__chip:hover {
+    background: #4f46e5;
+    color: #ffffff;
+    transform: translateY(-1px);
+}
+
+.graph-bubble__body {
+    padding: 12px 16px 16px 16px;
+    font-size: 13.5px;
+    line-height: 1.65;
+    color: #cbd5e1;
+    cursor: text;
+    user-select: text;
+    max-height: 160px;
+    overflow-y: auto;
+}
+
+.graph-bubble__body::-webkit-scrollbar {
+    width: 6px;
+}
+
+.graph-bubble__body::-webkit-scrollbar-thumb {
+    background: rgba(129, 140, 248, 0.4);
+    border-radius: 3px;
+}
+
+mark.graph-mark {
+    background: rgba(99, 102, 241, 0.35);
+    color: #f8fafc;
+    padding: 2px 6px;
+    border-radius: 5px;
+    border-bottom: 2px solid #818cf8;
+    cursor: pointer;
+    display: inline-block;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+mark.graph-mark:hover {
+    background: #4f46e5;
+    border-bottom-color: #38bdf8;
+    color: #ffffff;
+    transform: translateY(-1px);
+    box-shadow: 0 0 14px rgba(99, 102, 241, 0.6);
+}
+
+/* ---- selection pill ---- */
+
+.graph-view__pill {
+    position: fixed;
+    display: none;
+    background: rgba(30, 27, 75, 0.95);
+    border: 1px solid #818cf8;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 16px rgba(99, 102, 241, 0.4);
+    border-radius: 30px;
+    padding: 7px 15px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    color: #ffffff;
+    align-items: center;
+    z-index: 10000;
+    transform: translate(-50%, -100%);
+    transition: transform 0.15s ease, background-color 0.2s;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+.graph-view__pill:hover {
+    background: #4f46e5;
+    transform: translate(-50%, -105%) scale(1.04);
+}
+
+/* ---- HUD ---- */
+
+.graph-view__hud {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    z-index: 100;
+    pointer-events: auto;
+    max-width: calc(100% - 32px);
+}
+
+.graph-view__back {
+    background: rgba(15, 23, 42, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #cbd5e1;
+    padding: 9px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    backdrop-filter: blur(10px);
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.graph-view__back:hover {
+    background: rgba(30, 41, 59, 0.9);
+    color: #ffffff;
+    border-color: rgba(99, 102, 241, 0.5);
+}
+
+.graph-view__title {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: #94a3b8;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 9px 14px;
+    backdrop-filter: blur(10px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.graph-view__controls {
+    position: absolute;
+    bottom: 16px;
+    right: 16px;
+    display: flex;
+    gap: 10px;
+    z-index: 100;
+}
+
+.graph-view__btn {
+    background: rgba(15, 23, 42, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #cbd5e1;
+    padding: 10px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    backdrop-filter: blur(10px);
+    transition: all 0.2s;
+}
+
+.graph-view__btn:hover {
+    background: rgba(30, 41, 59, 0.9);
+    color: #ffffff;
+    border-color: rgba(99, 102, 241, 0.5);
+}

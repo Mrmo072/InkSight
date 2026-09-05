@@ -19,6 +19,7 @@ export const APP_EVENTS = Object.freeze({
     RESTORE_BOARD_STATE: 'restore-board-state',
     BOARD_READY: 'board-ready',
     ADD_CARD_TO_BOARD: 'add-card-to-board',
+    OPEN_GRAPH_VIEW: 'open-graph-view',
 
     // Highlight lifecycle (HighlightManager ↔ readers ↔ annotation list)
     HIGHLIGHT_CREATED: 'highlight-created',

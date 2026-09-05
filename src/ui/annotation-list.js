@@ -307,6 +307,13 @@ export class AnnotationList {
             div.classList.remove('dragging');
         });
 
+        // Double-click opens the graph tree view rooted at this annotation
+        div.addEventListener('dblclick', () => {
+            window.dispatchEvent(new CustomEvent(APP_EVENTS.OPEN_GRAPH_VIEW, {
+                detail: { cardId: card.id }
+            }));
+        });
+
         // Header
         const header = document.createElement('div');
         header.className = 'annotation-header';
