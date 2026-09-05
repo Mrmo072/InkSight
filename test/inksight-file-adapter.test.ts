@@ -181,10 +181,10 @@ describe('InkSight file adapter', () => {
     expect(restoreCards).toHaveBeenLastCalledWith({
       cards: [{ id: 'card-2' }],
       connections: undefined,
-    }, 'active-book-id');
+    }, { from: null, to: 'active-book-id' });
     expect(restoreHighlights).toHaveBeenLastCalledWith({
       highlights: [{ id: 'hl-2' }],
-    }, 'active-book-id');
+    }, { from: null, to: 'active-book-id' });
   });
 
   it('validates restore payload md5 and reports expected element count', async () => {

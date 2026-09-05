@@ -198,11 +198,11 @@ describe('DocumentHistoryManager', () => {
             expect(restoreBoardListener).toHaveBeenCalled();
             expect(window.inksight.highlightManager.restorePersistenceData).toHaveBeenCalledWith(
                 { highlights: [{ id: 'h-9' }] },
-                'book-md5'
+                { from: null, to: 'book-md5' }
             );
             expect(window.inksight.cardSystem.restorePersistenceData).toHaveBeenCalledWith(
                 { cards: [['c-9', { id: 'c-9' }]], connections: [{ id: 'link-9' }] },
-                'book-md5'
+                { from: null, to: 'book-md5' }
             );
             expect(manager.initialElementCount).toBe(1);
             expect(manager.isStatsRestored).toBe(true);

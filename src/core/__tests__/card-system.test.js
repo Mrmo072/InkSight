@@ -131,16 +131,19 @@ describe('CardSystem', () => {
         cardSystem.restorePersistenceData({
             cards: [
                 ['c-1', { id: 'c-1', sourceId: 'old-doc' }],
-                ['c-2', { id: 'c-2', sourceId: 'old-doc' }]
+                ['c-2', { id: 'c-2', sourceId: 'old-doc' }],
+                ['c-3', { id: 'c-3', sourceId: 'other-doc' }]
             ],
             connections: [
                 { id: 'link-ok', sourceId: 'c-1', targetId: 'c-2' },
                 { id: 'link-stale', sourceId: 'c-1', targetId: 'missing' }
             ]
-        }, 'new-doc');
+        }, { from: 'old-doc', to: 'new-doc' });
 
         expect(cardSystem.cards.get('c-1').sourceId).toBe('new-doc');
         expect(cardSystem.cards.get('c-2').sourceId).toBe('new-doc');
+        // 其他书籍的卡片保持原有归属
+        expect(cardSystem.cards.get('c-3').sourceId).toBe('other-doc');
         expect(cardSystem.connections).toEqual([
             { id: 'link-ok', sourceId: 'c-1', targetId: 'c-2' }
         ]);

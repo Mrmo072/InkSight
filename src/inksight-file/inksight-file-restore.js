@@ -1,4 +1,5 @@
 import { createLogger } from '../core/logger.js';
+import { graphNodesStore } from '../mindmap/graph-view/graph-nodes-store.js';
 
 const logger = createLogger('InkSightFileRestore');
 
@@ -10,7 +11,8 @@ function hasRestorePayload(payload) {
             payload.cards ||
             payload.connections ||
             payload.highlights ||
-            payload.documents
+            payload.documents ||
+            payload.graphNodes
         )
     );
 }
@@ -77,11 +79,18 @@ export function restoreInksightPersistence(payload, appContext = {}, options = {
         appContext.pendingRestore = { md5: savedMd5, id: payload.bookId };
     }
 
+    // Only entries belonging to the book this payload was saved with are
+    // remapped — the payload carries highlights/cards from every book in the
+    // project, and rewriting them all would break book ownership. Legacy
+    // payloads without a bookId predate multi-book projects and keep the old
+    // remap-everything behavior.
+    const sourceRemap = newId ? { from: payload.bookId || null, to: newId } : null;
+
     if (appContext.cardSystem?.restorePersistenceData) {
         appContext.cardSystem.restorePersistenceData({
             cards: payload.cards,
             connections: payload.connections
-        }, newId);
+        }, sourceRemap);
     }
 
     if (appContext.highlightManager?.restorePersistenceData) {
@@ -92,12 +101,16 @@ export function restoreInksightPersistence(payload, appContext = {}, options = {
 
         appContext.highlightManager.restorePersistenceData({
             highlights: payload.highlights
-        }, newId);
+        }, sourceRemap);
     }
 
     if (appContext.documentManager?.restorePersistenceData) {
         appContext.documentManager.restorePersistenceData({
             documents: payload.documents
         });
+    }
+
+    if (payload.graphNodes) {
+        graphNodesStore.restorePersistenceData(payload.graphNodes);
     }
 }

@@ -2511,6 +2511,31 @@ body.compact-layout .annotation-item {
   margin-top: 20px;
 }
 
+.settings-modal__input {
+  flex: 1;
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-main);
+  color: var(--text-main);
+  font-size: 13px;
+}
+
+.settings-modal__input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.settings-modal__row--tall {
+  margin-bottom: 12px;
+}
+
+.settings-modal__row--tall .settings-modal__label {
+  flex: 0 0 56px;
+}
+
 
 /* Keyboard focus visibility (a11y floor) */
 :focus-visible {

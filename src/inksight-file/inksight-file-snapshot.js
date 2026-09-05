@@ -1,5 +1,6 @@
 import { VERSIONS } from '../drawnix/drawnix/src/constants.ts';
 import { sanitizeViewport } from '../mindmap/drawnix-board-state.js';
+import { graphNodesStore } from '../mindmap/graph-view/graph-nodes-store.js';
 import { isInksightPayload } from './inksight-file-types.js';
 
 export function buildInksightPersistenceSnapshot(appContext = {}) {
@@ -25,6 +26,10 @@ export function buildInksightPersistenceSnapshot(appContext = {}) {
     if (appContext.documentManager?.getPersistenceData) {
         const documentData = appContext.documentManager.getPersistenceData();
         snapshot.documents = documentData.documents;
+    }
+
+    if (graphNodesStore.hasData()) {
+        snapshot.graphNodes = graphNodesStore.getPersistenceData();
     }
 
     return snapshot;

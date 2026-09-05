@@ -198,34 +198,6 @@
     color: #94a3b8;
 }
 
-.graph-bubble__chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    padding: 8px 14px 0 14px;
-}
-
-.graph-bubble__chip {
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    background: rgba(99, 102, 241, 0.16);
-    border: 1px solid rgba(99, 102, 241, 0.35);
-    color: #c7d2fe;
-    font-size: 11px;
-    font-weight: 600;
-    padding: 3px 9px;
-    border-radius: 20px;
-    cursor: pointer;
-    transition: background-color 0.2s, color 0.2s, transform 0.15s;
-}
-
-.graph-bubble__chip:hover {
-    background: #4f46e5;
-    color: #ffffff;
-    transform: translateY(-1px);
-}
 
 .graph-bubble__body {
     padding: 12px 16px 16px 16px;
@@ -373,4 +345,286 @@ mark.graph-mark:hover {
     background: rgba(30, 41, 59, 0.9);
     color: #ffffff;
     border-color: rgba(99, 102, 241, 0.5);
+}
+
+/* ---- bubble header actions ---- */
+
+.graph-bubble__actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 0 0 auto;
+}
+
+.graph-bubble__action-btn {
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    color: #94a3b8;
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+    transition: all 0.15s;
+    padding: 0;
+}
+
+.graph-bubble__action-btn:hover {
+    background: rgba(99, 102, 241, 0.35);
+    color: #ffffff;
+    border-color: rgba(129, 140, 248, 0.6);
+}
+
+.graph-bubble__action-btn--danger:hover {
+    background: rgba(220, 38, 38, 0.5);
+    border-color: rgba(248, 113, 113, 0.7);
+}
+
+.graph-bubble__tag-title--editable {
+    cursor: text;
+    border-bottom: 1px dashed rgba(129, 140, 248, 0.5);
+}
+
+.graph-bubble__title-input {
+    width: 100%;
+    min-width: 90px;
+    background: rgba(15, 23, 42, 0.9);
+    border: 1px solid #818cf8;
+    border-radius: 5px;
+    color: #f8fafc;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 5px;
+    outline: none;
+}
+
+/* ---- expanded bubble ---- */
+
+.graph-bubble--expanded {
+    width: 480px;
+    z-index: 5;
+}
+
+.graph-bubble--expanded .graph-bubble__body {
+    max-height: none;
+    overflow-y: visible;
+}
+
+/* ---- loading state ---- */
+
+.graph-bubble--loading .graph-bubble__body {
+    color: #818cf8;
+    animation: graphLoadingPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes graphLoadingPulse {
+    0%, 100% { opacity: 0.45; }
+    50% { opacity: 1; }
+}
+
+/* ---- extend dialog ---- */
+
+.graph-view__dialog {
+    position: absolute;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(2, 6, 23, 0.55);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+.graph-view__dialog[hidden] {
+    display: none;
+}
+
+.graph-view__dialog-card {
+    width: 440px;
+    max-width: 90%;
+    background: rgba(17, 24, 39, 0.97);
+    border: 1px solid rgba(99, 102, 241, 0.4);
+    border-radius: 14px;
+    padding: 16px 18px;
+    box-shadow: 0 24px 50px -10px rgba(0, 0, 0, 0.8);
+}
+
+.graph-view__dialog-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #e2e8f0;
+    margin-bottom: 10px;
+}
+
+.graph-view__dialog-input {
+    width: 100%;
+    box-sizing: border-box;
+    background: rgba(15, 23, 42, 0.9);
+    border: 1px solid rgba(99, 102, 241, 0.35);
+    border-radius: 8px;
+    color: #e2e8f0;
+    font-size: 13px;
+    line-height: 1.55;
+    padding: 9px 11px;
+    resize: vertical;
+    min-height: 68px;
+    outline: none;
+    font-family: inherit;
+}
+
+.graph-view__dialog-input:focus {
+    border-color: #818cf8;
+}
+
+.graph-view__dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.graph-view__dialog-btn {
+    background: rgba(30, 41, 59, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #cbd5e1;
+    padding: 7px 13px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.15s;
+}
+
+.graph-view__dialog-btn:hover {
+    color: #ffffff;
+    border-color: rgba(129, 140, 248, 0.6);
+}
+
+.graph-view__dialog-btn--primary {
+    background: #4f46e5;
+    border-color: #4f46e5;
+    color: #ffffff;
+    font-weight: 600;
+}
+
+.graph-view__dialog-btn--primary:hover {
+    background: #6366f1;
+    border-color: #6366f1;
+}
+
+/* ---- markdown body ---- */
+
+.graph-bubble__body--md > *:first-child {
+    margin-top: 0;
+}
+
+.graph-bubble__body--md > *:last-child {
+    margin-bottom: 0;
+}
+
+.graph-bubble__body--md h1,
+.graph-bubble__body--md h2,
+.graph-bubble__body--md h3,
+.graph-bubble__body--md h4 {
+    margin: 12px 0 6px;
+    color: #f1f5f9;
+    line-height: 1.4;
+}
+
+.graph-bubble__body--md h1 { font-size: 17px; }
+.graph-bubble__body--md h2 { font-size: 15px; }
+.graph-bubble__body--md h3 { font-size: 14px; }
+.graph-bubble__body--md h4 { font-size: 13px; }
+
+.graph-bubble__body--md p {
+    margin: 8px 0;
+}
+
+.graph-bubble__body--md ul,
+.graph-bubble__body--md ol {
+    margin: 8px 0;
+    padding-left: 20px;
+}
+
+.graph-bubble__body--md li {
+    margin: 3px 0;
+}
+
+.graph-bubble__body--md code {
+    background: rgba(99, 102, 241, 0.18);
+    border: 1px solid rgba(99, 102, 241, 0.25);
+    color: #c7d2fe;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', Consolas, monospace;
+}
+
+.graph-bubble__body--md pre {
+    background: rgba(2, 6, 23, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 10px 12px;
+    overflow-x: auto;
+    margin: 10px 0;
+}
+
+.graph-bubble__body--md pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    color: #e2e8f0;
+    font-size: 12px;
+}
+
+.graph-bubble__body--md blockquote {
+    margin: 10px 0;
+    padding: 4px 12px;
+    border-left: 3px solid #818cf8;
+    background: rgba(99, 102, 241, 0.08);
+    color: #a5b4fc;
+    border-radius: 0 6px 6px 0;
+}
+
+.graph-bubble__body--md a {
+    color: #818cf8;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.graph-bubble__body--md a:hover {
+    color: #38bdf8;
+}
+
+.graph-bubble__body--md strong {
+    color: #f1f5f9;
+}
+
+.graph-bubble__body--md hr {
+    border: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    margin: 12px 0;
+}
+
+.graph-bubble__body--md table {
+    border-collapse: collapse;
+    margin: 10px 0;
+    font-size: 12px;
+    width: 100%;
+}
+
+.graph-bubble__body--md th,
+.graph-bubble__body--md td {
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    padding: 4px 8px;
+    text-align: left;
+}
+
+.graph-bubble__body--md th {
+    background: rgba(99, 102, 241, 0.15);
+    color: #e2e8f0;
 }

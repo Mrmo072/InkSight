@@ -209,8 +209,18 @@ export class CardSystem {
         };
     }
 
-    restorePersistenceData(data, newSourceId = null) {
-
+    /**
+     * Restores cards from a project payload. `remap` ({ from, to }) is
+     * optional: only cards whose sourceId matches `from` (the book id saved
+     * in the payload) are rewritten to `to`, so cards belonging to other
+     * books keep their ownership.
+     */
+    restorePersistenceData(data, remap = null) {
+        const remapCardSourceId = (card) => {
+            if (remap?.to && (!remap.from || card.sourceId === remap.from)) {
+                card.sourceId = remap.to;
+            }
+        };
 
         this.cards.clear();
         this.connections = [];
@@ -222,17 +232,14 @@ export class CardSystem {
 
                     // Map entries [[id, card], ...]
                     data.cards.forEach(([id, card]) => {
-                        if (newSourceId) {
-                            // console.log(`[CardSystem] Updating card ${id} sourceId from ${card.sourceId} to ${newSourceId}`);
-                            card.sourceId = newSourceId;
-                        }
+                        remapCardSourceId(card);
                         this.cards.set(id, card);
                     });
                 } else {
 
                     // Array of objects [card, ...]
                     data.cards.forEach(card => {
-                        if (newSourceId) card.sourceId = newSourceId;
+                        remapCardSourceId(card);
                         this.cards.set(card.id, card);
                     });
                 }

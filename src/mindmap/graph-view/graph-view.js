@@ -7,8 +7,14 @@ import {
     forceY
 } from 'd3-force';
 import { buildGraphTree } from './graph-tree.js';
+import { graphNodesStore } from './graph-nodes-store.js';
 import { cancelBoardCardFlash } from '../drawnix-board-interactions.js';
 import { getAppContext } from '../../app/app-context.js';
+import { aiConfigManager } from '../../core/ai-config-manager.js';
+import { chatComplete } from '../../core/ai-client.js';
+import { modalManager } from '../../ui/modal-manager.js';
+import { emitAppNotification } from '../../ui/app-notifications.js';
+import { marked } from 'marked';
 import './graph-view.css';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -64,23 +70,70 @@ class GraphViewController {
                     <div class="graph-view__nodes"></div>
                 </div>
             </div>
-            <div class="graph-view__pill">延伸思考节点</div>
+            <div class="graph-view__dialog" hidden>
+                <div class="graph-view__dialog-card">
+                    <div class="graph-view__dialog-title">延伸思考</div>
+                    <textarea class="graph-view__dialog-input" rows="3"
+                        placeholder="输入要传递给 AI 的问题…（Enter 发送，Shift+Enter 换行）"></textarea>
+                    <div class="graph-view__dialog-actions">
+                        <button type="button" class="graph-view__dialog-btn" data-action="cancel">取消</button>
+                        <button type="button" class="graph-view__dialog-btn" data-action="manual">仅创建节点</button>
+                        <button type="button" class="graph-view__dialog-btn graph-view__dialog-btn--primary" data-action="ai">AI 回答</button>
+                    </div>
+                </div>
+            </div>
         `;
         container.appendChild(overlay);
         this.overlay = overlay;
+
+        // 选区胶囊挂到 body：面板祖先链上的 transform 会劫持 fixed 定位
+        const selectionPill = document.createElement('div');
+        selectionPill.className = 'graph-view__pill';
+        selectionPill.textContent = '延伸思考节点';
+        document.body.appendChild(selectionPill);
+        this.selectionPill = selectionPill;
 
         this.viewport = overlay.querySelector('.graph-view__viewport');
         this.world = overlay.querySelector('.graph-view__world');
         this.nodesContainer = overlay.querySelector('.graph-view__nodes');
         this.edgesLayer = overlay.querySelector('.graph-view__edges');
         this.titleEl = overlay.querySelector('.graph-view__title');
-        this.selectionPill = overlay.querySelector('.graph-view__pill');
+        this.dialogEl = overlay.querySelector('.graph-view__dialog');
+        this.dialogInput = overlay.querySelector('.graph-view__dialog-input');
+        this.dialogTitleEl = overlay.querySelector('.graph-view__dialog-title');
+        this.dialogContext = null;
 
         overlay.querySelector('.graph-view__back').addEventListener('click', () => this.close());
         overlay.querySelector('.graph-view__center').addEventListener('click', () => {
             const root = this.nodes?.[0];
             if (root) {
                 this.focusOnNode(root.id, 'self');
+            }
+        });
+
+        this.dialogEl.addEventListener('click', (e) => {
+            if (e.target === this.dialogEl) {
+                this.hideDialog();
+                return;
+            }
+            const action = e.target.closest('[data-action]')?.dataset.action;
+            if (!action) {
+                return;
+            }
+            e.stopPropagation();
+            if (action === 'cancel') {
+                this.hideDialog();
+            } else if (action === 'ai') {
+                this.submitExtendDialog('ai');
+            } else if (action === 'manual') {
+                this.submitExtendDialog('manual');
+            }
+        });
+        this.dialogInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                // 有选区的上下文默认走 AI 回答，手动添加默认创建普通节点
+                this.submitExtendDialog(this.dialogContext?.range ? 'ai' : 'manual');
             }
         });
 
@@ -97,7 +150,7 @@ class GraphViewController {
         document.addEventListener('pointerdown', this.onPointerDownCapture, true);
         document.addEventListener('selectionchange', this.onSelectionChange);
         document.addEventListener('keydown', this.onKeyDown);
-        this.selectionPill.addEventListener('click', () => this.handleExtendSelection());
+        this.selectionPill.addEventListener('click', () => this.showExtendDialog());
     }
 
     onPointerMove = (e) => {
@@ -178,6 +231,10 @@ class GraphViewController {
 
     onKeyDown = (e) => {
         if (!this.isOpen || e.key !== 'Escape') return;
+        if (this.dialogEl && !this.dialogEl.hidden) {
+            this.hideDialog();
+            return;
+        }
         if (document.querySelector('.modal-overlay.active')) return;
         this.close();
     };
@@ -200,12 +257,8 @@ class GraphViewController {
         }
 
         this.rawTree = result.tree;
-        this.childNodesByNodeId = new Map();
-        const collectChildren = (node) => {
-            this.childNodesByNodeId.set(node.id, node.children || []);
-            (node.children || []).forEach(collectChildren);
-        };
-        collectChildren(this.rawTree);
+        this.rebuildTreeIndex();
+        this.mergePersistedNodes();
         this.nodes = [];
         this.links = [];
         this.transform = { x: 0, y: 0, scale: 1 };
@@ -234,10 +287,13 @@ class GraphViewController {
         this.isOpen = false;
         this.overlay.classList.remove('active');
         this.selectionPill.style.display = 'none';
+        this.hideDialog();
         this.simulation?.stop();
         this.simulation = null;
         this.rawTree = null;
         this.childNodesByNodeId = null;
+        this.nodeById = null;
+        this.parentByNodeId = null;
         this.nodes = [];
         this.links = [];
         this.selectedTextContext = null;
@@ -250,6 +306,183 @@ class GraphViewController {
         this.nodesContainer.innerHTML = '';
         this.edgesLayer.innerHTML = '';
         this.edgeItems.clear();
+    }
+
+    /**
+     * Rebuilds lookup indexes (children / parent / node maps) from rawTree.
+     * Card-derived nodes are marked kind 'card'; persisted nodes merged in
+     * afterwards carry their own kind.
+     */
+    rebuildTreeIndex() {
+        this.childNodesByNodeId = new Map();
+        this.nodeById = new Map();
+        this.parentByNodeId = new Map();
+        const walk = (node, parentId) => {
+            node.kind = node.kind || 'card';
+            this.nodeById.set(node.id, node);
+            this.parentByNodeId.set(node.id, parentId);
+            this.childNodesByNodeId.set(node.id, node.children || []);
+            (node.children || []).forEach((child) => walk(child, node.id));
+        };
+        walk(this.rawTree, null);
+    }
+
+    /**
+     * Merges persisted graph-view nodes (manual/AI) into the freshly derived
+     * card tree. Nodes are scoped to the root annotation they were created
+     * under, so each annotation's graph view stays independent. Nodes whose
+     * parent chain no longer exists on the board are reattached to the root
+     * so their content is never lost.
+     */
+    mergePersistedNodes() {
+        if (!graphNodesStore.hasData()) {
+            return;
+        }
+
+        const rootId = this.rawTree.id;
+        const persisted = graphNodesStore.getAll().filter((n) => !n.rootCardId || n.rootCardId === rootId);
+        if (persisted.length === 0) {
+            return;
+        }
+        const persistedIds = new Set(persisted.map((n) => n.id));
+        const toTreeNode = (n) => ({
+            id: n.id,
+            tag: n.title,
+            text: n.content || '（无内容）',
+            color: n.kind === 'ai' ? '#a855f7' : '#38bdf8',
+            kind: n.kind,
+            children: []
+        });
+
+        const childrenByParent = new Map();
+        persisted.forEach((n) => {
+            const list = childrenByParent.get(n.parentId) || [];
+            list.push(n);
+            childrenByParent.set(n.parentId, list);
+        });
+
+        const attach = (storeNode, parentTreeNode) => {
+            const treeNode = toTreeNode(storeNode);
+            parentTreeNode.children.push(treeNode);
+            (childrenByParent.get(storeNode.id) || []).forEach((child) => attach(child, treeNode));
+        };
+
+        persisted
+            .filter((n) => !persistedIds.has(n.parentId) && !this.nodeById.has(n.parentId))
+            .forEach((orphan) => attach(orphan, this.rawTree));
+
+        // parentId 指向树上真实节点（卡片或已挂载的持久化节点）的剩余分支
+        const attachExisting = (treeNode) => {
+            (childrenByParent.get(treeNode.id) || []).forEach((storeNode) => {
+                if (treeNode.children.some((child) => child.id === storeNode.id)) {
+                    return;
+                }
+                attach(storeNode, treeNode);
+            });
+            (treeNode.children || []).forEach(attachExisting);
+        };
+        attachExisting(this.rawTree);
+
+        this.rebuildTreeIndex();
+    }
+
+    applyTreeChange() {
+        this.rebuildTreeIndex();
+        this.calculateLayout();
+        this.renderGraph();
+        this.simulation.nodes(this.nodes);
+        this.simulation.alpha(0.7).restart();
+    }
+
+    /**
+     * Creates a persisted child node under parentId and refreshes the view.
+     * Returns the view node.
+     */
+    createChildNode({ parentId, title, content = '', kind = 'manual' }) {
+        const id = `gv-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const storeNode = graphNodesStore.upsert({
+            id,
+            parentId,
+            rootCardId: this.rawTree?.id || null,
+            kind,
+            title,
+            content
+        });
+        const parentTreeNode = this.nodeById.get(parentId);
+        if (!parentTreeNode) {
+            return null;
+        }
+
+        const treeNode = {
+            id: storeNode.id,
+            tag: storeNode.title,
+            text: storeNode.content || '（无内容）',
+            color: storeNode.kind === 'ai' ? '#a855f7' : '#38bdf8',
+            kind: storeNode.kind,
+            children: []
+        };
+        parentTreeNode.children.push(treeNode);
+        this.applyTreeChange();
+        return treeNode;
+    }
+
+    /**
+     * Removes a view node subtree (persisted nodes only — card nodes are
+     * owned by the board).
+     */
+    deleteSubtree(nodeId) {
+        const treeNode = this.nodeById.get(nodeId);
+        if (!treeNode || treeNode.kind === 'card') {
+            return;
+        }
+        const parentId = this.parentByNodeId.get(nodeId);
+        const parentTreeNode = this.parentByNodeId.get(nodeId) ? this.nodeById.get(parentId) : null;
+        if (parentTreeNode) {
+            parentTreeNode.children = parentTreeNode.children.filter((child) => child.id !== nodeId);
+        }
+        graphNodesStore.removeSubtree(nodeId);
+        this.applyTreeChange();
+    }
+
+    /**
+     * Builds the AI conversation messages for a new question under parentId:
+     * every ancestor up to the root contributes context (card nodes as
+     * excerpt context, AI nodes as prior user/assistant turns).
+     */
+    buildConversation(parentId, question) {
+        const chain = [];
+        let cursor = parentId;
+        while (cursor) {
+            const node = this.nodeById.get(cursor);
+            if (!node) {
+                break;
+            }
+            chain.unshift(node);
+            cursor = this.parentByNodeId.get(cursor);
+        }
+
+        const messages = [];
+        chain.forEach((node) => {
+            if (node.kind === 'ai') {
+                messages.push({ role: 'user', content: node.tag });
+                messages.push({ role: 'assistant', content: node.text });
+            } else {
+                messages.push({ role: 'user', content: `[文献摘录｜${node.tag}]\n${node.text}` });
+            }
+        });
+        messages.push({ role: 'user', content: question });
+
+        // Anthropic/Gemini 需要相邻消息角色交替，合并连续同角色消息
+        const merged = [];
+        messages.forEach((message) => {
+            const last = merged[merged.length - 1];
+            if (last && last.role === message.role) {
+                last.content = `${last.content}\n\n${message.content}`;
+            } else {
+                merged.push({ ...message });
+            }
+        });
+        return merged;
     }
 
     calculateLayout() {
@@ -277,6 +510,7 @@ class GraphViewController {
                 existing.tag = d.data.tag;
                 existing.text = d.data.text;
                 existing.color = d.data.color;
+                existing.kind = d.data.kind;
                 return existing;
             }
 
@@ -286,6 +520,7 @@ class GraphViewController {
                 tag: d.data.tag,
                 text: d.data.text,
                 color: d.data.color,
+                kind: d.data.kind,
                 targetX,
                 targetY,
                 x: parentNode ? parentNode.x + 40 : targetX,
@@ -373,10 +608,6 @@ class GraphViewController {
                 this.nodesContainer.appendChild(el);
             } else {
                 el.querySelector('.graph-bubble__tag-title').textContent = node.tag;
-                // 重建子节点 chips，覆盖延伸思考后新增的分支
-                el.querySelector('.graph-bubble__chips')?.remove();
-                const body = el.querySelector('.graph-bubble__body');
-                el.insertBefore(this.createChildChips(node.id), body);
             }
         });
 
@@ -388,6 +619,7 @@ class GraphViewController {
         el.id = this.domId(node.id);
         el.className = 'graph-bubble';
         el.dataset.cardId = node.id;
+        el.dataset.kind = node.kind || 'card';
 
         const header = document.createElement('div');
         header.className = 'graph-bubble__header';
@@ -403,24 +635,137 @@ class GraphViewController {
         const tagTitle = document.createElement('span');
         tagTitle.className = 'graph-bubble__tag-title';
         escapelessText(tagTitle, node.tag);
+        if (node.kind && node.kind !== 'card') {
+            tagTitle.title = '点击修改标题';
+            tagTitle.classList.add('graph-bubble__tag-title--editable');
+            tagTitle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.startTitleEdit(node.id, tagTitle);
+            });
+        } else {
+            tagTitle.title = '卡片节点标题由来源文档管理';
+        }
         tag.appendChild(tagTitle);
+
+        const headerActions = document.createElement('div');
+        headerActions.className = 'graph-bubble__actions';
+
+        const addChildBtn = document.createElement('button');
+        addChildBtn.type = 'button';
+        addChildBtn.className = 'graph-bubble__action-btn';
+        addChildBtn.textContent = '＋';
+        addChildBtn.title = '创建子节点';
+        addChildBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const childNode = this.createChildNode({
+                parentId: node.id,
+                title: '新思考节点',
+                content: '（待补充）',
+                kind: 'manual'
+            });
+            if (childNode) {
+                // 飞向新节点并直接进入标题编辑
+                setTimeout(() => {
+                    this.triggerJumpToChild(childNode.id, node.id);
+                    const tagTitle = document.querySelector(
+                        `#${CSS.escape(this.domId(childNode.id))} .graph-bubble__tag-title`
+                    );
+                    if (tagTitle) {
+                        this.startTitleEdit(childNode.id, tagTitle);
+                    }
+                }, 100);
+            }
+        });
+        headerActions.appendChild(addChildBtn);
+
+        // 手动/AI 节点支持用标题作为问题调用 AI 填充内容
+        if (node.kind && node.kind !== 'card') {
+            const aiFillBtn = document.createElement('button');
+            aiFillBtn.type = 'button';
+            aiFillBtn.className = 'graph-bubble__action-btn graph-bubble__action-btn--ai';
+            aiFillBtn.textContent = '✨';
+            aiFillBtn.title = '以标题为问题，调用 AI 生成内容';
+            aiFillBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                // 以树节点的实时标题为准（视图节点可能因刚编辑而不同步）
+                const treeNode = this.nodeById?.get(node.id);
+                if (!treeNode || treeNode.tag === '新思考节点' || !treeNode.tag?.trim()) {
+                    emitAppNotification({ message: '请先把标题改写成你要问 AI 的问题', level: 'info' });
+                    return;
+                }
+                const parentId = this.parentByNodeId?.get(node.id) || null;
+                await this.requestAiAnswer(treeNode, treeNode.tag, parentId);
+            });
+            headerActions.appendChild(aiFillBtn);
+        }
+
+        if (node.id !== this.rawTree?.id && node.kind !== 'card') {
+            const deleteBtn = document.createElement('button');
+            deleteBtn.type = 'button';
+            deleteBtn.className = 'graph-bubble__action-btn graph-bubble__action-btn--danger';
+            deleteBtn.textContent = '🗑';
+            deleteBtn.title = '删除此节点及其所有子节点';
+            deleteBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const confirmed = await modalManager.confirm({
+                    title: '删除思考分支',
+                    message: '将删除该节点及其所有子节点（脑图上的卡片节点不受影响）。确定删除？',
+                    confirmLabel: '删除',
+                    cancelLabel: '取消',
+                    danger: true
+                });
+                if (confirmed) {
+                    this.deleteSubtree(node.id);
+                }
+            });
+            headerActions.appendChild(deleteBtn);
+        }
 
         const dragIcon = document.createElement('span');
         dragIcon.className = 'graph-bubble__drag-icon';
         dragIcon.textContent = '⠿';
 
         header.appendChild(tag);
+        header.appendChild(headerActions);
         header.appendChild(dragIcon);
 
         const body = document.createElement('div');
-        body.className = 'graph-bubble__body';
-        escapelessText(body, node.text);
+        body.className = 'graph-bubble__body graph-bubble__body--md';
+        body.innerHTML = marked.parse(node.text || '');
+        // Markdown 链接在新标签页打开，避免污染画布会话
+        body.addEventListener('click', (e) => {
+            const anchor = e.target.closest('a');
+            if (anchor?.href) {
+                e.preventDefault();
+                window.open(anchor.href, '_blank', 'noopener');
+            }
+        });
 
         el.appendChild(header);
-        el.appendChild(this.createChildChips(node.id));
         el.appendChild(body);
 
         this.bindNodeDrag(header, node.id);
+
+        // 双击标题区/边缘切换放大态；正文内双击保留原生选词。
+        // 放大的气泡更宽，需同步放大其碰撞半径并重启模拟，避免与其他气泡重叠。
+        header.addEventListener('dblclick', (e) => {
+            if (e.target.closest('.graph-bubble__action-btn')) return;
+            const expanded = el.classList.toggle('graph-bubble--expanded');
+            const viewNode = this.nodes.find((n) => n.id === node.id);
+            if (viewNode) {
+                viewNode.expanded = expanded;
+                // 圆形碰撞需覆盖矩形对角线，否则放大气泡的角落仍会压到相邻气泡
+                const rect = el.getBoundingClientRect();
+                viewNode.collideRadius = expanded
+                    ? Math.hypot(rect.width, rect.height) / 2 + 12
+                    : 155;
+                this.simulation?.force(
+                    'collide',
+                    forceCollide().radius((d) => d.collideRadius || 155).iterations(4)
+                );
+                this.simulation?.alpha(0.6).restart();
+            }
+        });
 
         el.addEventListener('pointerup', (e) => {
             if (Date.now() - this.justClickedMarkTimestamp < 350) return;
@@ -435,27 +780,46 @@ class GraphViewController {
         return el;
     }
 
-    createChildChips(nodeId) {
-        const children = this.childNodesByNodeId?.get(nodeId) || [];
-        if (children.length === 0) {
-            return document.createDocumentFragment();
+    startTitleEdit(nodeId, tagTitle) {
+        const treeNode = this.nodeById?.get(nodeId);
+        if (!treeNode || tagTitle.querySelector('input')) {
+            return;
         }
 
-        const wrap = document.createElement('div');
-        wrap.className = 'graph-bubble__chips';
-        children.forEach((child) => {
-            const chip = document.createElement('button');
-            chip.type = 'button';
-            chip.className = 'graph-bubble__chip';
-            escapelessText(chip, `→ ${child.tag}`);
-            chip.title = '点击跳转追踪此思考分支';
-            chip.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.triggerJumpToChild(child.id, nodeId);
-            });
-            wrap.appendChild(chip);
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'graph-bubble__title-input';
+        input.value = treeNode.tag;
+        tagTitle.replaceChildren(input);
+        input.focus();
+        input.select();
+
+        const commit = () => {
+            const nextTitle = input.value.trim();
+            if (nextTitle && nextTitle !== treeNode.tag) {
+                treeNode.tag = nextTitle;
+                graphNodesStore.setTitle(nodeId, nextTitle);
+                // 同步视图节点，避免其他交互读到过期标题
+                const viewNode = this.nodes.find((n) => n.id === nodeId);
+                if (viewNode) {
+                    viewNode.tag = nextTitle;
+                }
+            }
+            tagTitle.replaceChildren();
+            escapelessText(tagTitle, treeNode.tag);
+        };
+
+        input.addEventListener('click', (e) => e.stopPropagation());
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                commit();
+            } else if (e.key === 'Escape') {
+                tagTitle.replaceChildren();
+                escapelessText(tagTitle, treeNode.tag);
+            }
         });
-        return wrap;
+        input.addEventListener('blur', commit);
     }
 
     bindNodeDrag(dragHandle, nodeId) {
@@ -511,64 +875,156 @@ class GraphViewController {
         this.focusOnNode(childId, 'child');
     }
 
-    handleExtendSelection() {
-        const ctx = this.selectedTextContext;
-        if (!ctx || !this.rawTree) return;
-
-        const { text, parentId, range } = ctx;
-        const newChildId = `graph-ext-${Date.now()}`;
-
-        const mark = document.createElement('mark');
-        mark.className = 'graph-mark';
-        mark.setAttribute('data-target-id', newChildId);
-        mark.title = '点击跳转追踪此思考分支';
-
-        try {
-            range.surroundContents(mark);
-        } catch (err) {
-            console.warn('选区包裹退回机制:', err);
+    /**
+     * Wraps the selected range in one or more marks. Unlike
+     * range.surroundContents, this also works when the selection spans
+     * multiple DOM elements (e.g. markdown-generated <p>/<code> nodes):
+     * every participating text node's covered segment gets its own mark
+     * clone sharing the same data-target-id.
+     */
+    wrapRangeWithMark(range, mark) {
+        if (!range || range.collapsed) {
+            return false;
         }
 
-        const appendChildNode = (current) => {
-            if (current.id === parentId) {
-                current.children = current.children || [];
-                current.children.push({
-                    id: newChildId,
-                    tag: '延伸思考',
-                    text: `针对「${text}」的核心逻辑延展与更深入的思考发散...`,
-                    color: null,
-                    children: []
-                });
-                return true;
-            }
-            if (current.children) {
-                for (const child of current.children) {
-                    if (appendChildNode(child)) return true;
-                }
-            }
-            return false;
-        };
+        const root = range.commonAncestorContainer.nodeType === 1
+            ? range.commonAncestorContainer
+            : range.commonAncestorContainer.parentNode;
 
-        if (!appendChildNode(this.rawTree)) {
-            this.selectionPill.style.display = 'none';
+        const textNodes = [];
+        if (range.startContainer === range.endContainer && range.startContainer.nodeType === 3) {
+            textNodes.push(range.startContainer);
+        } else {
+            const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+                acceptNode: (node) => (range.intersectsNode(node) && node.textContent.length
+                    ? NodeFilter.FILTER_ACCEPT
+                    : NodeFilter.FILTER_REJECT)
+            });
+            let current;
+            while ((current = walker.nextNode())) {
+                textNodes.push(current);
+            }
+        }
+
+        let wrappedAny = false;
+        textNodes.forEach((textNode) => {
+            const start = textNode === range.startContainer ? range.startOffset : 0;
+            const end = textNode === range.endContainer ? range.endOffset : textNode.textContent.length;
+            if (end <= start) {
+                return;
+            }
+
+            const middle = start > 0 ? textNode.splitText(start) : textNode;
+            if (end - start < middle.textContent.length) {
+                middle.splitText(end - start);
+            }
+
+            const wrapped = mark.cloneNode();
+            middle.parentNode.insertBefore(wrapped, middle);
+            wrapped.appendChild(middle);
+            wrappedAny = true;
+        });
+
+        return wrappedAny;
+    }
+
+    showExtendDialog() {
+        const ctx = this.selectedTextContext;
+        if (!ctx || !this.rawTree) return;
+        this.openDialog(ctx, '延伸思考', ctx.text || '');
+    }
+
+    openDialog(context, titleText, prefill = '') {
+        this.dialogContext = context;
+        this.dialogTitleEl.textContent = titleText;
+        this.dialogInput.value = prefill;
+        this.dialogEl.hidden = false;
+        this.dialogInput.focus();
+        this.dialogInput.select();
+    }
+
+    hideDialog() {
+        if (!this.dialogEl) return;
+        this.dialogEl.hidden = true;
+        this.dialogContext = null;
+        this.dialogInput.value = '';
+    }
+
+    submitExtendDialog(mode) {
+        const ctx = this.dialogContext;
+        const question = (this.dialogInput?.value || '').trim();
+        if (!ctx || !question) {
+            return;
+        }
+        const { parentId, range } = ctx;
+        this.hideDialog();
+
+        // 选中文本包裹为可跳转的 mark，指向新生成的子节点
+        const node = this.createChildNode({
+            parentId,
+            title: question,
+            content: mode === 'ai' ? '（AI 思考中…）' : '（待补充）',
+            kind: mode === 'ai' ? 'ai' : 'manual'
+        });
+        if (!node) {
             return;
         }
 
-        this.calculateLayout();
-        this.renderGraph();
-
-        this.simulation.nodes(this.nodes);
-        this.simulation.force('x', forceX((d) => d.targetX).strength(0.35));
-        this.simulation.force('y', forceY((d) => d.targetY).strength(0.35));
-        this.simulation.alpha(0.7).restart();
-
-        setTimeout(() => {
-            this.triggerJumpToChild(newChildId, parentId);
-        }, 100);
+        if (range) {
+            const mark = document.createElement('mark');
+            mark.className = 'graph-mark';
+            mark.setAttribute('data-target-id', node.id);
+            mark.title = '点击跳转追踪此思考分支';
+            this.wrapRangeWithMark(range, mark);
+        }
 
         this.selectionPill.style.display = 'none';
         window.getSelection().removeAllRanges();
         this.selectedTextContext = null;
+
+        setTimeout(() => {
+            this.triggerJumpToChild(node.id, parentId);
+        }, 100);
+
+        if (mode === 'ai') {
+            void this.requestAiAnswer(node, question, parentId);
+        }
+    }
+
+    async requestAiAnswer(treeNode, question, parentId) {
+        const config = aiConfigManager.get();
+        if (!aiConfigManager.isConfigured()) {
+            this.updateNodeContent(treeNode.id, '（AI 接口未配置：请在设置中填写接口地址、API Key 和模型名）');
+            emitAppNotification({ message: 'AI 接口尚未配置，已在设置中新增“AI 接口”分组', level: 'warning' });
+            return;
+        }
+
+        const bubbleEl = document.getElementById(this.domId(treeNode.id));
+        bubbleEl?.classList.add('graph-bubble--loading');
+
+        try {
+            const answer = await chatComplete(config, {
+                system: '你是深度阅读助手。用户正在阅读文献并对摘录内容做渐进式思考。请基于给定的文献摘录上下文和此前的思考对话，回答用户的新问题；回答应简明、紧扣上下文。',
+                messages: this.buildConversation(parentId, question)
+            });
+            this.updateNodeContent(treeNode.id, answer);
+        } catch (error) {
+            this.updateNodeContent(treeNode.id, `（AI 请求失败：${error.message}）`);
+            emitAppNotification({ message: `AI 请求失败：${error.message}`, level: 'error' });
+        } finally {
+            bubbleEl?.classList.remove('graph-bubble--loading');
+        }
+    }
+
+    updateNodeContent(nodeId, text) {
+        const treeNode = this.nodeById?.get(nodeId);
+        if (!treeNode) return;
+        treeNode.text = text;
+        graphNodesStore.setContent(nodeId, text);
+        const body = document.querySelector(`#${CSS.escape(this.domId(nodeId))} .graph-bubble__body`);
+        if (body) {
+            body.innerHTML = marked.parse(text || '');
+        }
     }
 
     focusOnNode(nodeId, type = 'child') {

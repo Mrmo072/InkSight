@@ -1,5 +1,8 @@
 import { themeManager } from '../core/theme-manager.js';
 import { preferencesManager } from '../core/preferences-manager.js';
+import { aiConfigManager } from '../core/ai-config-manager.js';
+import { chatComplete } from '../core/ai-client.js';
+import { emitAppNotification } from './app-notifications.js';
 
 const THEME_OPTIONS = [
     { value: 'default', label: '默认' },
@@ -45,6 +48,7 @@ class SettingsModal {
 
         this.body.appendChild(this.buildAppearanceSection());
         this.body.appendChild(this.buildReadingSection());
+        this.body.appendChild(this.buildAiSection());
 
         const actions = document.createElement('div');
         actions.className = 'modal-actions settings-modal__actions';
@@ -187,6 +191,141 @@ class SettingsModal {
         container.appendChild(row);
 
         return slider;
+    }
+
+    buildAiSection() {
+        const presets = aiConfigManager.getPresets();
+        const config = aiConfigManager.get();
+        const section = document.createElement('div');
+        section.className = 'settings-modal__group';
+
+        const heading = document.createElement('h4');
+        heading.className = 'settings-modal__group-title';
+        heading.textContent = 'AI 接口';
+        section.appendChild(heading);
+
+        const buildRow = (labelText, control) => {
+            const row = document.createElement('div');
+            row.className = 'settings-modal__row';
+            const label = document.createElement('label');
+            label.className = 'settings-modal__label';
+            label.textContent = labelText;
+            row.appendChild(label);
+            row.appendChild(control);
+            section.appendChild(row);
+            return row;
+        };
+
+        const buildInput = (placeholder, type = 'text') => {
+            const input = document.createElement('input');
+            input.type = type;
+            input.className = 'settings-modal__input';
+            input.placeholder = placeholder;
+            input.spellcheck = false;
+            return input;
+        };
+
+        // 厂商预设
+        this.aiProviderSelect = document.createElement('select');
+        this.aiProviderSelect.className = 'settings-modal__select';
+        Object.entries(presets).forEach(([value, preset]) => {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = preset.label;
+            this.aiProviderSelect.appendChild(option);
+        });
+        this.aiProviderSelect.value = config.provider;
+        buildRow('厂商', this.aiProviderSelect).classList.add('settings-modal__row--tall');
+        this.aiProviderSelect.addEventListener('change', () => {
+            const next = aiConfigManager.set({ provider: this.aiProviderSelect.value });
+            this.syncAiSection(next);
+        });
+
+        // 接口协议（自定义时可改）
+        this.aiProtocolSelect = document.createElement('select');
+        this.aiProtocolSelect.className = 'settings-modal__select';
+        [
+            { value: 'openai', label: 'OpenAI 兼容' },
+            { value: 'anthropic', label: 'Anthropic (Claude)' },
+            { value: 'gemini', label: 'Google Gemini' }
+        ].forEach(({ value, label }) => {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = label;
+            this.aiProtocolSelect.appendChild(option);
+        });
+        buildRow('协议', this.aiProtocolSelect).classList.add('settings-modal__row--tall');
+        this.aiProtocolSelect.addEventListener('change', () => {
+            aiConfigManager.set({ protocol: this.aiProtocolSelect.value });
+        });
+
+        // Base URL
+        this.aiBaseUrlInput = buildInput('https://…（接口地址）');
+        this.aiBaseUrlInput.value = config.baseUrl;
+        buildRow('地址', this.aiBaseUrlInput).classList.add('settings-modal__row--tall');
+        this.aiBaseUrlInput.addEventListener('change', () => {
+            aiConfigManager.set({ baseUrl: this.aiBaseUrlInput.value });
+        });
+
+        // API Key
+        this.aiApiKeyInput = buildInput('sk-…（密钥仅保存在本机）', 'password');
+        this.aiApiKeyInput.value = config.apiKey;
+        buildRow('API Key', this.aiApiKeyInput).classList.add('settings-modal__row--tall');
+        this.aiApiKeyInput.addEventListener('change', () => {
+            aiConfigManager.set({ apiKey: this.aiApiKeyInput.value });
+        });
+
+        // 模型名
+        this.aiModelInput = buildInput('模型名，如 deepseek-chat');
+        this.aiModelInput.value = config.model;
+        buildRow('模型', this.aiModelInput).classList.add('settings-modal__row--tall');
+        this.aiModelInput.addEventListener('change', () => {
+            aiConfigManager.set({ model: this.aiModelInput.value });
+        });
+
+        // 测试连接
+        const testRow = document.createElement('div');
+        testRow.className = 'settings-modal__row';
+        this.aiTestBtn = document.createElement('button');
+        this.aiTestBtn.type = 'button';
+        this.aiTestBtn.className = 'modal-btn';
+        this.aiTestBtn.textContent = '测试连接';
+        this.aiTestBtn.onclick = () => this.handleAiTest();
+        testRow.appendChild(this.aiTestBtn);
+        section.appendChild(testRow);
+
+        return section;
+    }
+
+    syncAiSection(config) {
+        if (this.aiProviderSelect) this.aiProviderSelect.value = config.provider;
+        if (this.aiProtocolSelect) this.aiProtocolSelect.value = config.protocol;
+        if (this.aiBaseUrlInput) this.aiBaseUrlInput.value = config.baseUrl;
+        if (this.aiApiKeyInput) this.aiApiKeyInput.value = config.apiKey;
+        if (this.aiModelInput) this.aiModelInput.value = config.model;
+    }
+
+    async handleAiTest() {
+        const config = aiConfigManager.get();
+        if (!config.baseUrl || !config.apiKey || !config.model) {
+            emitAppNotification({ message: '请先填写完整的接口地址、API Key 和模型名', level: 'warning' });
+            return;
+        }
+
+        this.aiTestBtn.disabled = true;
+        this.aiTestBtn.textContent = '测试中…';
+        try {
+            const reply = await chatComplete(config, {
+                system: '你是连接测试助手，请只回复：连接成功',
+                messages: [{ role: 'user', content: 'ping' }]
+            });
+            emitAppNotification({ message: `AI 连接成功：${reply.slice(0, 40)}`, level: 'success' });
+        } catch (error) {
+            emitAppNotification({ message: `AI 连接失败：${error.message}`, level: 'error' });
+        } finally {
+            this.aiTestBtn.disabled = false;
+            this.aiTestBtn.textContent = '测试连接';
+        }
     }
 
     handleReset() {

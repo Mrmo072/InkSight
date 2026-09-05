@@ -32,11 +32,20 @@ describe('HighlightManager', () => {
         highlightManager.restorePersistenceData({
             highlights: [
                 { id: 'h-1', text: 'a', sourceId: 'old-doc' },
-                { id: 'h-2', text: 'b', sourceId: 'old-doc' }
+                { id: 'h-2', text: 'b', sourceId: 'old-doc' },
+                { id: 'h-3', text: 'c', sourceId: 'other-doc' }
             ]
-        }, 'new-doc');
+        }, { from: 'old-doc', to: 'new-doc' });
 
         expect(highlightManager.getHighlightsBySource('new-doc')).toHaveLength(2);
+        // 其他书籍的高亮保持原有归属，不被错误改绑
+        expect(highlightManager.getHighlightsBySource('other-doc')).toHaveLength(1);
+
+        // 旧版无 bookId 的 payload 保持全量重绑行为
+        highlightManager.restorePersistenceData({
+            highlights: [{ id: 'h-4', text: 'd', sourceId: 'legacy' }]
+        }, { from: null, to: 'legacy-doc' });
+        expect(highlightManager.getHighlightsBySource('legacy-doc')).toHaveLength(1);
         expect(listener).toHaveBeenCalledWith(expect.objectContaining({
             detail: { highlights: highlightManager.highlights }
         }));

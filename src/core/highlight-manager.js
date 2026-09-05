@@ -78,7 +78,14 @@ export class HighlightManager {
         };
     }
 
-    restorePersistenceData(data, newSourceId = null) {
+    /**
+     * Restores highlights from a project payload. `remap` ({ from, to }) is
+     * optional: only entries whose sourceId matches `from` (the book id saved
+     * in the payload) are rewritten to `to`. The payload may contain
+     * highlights from several books — remapping everything would corrupt
+     * their book ownership and leak highlights across books.
+     */
+    restorePersistenceData(data, remap = null) {
 
 
         if (!data || !data.highlights) {
@@ -88,11 +95,11 @@ export class HighlightManager {
 
         this.highlights = data.highlights;
 
-        // If a new source ID is provided (because we're loading into a new session where the file ID changed),
-        // update all highlights to point to this new ID.
-        if (newSourceId) {
+        if (remap?.to) {
             this.highlights.forEach(h => {
-                h.sourceId = newSourceId;
+                if (!remap.from || h.sourceId === remap.from) {
+                    h.sourceId = remap.to;
+                }
             });
         }
 
