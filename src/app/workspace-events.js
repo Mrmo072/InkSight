@@ -45,10 +45,10 @@ export function createWorkspaceEventListeners({
                     return;
                 }
 
-                const context = getAppContext();
-                const onBoard = context?.board?.children?.some((child) => child.data?.cardId === cardId);
-                if (!onBoard) {
-                    emitAppNotification('该标注尚未加入脑图，请先拖入画布后再展开图谱');
+                // 未上板的标注也可以展开图谱（单根视图，子节点来自图谱内创建）
+                const cardExists = getAppContext()?.cardSystem?.cards?.has?.(cardId);
+                if (!cardExists) {
+                    emitAppNotification({ message: '未找到该标注，可能已被删除', level: 'warning' });
                     return;
                 }
 

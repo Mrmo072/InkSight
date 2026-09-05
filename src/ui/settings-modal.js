@@ -2,7 +2,9 @@ import { themeManager } from '../core/theme-manager.js';
 import { preferencesManager } from '../core/preferences-manager.js';
 import { aiConfigManager } from '../core/ai-config-manager.js';
 import { chatComplete } from '../core/ai-client.js';
+import { modalManager } from './modal-manager.js';
 import { emitAppNotification } from './app-notifications.js';
+import { resetWorkspace } from '../app/workspace-reset.js';
 
 const THEME_OPTIONS = [
     { value: 'default', label: '默认' },
@@ -49,6 +51,7 @@ class SettingsModal {
         this.body.appendChild(this.buildAppearanceSection());
         this.body.appendChild(this.buildReadingSection());
         this.body.appendChild(this.buildAiSection());
+        this.body.appendChild(this.buildWorkspaceSection());
 
         const actions = document.createElement('div');
         actions.className = 'modal-actions settings-modal__actions';
@@ -191,6 +194,51 @@ class SettingsModal {
         container.appendChild(row);
 
         return slider;
+    }
+
+    buildWorkspaceSection() {
+        const section = document.createElement('div');
+        section.className = 'settings-modal__group';
+
+        const heading = document.createElement('h4');
+        heading.className = 'settings-modal__group-title';
+        heading.textContent = '工作区';
+        section.appendChild(heading);
+
+        const hint = document.createElement('p');
+        hint.className = 'settings-modal__hint';
+        hint.textContent = '清空画布、标注、高亮、文档与图谱节点，并重置项目身份。下次启动将从一个空白工作区开始。';
+        section.appendChild(hint);
+
+        const resetBtn = document.createElement('button');
+        resetBtn.type = 'button';
+        resetBtn.className = 'modal-btn modal-btn-primary danger';
+        resetBtn.textContent = '清空工作区…';
+        resetBtn.onclick = () => this.handleWorkspaceReset();
+        section.appendChild(resetBtn);
+
+        return section;
+    }
+
+    async handleWorkspaceReset() {
+        const confirmed = await modalManager.confirm({
+            title: '清空工作区',
+            message: '将删除当前工作区的全部内容：画布节点、标注卡片、高亮、已导入文档、图谱思考节点，并重置项目身份。此操作不可撤销，确定继续？',
+            confirmLabel: '全部清空',
+            cancelLabel: '取消',
+            danger: true
+        });
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            resetWorkspace();
+            emitAppNotification({ message: '工作区已清空，即将重新加载…', level: 'success' });
+            setTimeout(() => window.location.reload(), 800);
+        } catch (error) {
+            emitAppNotification({ message: `清空失败：${error.message}`, level: 'error' });
+        }
     }
 
     buildAiSection() {

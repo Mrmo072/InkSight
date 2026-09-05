@@ -2570,3 +2570,10 @@ body.compact-layout .annotation-item {
 .annotation-status-tag .material-icons-round {
   font-size: 14px;
 }
+
+.settings-modal__hint {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}

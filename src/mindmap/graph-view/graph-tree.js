@@ -23,11 +23,11 @@ function buildCardText(card) {
 }
 
 export function buildGraphTree({ board, getCardById, rootCardId }) {
-    if (!board || !rootCardId) {
+    if (!rootCardId) {
         return null;
     }
 
-    const children = board.children || [];
+    const children = board?.children || [];
     const cardIdByElementId = new Map();
     const elementByCardId = new Map();
 
@@ -56,8 +56,22 @@ export function buildGraphTree({ board, getCardById, rootCardId }) {
         outgoing.get(sourceCardId).push(targetCardId);
     });
 
+    // 未上板的标注也可以展开图谱：退化为单根树（子节点来自图谱视图内创建）
     if (!elementByCardId.has(rootCardId)) {
-        return null;
+        const rootCard = getCardById?.(rootCardId) || null;
+        if (!rootCard) {
+            return null;
+        }
+        return {
+            tree: {
+                id: rootCardId,
+                tag: rootCard.sourceName || '标注',
+                text: buildCardText(rootCard),
+                color: rootCard.color || null,
+                children: []
+            },
+            cardById: elementByCardId
+        };
     }
 
     const visited = new Set();

@@ -25,13 +25,21 @@ function getCardById(id) {
 }
 
 describe('buildGraphTree', () => {
-    it('returns null without a board or root card id', () => {
-        expect(buildGraphTree({ board: null, getCardById, rootCardId: 'a' })).toBeNull();
+    it('returns null without a root card id or when the card is missing entirely', () => {
         expect(buildGraphTree({ board: createBoard([]), getCardById, rootCardId: null })).toBeNull();
+        expect(buildGraphTree({ board: createBoard([]), getCardById, rootCardId: 'ghost' })).toBeNull();
     });
 
-    it('returns null when the root card has no node on the board', () => {
-        expect(buildGraphTree({ board: createBoard([]), getCardById, rootCardId: 'a' })).toBeNull();
+    it('builds a root-only tree for a card that is not on the board', () => {
+        const { tree } = buildGraphTree({ board: createBoard([]), getCardById, rootCardId: 'a' });
+
+        expect(tree).toEqual({
+            id: 'a',
+            tag: 'Paper A',
+            text: 'Root excerpt\n\nroot note',
+            color: '#ff0000',
+            children: []
+        });
     });
 
     it('builds a single-node tree when the root has no outgoing arrows', () => {

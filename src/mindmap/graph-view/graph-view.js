@@ -330,9 +330,10 @@ class GraphViewController {
     /**
      * Merges persisted graph-view nodes (manual/AI) into the freshly derived
      * card tree. Nodes are scoped to the root annotation they were created
-     * under, so each annotation's graph view stays independent. Nodes whose
-     * parent chain no longer exists on the board are reattached to the root
-     * so their content is never lost.
+     * under — nodes without an explicit root (legacy data) stay hidden
+     * instead of being adopted by whichever view opens next, which used to
+     * surface "ghost" children. Orphans whose parent chain broke reattach to
+     * their own root so their content is never lost.
      */
     mergePersistedNodes() {
         if (!graphNodesStore.hasData()) {
@@ -340,7 +341,7 @@ class GraphViewController {
         }
 
         const rootId = this.rawTree.id;
-        const persisted = graphNodesStore.getAll().filter((n) => !n.rootCardId || n.rootCardId === rootId);
+        const persisted = graphNodesStore.getAll().filter((n) => n.rootCardId === rootId);
         if (persisted.length === 0) {
             return;
         }
@@ -367,6 +368,8 @@ class GraphViewController {
             (childrenByParent.get(storeNode.id) || []).forEach((child) => attach(child, treeNode));
         };
 
+        // 父链断裂的孤儿节点只挂回自己归属的根（过滤已保证 rootCardId 匹配），
+        // 归属不明的节点不再被任意视图收养
         persisted
             .filter((n) => !persistedIds.has(n.parentId) && !this.nodeById.has(n.parentId))
             .forEach((orphan) => attach(orphan, this.rawTree));
