@@ -1791,6 +1791,12 @@ body:not(.mobile-layout) .toolbar-mobile-summary {
   box-shadow: none;
   padding: 4px 4px 0;
   border-radius: 0;
+  flex-wrap: wrap;
+  row-gap: 12px;
+}
+
+.project-home .project-home-copy {
+  min-width: 0;
 }
 
 .project-home .project-home-icon {
@@ -2166,4 +2172,188 @@ body:not(.mobile-layout) .selection-mode-floating .mode-btn.active {
 
 .pdf-color-picker-wrapper .color-select-item .selected-icon {
   color: var(--text-strong);
+}
+
+/* ---- Mobile / tablet adaptation (compact & mobile layouts) ---- */
+
+/* The floating selection toolbar had no positioned style outside the desktop
+   layout: phones rendered it as a 310px in-flow bar (blue stripe) and tablets
+   as a giant centered card covering the page. Restore it as an overlay. */
+body.compact-layout .reader-container .selection-mode-floating,
+body.mobile-layout .reader-container .selection-mode-floating {
+  position: absolute;
+  top: auto;
+  right: auto;
+  left: 12px;
+  bottom: 76px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  width: auto;
+  padding: 5px;
+  border-radius: 12px;
+  border: 1px solid var(--surface-border);
+  background: var(--surface-base);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
+  z-index: 30;
+}
+
+body.compact-layout .reader-container .selection-mode-floating .icon-btn,
+body.mobile-layout .reader-container .selection-mode-floating .icon-btn {
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  min-height: 38px;
+  border-radius: 9px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+body.compact-layout .reader-container .selection-mode-floating .mode-btn.active,
+body.mobile-layout .reader-container .selection-mode-floating .mode-btn.active {
+  background: var(--accent-soft);
+  border: none;
+  color: var(--accent-strong);
+}
+
+/* Compact toolbar: collapse to at most two rows by dropping controls that are
+   duplicated in the library panel, and keeping the primary row scrollable. */
+body.compact-layout .reader-container .toolbar,
+body.mobile-layout .reader-container .toolbar {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  gap: 8px;
+}
+
+body.compact-layout .reader-container .toolbar::-webkit-scrollbar,
+body.mobile-layout .reader-container .toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+body.compact-layout .reader-container .toolbar .toolbar-doc-actions,
+body.mobile-layout .reader-container .toolbar .toolbar-doc-actions,
+body.compact-layout .reader-container .toolbar .toolbar-mobile-summary,
+body.mobile-layout .reader-container .toolbar .toolbar-mobile-summary {
+  display: none;
+}
+
+body.compact-layout .reader-container .toolbar .workspace-mode-group,
+body.mobile-layout .reader-container .toolbar .workspace-mode-group {
+  order: 5;
+  margin-left: auto;
+}
+
+body.compact-layout .reader-container .toolbar .theme-switcher {
+  order: 4;
+}
+
+body.compact-layout .reader-container #doc-title,
+body.mobile-layout .reader-container #doc-title {
+  order: 0;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* Phone (<680): two-row toolbar — row 1 leading + trailing controls,
+   row 2 document title + mode switcher + theme. */
+body.mobile-layout .reader-container .toolbar {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+/* Panel width cycling is meaningless on phones (panels are fixed overlays). */
+body.mobile-layout .reader-container .toolbar .panel-width-btn {
+  display: none;
+}
+
+body.mobile-layout .reader-container .toolbar {
+  gap: 6px;
+}
+
+body.mobile-layout .reader-container .toolbar .toolbar-section-leading .icon-btn,
+body.mobile-layout .reader-container .toolbar .toolbar-section-trailing .icon-btn {
+  width: 38px;
+  min-width: 38px;
+}
+
+body.mobile-layout .reader-container .toolbar .theme-switcher {
+  padding: 0 2px 0 6px;
+}
+
+body.mobile-layout .reader-container .toolbar .theme-switcher select {
+  max-width: 62px;
+}
+
+body.mobile-layout .reader-container .toolbar .toolbar-section-leading {
+  order: 0;
+}
+
+body.mobile-layout .reader-container .toolbar .toolbar-section-trailing {
+  order: 1;
+  margin-left: auto;
+}
+
+body.mobile-layout .reader-container .toolbar .toolbar-section-center {
+  order: 2;
+  flex: 1 1 100%;
+}
+
+/* Page navigation floats bottom-center on touch layouts too. */
+body.compact-layout .reader-container .page-nav-floating,
+body.mobile-layout .reader-container .page-nav-floating {
+  position: absolute;
+  left: 50%;
+  right: auto;
+  top: auto;
+  bottom: 12px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--surface-border);
+  background: var(--surface-base);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12);
+  z-index: 25;
+}
+
+body.compact-layout .reader-container .page-nav-floating .icon-btn,
+body.mobile-layout .reader-container .page-nav-floating .icon-btn {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+body.compact-layout .reader-container #page-info,
+body.mobile-layout .reader-container #page-info {
+  min-width: 32px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* Touch targets: keep toolbar controls at a comfortable minimum on
+   touch layouts (Apple HIG 44pt / Material 48dp; 40px is the floor). */
+body.compact-layout .reader-container .toolbar .icon-btn,
+body.mobile-layout .reader-container .toolbar .icon-btn,
+body.compact-layout .reader-container .toolbar .action-pill,
+body.mobile-layout .reader-container .toolbar .action-pill {
+  min-width: 40px;
+  min-height: 40px;
+}
+
+body.compact-layout .reader-container .toolbar .workspace-mode-btn,
+body.mobile-layout .reader-container .toolbar .workspace-mode-btn {
+  min-width: 44px;
+  min-height: 40px;
 }
