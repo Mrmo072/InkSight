@@ -865,7 +865,6 @@ body:not(.mobile-layout) .workspace-mode-group {
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  align-items: flex-start;
 }
 
 .project-home-list-icon,
@@ -1895,6 +1894,14 @@ span.material-icons-round.project-home-icon {
   color: var(--ink-muted);
   font-size: 18px;
   flex: 0 0 auto;
+}
+
+/* 箭头与左图标同款居中：优先级需压过 vendor 的 .material-icons-round (inline-block) */
+.project-home .project-home-list-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
 }
 
 .project-home .project-home-action-row:hover .project-home-list-icon {

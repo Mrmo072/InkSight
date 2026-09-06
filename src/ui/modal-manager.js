@@ -33,6 +33,8 @@ export class ModalManager {
         // Close on Escape
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && this.isVisible) {
+                // 确认/输入弹窗优先消费 Escape，避免叠加弹窗被一并关闭
+                e.stopImmediatePropagation();
                 this.hide();
             }
         });
@@ -109,6 +111,8 @@ export class ModalManager {
             confirmBtn.onclick = () => finish(true);
             this._confirmFinish = finish;
 
+            // 可能从设置弹窗等更高层弹窗中触发，必须压过所有现有遮罩
+            this.overlay.classList.add('modal-overlay--top');
             this.show();
             confirmBtn.focus();
         });
@@ -179,6 +183,8 @@ export class ModalManager {
             });
             this._confirmFinish = finish;
 
+            // 可能从设置弹窗等更高层弹窗中触发，必须压过所有现有遮罩
+            this.overlay.classList.add('modal-overlay--top');
             this.show();
             input.focus();
         });
@@ -192,6 +198,7 @@ export class ModalManager {
     hide() {
         this.isVisible = false;
         this.overlay.classList.remove('active');
+        this.overlay.classList.remove('modal-overlay--top');
         if (this._confirmFinish) {
             const finish = this._confirmFinish;
             this._confirmFinish = null;

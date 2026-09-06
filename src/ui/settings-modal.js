@@ -15,14 +15,23 @@ const THEME_OPTIONS = [
     { value: 'starry', label: '星空' }
 ];
 
+const SETTINGS_SECTIONS = [
+    { key: 'appearance', label: '外观' },
+    { key: 'reading', label: '阅读' },
+    { key: 'ai', label: 'AI 接口' },
+    { key: 'workspace', label: '工作区' }
+];
+
 /**
- * Standalone settings dialog. Uses the same modal CSS classes as
+ * Standalone settings dialog with a sidebar layout: nav on the left,
+ * one page per section on the right. Uses the same modal CSS classes as
  * ModalManager but keeps its own overlay so confirm/prompt content can
  * never clobber the settings form.
  */
 class SettingsModal {
     constructor() {
         this.isVisible = false;
+        this.activeSection = 'appearance';
         this._resetArmed = false;
         this._resetTimer = null;
         this.createModal();
@@ -40,18 +49,48 @@ class SettingsModal {
         this.closeBtn.innerHTML = '&times;';
         this.closeBtn.onclick = () => this.hide();
 
-        this.body = document.createElement('div');
-        this.body.className = 'modal-body';
+        this.layout = document.createElement('div');
+        this.layout.className = 'settings-modal__layout';
 
-        const title = document.createElement('h3');
-        title.className = 'modal-title';
-        title.textContent = '设置';
-        this.body.appendChild(title);
+        this.sidebar = document.createElement('nav');
+        this.sidebar.className = 'settings-modal__sidebar';
 
-        this.body.appendChild(this.buildAppearanceSection());
-        this.body.appendChild(this.buildReadingSection());
-        this.body.appendChild(this.buildAiSection());
-        this.body.appendChild(this.buildWorkspaceSection());
+        const sidebarTitle = document.createElement('div');
+        sidebarTitle.className = 'settings-modal__sidebar-title';
+        sidebarTitle.textContent = '设置';
+        this.sidebar.appendChild(sidebarTitle);
+
+        this.navButtons = new Map();
+        SETTINGS_SECTIONS.forEach(({ key, label }) => {
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'settings-modal__nav-item';
+            item.textContent = label;
+            item.dataset.section = key;
+            item.onclick = () => this.setActiveSection(key);
+            this.sidebar.appendChild(item);
+            this.navButtons.set(key, item);
+        });
+
+        this.pages = document.createElement('div');
+        this.pages.className = 'settings-modal__pages';
+        this.pageMap = new Map();
+
+        const sectionBuilders = {
+            appearance: () => this.buildAppearanceSection(),
+            reading: () => this.buildReadingSection(),
+            ai: () => this.buildAiSection(),
+            workspace: () => this.buildWorkspaceSection()
+        };
+
+        SETTINGS_SECTIONS.forEach(({ key }) => {
+            const page = document.createElement('div');
+            page.className = 'settings-modal__page';
+            page.dataset.section = key;
+            page.appendChild(sectionBuilders[key]());
+            this.pages.appendChild(page);
+            this.pageMap.set(key, page);
+        });
 
         const actions = document.createElement('div');
         actions.className = 'modal-actions settings-modal__actions';
@@ -70,10 +109,17 @@ class SettingsModal {
 
         actions.appendChild(this.resetBtn);
         actions.appendChild(closeActionBtn);
-        this.body.appendChild(actions);
+
+        this.main = document.createElement('div');
+        this.main.className = 'settings-modal__main';
+        this.main.appendChild(this.pages);
+        this.main.appendChild(actions);
+
+        this.layout.appendChild(this.sidebar);
+        this.layout.appendChild(this.main);
 
         this.content.appendChild(this.closeBtn);
-        this.content.appendChild(this.body);
+        this.content.appendChild(this.layout);
         this.overlay.appendChild(this.content);
         document.body.appendChild(this.overlay);
 
@@ -84,9 +130,22 @@ class SettingsModal {
         });
 
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && this.isVisible) {
+            // 确认/输入弹窗打开时让它优先处理 Escape，避免一并关闭设置弹窗
+            if (e.key === 'Escape' && this.isVisible && !modalManager.isVisible) {
                 this.hide();
             }
+        });
+
+        this.setActiveSection('appearance');
+    }
+
+    setActiveSection(key) {
+        this.activeSection = key;
+        this.navButtons.forEach((btn, btnKey) => {
+            btn.classList.toggle('active', btnKey === key);
+        });
+        this.pageMap.forEach((page, pageKey) => {
+            page.classList.toggle('active', pageKey === key);
         });
     }
 

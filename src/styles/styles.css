@@ -1029,7 +1029,6 @@ body.split-resizing {
   box-shadow: none;
 }
 
-.project-home-list-item span:last-child,
 .project-home-list-empty {
   font-size: 13px;
   color: var(--text-secondary);
@@ -1491,7 +1490,8 @@ body.split-resizing {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  z-index: 1200;
+  /* 必须压过所有弹窗遮罩（9999/--top 10000），否则弹窗打开时通知不可见 */
+  z-index: 10100;
   pointer-events: none;
 }
 
@@ -2458,13 +2458,86 @@ body.compact-layout .annotation-item {
   border-color: var(--primary);
 }
 
-/* Settings dialog (SettingsModal) */
+/* Settings dialog (SettingsModal): sidebar nav + paged content */
 .settings-modal {
-  width: 360px;
+  width: 620px;
+  max-width: 92vw;
+  height: 480px;
+  max-height: 86vh;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.settings-modal .modal-title {
-  margin-bottom: 16px;
+.settings-modal__layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.settings-modal__sidebar {
+  flex: 0 0 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 12px;
+  border-right: 1px solid var(--line);
+  background: var(--paper-surface);
+}
+
+.settings-modal__sidebar-title {
+  margin: 0 4px 10px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink-strong);
+}
+
+.settings-modal__nav-item {
+  appearance: none;
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--ink-muted);
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.settings-modal__nav-item:hover {
+  background: var(--paper-hover);
+  color: var(--ink-body);
+}
+
+.settings-modal__nav-item.active {
+  background: var(--brand-soft-strong);
+  color: var(--brand-strong);
+  font-weight: 600;
+}
+
+.settings-modal__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 18px 20px 16px;
+}
+
+.settings-modal__pages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.settings-modal__page {
+  display: none;
+}
+
+.settings-modal__page.active {
+  display: block;
 }
 
 .settings-modal__group {
@@ -2525,7 +2598,9 @@ body.compact-layout .annotation-item {
 
 .settings-modal__actions {
   justify-content: space-between;
-  margin-top: 20px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
 }
 
 .settings-modal__input {
@@ -2613,4 +2688,9 @@ body.compact-layout .annotation-item {
 
 .settings-modal__test-status.is-error {
   color: #dc2626;
+}
+
+/* Confirm/prompt dialogs can open above other active modals (e.g. settings) */
+.modal-overlay.modal-overlay--top {
+  z-index: 10000;
 }
