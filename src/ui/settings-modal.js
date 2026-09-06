@@ -340,6 +340,10 @@ class SettingsModal {
         this.aiTestBtn.textContent = '测试连接';
         this.aiTestBtn.onclick = () => this.handleAiTest();
         testRow.appendChild(this.aiTestBtn);
+        // 结果内联显示在弹窗内：全局通知会被设置弹窗的遮罩挡住
+        this.aiTestStatus = document.createElement('span');
+        this.aiTestStatus.className = 'settings-modal__test-status';
+        testRow.appendChild(this.aiTestStatus);
         section.appendChild(testRow);
 
         return section;
@@ -353,23 +357,35 @@ class SettingsModal {
         if (this.aiModelInput) this.aiModelInput.value = config.model;
     }
 
+    setAiTestStatus(message, state = '') {
+        if (!this.aiTestStatus) {
+            return;
+        }
+        this.aiTestStatus.textContent = message;
+        this.aiTestStatus.classList.remove('is-pending', 'is-success', 'is-error');
+        if (state) {
+            this.aiTestStatus.classList.add(state);
+        }
+    }
+
     async handleAiTest() {
         const config = aiConfigManager.get();
         if (!config.baseUrl || !config.apiKey || !config.model) {
-            emitAppNotification({ message: '请先填写完整的接口地址、API Key 和模型名', level: 'warning' });
+            this.setAiTestStatus('请先填写完整的接口地址、API Key 和模型名', 'is-error');
             return;
         }
 
         this.aiTestBtn.disabled = true;
         this.aiTestBtn.textContent = '测试中…';
+        this.setAiTestStatus('正在连接接口…', 'is-pending');
         try {
             const reply = await chatComplete(config, {
                 system: '你是连接测试助手，请只回复：连接成功',
                 messages: [{ role: 'user', content: 'ping' }]
             });
-            emitAppNotification({ message: `AI 连接成功：${reply.slice(0, 40)}`, level: 'success' });
+            this.setAiTestStatus(`连接成功：${reply.slice(0, 40)}`, 'is-success');
         } catch (error) {
-            emitAppNotification({ message: `AI 连接失败：${error.message}`, level: 'error' });
+            this.setAiTestStatus(`连接失败：${error.message}`, 'is-error');
         } finally {
             this.aiTestBtn.disabled = false;
             this.aiTestBtn.textContent = '测试连接';

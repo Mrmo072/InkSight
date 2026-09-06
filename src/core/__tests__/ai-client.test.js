@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { chatComplete } from '../ai-client.js';
+import { chatComplete, chatStream } from '../ai-client.js';
 
 const OPENAI_CONFIG = { protocol: 'openai', baseUrl: 'https://api.example.com/v1', apiKey: 'sk-test', model: 'test-model' };
 const ANTHROPIC_CONFIG = { protocol: 'anthropic', baseUrl: 'https://api.anthropic.com', apiKey: 'ak-test', model: 'claude-test' };
@@ -10,6 +10,27 @@ function jsonResponse(body, ok = true, status = 200) {
         ok,
         status,
         json: async () => body
+    };
+}
+
+function sseResponse(frames) {
+    const encoder = new TextEncoder();
+    let index = 0;
+    return {
+        ok: true,
+        status: 200,
+        body: {
+            getReader() {
+                return {
+                    read() {
+                        if (index < frames.length) {
+                            return Promise.resolve({ done: false, value: encoder.encode(frames[index++]) });
+                        }
+                        return Promise.resolve({ done: true, value: undefined });
+                    }
+                };
+            }
+        }
     };
 }
 
@@ -104,5 +125,56 @@ describe('ai-client', () => {
     it('throws a readable error on HTTP failure without JSON body', async () => {
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 502, json: async () => { throw new Error('bad json'); } }));
         await expect(chatComplete(OPENAI_CONFIG, { messages: [] })).rejects.toThrow('HTTP 502');
+    });
+
+    it('streams OpenAI deltas and resolves the full text', async () => {
+        const fetchMock = vi.fn().mockResolvedValue(sseResponse([
+            'data: {"choices":[{"delta":{"content":"你"}}]}\n\n',
+            'data: {"choices":[{"delta":{"content":"好"}}]}\n',
+            'data: [DONE]\n\n'
+        ]));
+        vi.stubGlobal('fetch', fetchMock);
+
+        const deltas = [];
+        const text = await chatStream(OPENAI_CONFIG, {
+            messages: [{ role: 'user', content: '问题' }],
+            onDelta: (delta, full) => deltas.push([delta, full])
+        });
+
+        expect(text).toBe('你好');
+        expect(deltas).toEqual([['你', '你'], ['好', '你好']]);
+        const [url, options] = fetchMock.mock.calls[0];
+        expect(url).toBe('https://api.example.com/v1/chat/completions');
+        expect(JSON.parse(options.body).stream).toBe(true);
+    });
+
+    it('streams Anthropic content_block_delta events', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(sseResponse([
+            'event: content_block_delta\ndata: {"type":"content_block_delta","delta":{"text":"流式"}}\n\n',
+            'event: message_stop\ndata: {"type":"message_stop"}\n\n'
+        ])));
+
+        const text = await chatStream(ANTHROPIC_CONFIG, { messages: [{ role: 'user', content: '问题' }], onDelta: () => {} });
+        expect(text).toBe('流式');
+    });
+
+    it('streams Gemini SSE parts and appends the key', async () => {
+        const fetchMock = vi.fn().mockResolvedValue(sseResponse([
+            'data: {"candidates":[{"content":{"parts":[{"text":"Gemini 流"}]}}]}\n\n'
+        ]));
+        vi.stubGlobal('fetch', fetchMock);
+
+        const text = await chatStream(GEMINI_CONFIG, { messages: [{ role: 'user', content: '问题' }], onDelta: () => {} });
+        expect(text).toBe('Gemini 流');
+        expect(fetchMock.mock.calls[0][0]).toContain(':streamGenerateContent?alt=sse&key=gm-test');
+    });
+
+    it('surfaces provider errors on a streaming response', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: false,
+            status: 401,
+            json: async () => ({ error: { message: '密钥无效' } })
+        }));
+        await expect(chatStream(OPENAI_CONFIG, { messages: [], onDelta: () => {} })).rejects.toThrow('密钥无效');
     });
 });

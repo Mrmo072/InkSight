@@ -2577,3 +2577,23 @@ body.compact-layout .annotation-item {
   line-height: 1.6;
   color: var(--text-secondary);
 }
+
+.settings-modal__test-status {
+  margin-left: 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-all;
+  color: var(--text-secondary);
+}
+
+.settings-modal__test-status.is-pending {
+  color: var(--theme-primary);
+}
+
+.settings-modal__test-status.is-success {
+  color: #16a34a;
+}
+
+.settings-modal__test-status.is-error {
+  color: #dc2626;
+}

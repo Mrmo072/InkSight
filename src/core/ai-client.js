@@ -5,6 +5,9 @@
  */
 
 const REQUEST_TIMEOUT_MS = 60000;
+// Streaming responses can legitimately last minutes; the timeout guards
+// against a stalled connection, so it resets on every received chunk.
+const STREAM_IDLE_TIMEOUT_MS = 60000;
 
 function extractErrorMessage(payload, response) {
     const detail = payload?.error?.message
@@ -116,6 +119,171 @@ const ADAPTERS = {
 };
 
 /**
+ * Reads an SSE response body and invokes `onData` with every `data:` payload.
+ * The idle timer resets on each chunk so only a stalled connection aborts.
+ */
+async function requestSse(url, options, onData) {
+    const controller = new AbortController();
+    let timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const resetIdleTimer = () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => controller.abort(), STREAM_IDLE_TIMEOUT_MS);
+    };
+    try {
+        const response = await fetch(url, { ...options, signal: controller.signal });
+        if (!response.ok) {
+            let payload = null;
+            try {
+                payload = await response.json();
+            } catch {
+                // Non-JSON error body — fall through to status handling.
+            }
+            throw new Error(extractErrorMessage(payload, response));
+        }
+        if (!response.body) {
+            throw new Error('AI 流式响应不可用（无响应体）');
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+                break;
+            }
+            resetIdleTimer();
+            buffer += decoder.decode(value, { stream: true });
+            let newlineIndex;
+            while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+                const line = buffer.slice(0, newlineIndex).trim();
+                buffer = buffer.slice(newlineIndex + 1);
+                if (line.startsWith('data:')) {
+                    onData(line.slice(5).trim());
+                }
+            }
+        }
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+function finishStreamText(text) {
+    const trimmed = text.trim();
+    if (!trimmed) {
+        throw new Error('AI 响应格式异常：流式返回为空');
+    }
+    return trimmed;
+}
+
+async function streamOpenAI(config, { system, messages, onDelta }) {
+    let full = '';
+    await requestSse(joinUrl(config.baseUrl, '/chat/completions'), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${config.apiKey}`
+        },
+        body: JSON.stringify({
+            model: config.model,
+            messages: system ? [{ role: 'system', content: system }, ...messages] : messages,
+            stream: true
+        })
+    }, (data) => {
+        if (data === '[DONE]') {
+            return;
+        }
+        try {
+            const payload = JSON.parse(data);
+            const delta = payload?.choices?.[0]?.delta?.content;
+            if (typeof delta === 'string' && delta) {
+                full += delta;
+                onDelta(delta, full);
+            }
+        } catch {
+            // Ignore keep-alive / malformed frames.
+        }
+    });
+    return finishStreamText(full);
+}
+
+async function streamAnthropic(config, { system, messages, onDelta }) {
+    let full = '';
+    await requestSse(joinUrl(config.baseUrl, '/v1/messages'), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': config.apiKey,
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+            model: config.model,
+            max_tokens: 2048,
+            stream: true,
+            system: system || undefined,
+            messages
+        })
+    }, (data) => {
+        try {
+            const payload = JSON.parse(data);
+            if (payload?.type === 'content_block_delta') {
+                const delta = payload?.delta?.text;
+                if (typeof delta === 'string' && delta) {
+                    full += delta;
+                    onDelta(delta, full);
+                }
+            } else if (payload?.type === 'error') {
+                throw new Error(payload?.error?.message || 'AI 流式请求失败');
+            }
+        } catch (error) {
+            if (error instanceof SyntaxError) {
+                return;
+            }
+            throw error;
+        }
+    });
+    return finishStreamText(full);
+}
+
+async function streamGemini(config, { system, messages, onDelta }) {
+    let full = '';
+    const contents = messages.map((message) => ({
+        role: message.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: message.content }]
+    }));
+    const url = joinUrl(config.baseUrl, `/v1beta/models/${encodeURIComponent(config.model)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(config.apiKey)}`);
+    await requestSse(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            contents,
+            ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {})
+        })
+    }, (data) => {
+        try {
+            const payload = JSON.parse(data);
+            const delta = (payload?.candidates?.[0]?.content?.parts || [])
+                .map((part) => part.text || '')
+                .join('');
+            if (delta) {
+                full += delta;
+                onDelta(delta, full);
+            }
+        } catch {
+            // Ignore keep-alive / malformed frames.
+        }
+    });
+    return finishStreamText(full);
+}
+
+const STREAM_ADAPTERS = {
+    openai: streamOpenAI,
+    anthropic: streamAnthropic,
+    gemini: streamGemini
+};
+
+/**
  * Sends a chat completion request. `messages` is [{ role: 'user'|'assistant', content }].
  * Returns the assistant text; throws with a user-readable message on failure.
  */
@@ -125,4 +293,19 @@ export async function chatComplete(config, { system, messages }) {
     }
     const adapter = ADAPTERS[config.protocol] || chatOpenAI;
     return adapter(config, { system, messages });
+}
+
+/**
+ * Streaming variant of chatComplete. `onDelta(deltaText, fullText)` fires as
+ * tokens arrive; the resolved value is the complete assistant text.
+ */
+export async function chatStream(config, { system, messages, onDelta }) {
+    if (!config?.baseUrl || !config?.apiKey || !config?.model) {
+        throw new Error('AI 接口尚未配置完整（需要 Base URL、API Key 和模型名）');
+    }
+    if (typeof onDelta !== 'function') {
+        return chatComplete(config, { system, messages });
+    }
+    const adapter = STREAM_ADAPTERS[config.protocol] || streamOpenAI;
+    return adapter(config, { system, messages, onDelta });
 }

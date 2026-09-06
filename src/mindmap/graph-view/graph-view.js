@@ -11,7 +11,7 @@ import { graphNodesStore } from './graph-nodes-store.js';
 import { cancelBoardCardFlash } from '../drawnix-board-interactions.js';
 import { getAppContext } from '../../app/app-context.js';
 import { aiConfigManager } from '../../core/ai-config-manager.js';
-import { chatComplete } from '../../core/ai-client.js';
+import { chatStream } from '../../core/ai-client.js';
 import { modalManager } from '../../ui/modal-manager.js';
 import { emitAppNotification } from '../../ui/app-notifications.js';
 import { marked } from 'marked';
@@ -1004,12 +1004,33 @@ class GraphViewController {
 
         const bubbleEl = document.getElementById(this.domId(treeNode.id));
         bubbleEl?.classList.add('graph-bubble--loading');
+        // 两种入口（选区延伸 / 气泡 ✨ 按钮）统一进入可见的思考中状态
+        this.updateNodeContent(treeNode.id, '（AI 思考中…）');
 
         try {
-            const answer = await chatComplete(config, {
+            let answer = '';
+            let flushTimer = null;
+            const flush = () => {
+                flushTimer = null;
+                // 流式期间只更新内存态和 DOM，完整内容最后统一入库
+                const viewNode = this.nodeById?.get(treeNode.id);
+                if (viewNode) {
+                    viewNode.text = answer;
+                }
+                this.renderNodeBody(treeNode.id, answer);
+            };
+            await chatStream(config, {
                 system: '你是深度阅读助手。用户正在阅读文献并对摘录内容做渐进式思考。请基于给定的文献摘录上下文和此前的思考对话，回答用户的新问题；回答应简明、紧扣上下文。',
-                messages: this.buildConversation(parentId, question)
+                messages: this.buildConversation(parentId, question),
+                onDelta: (delta, full) => {
+                    answer = full;
+                    // 节流渲染：markdown 解析 + DOM 重排不必跟随每个 token
+                    if (!flushTimer) {
+                        flushTimer = setTimeout(flush, 120);
+                    }
+                }
             });
+            clearTimeout(flushTimer);
             this.updateNodeContent(treeNode.id, answer);
         } catch (error) {
             this.updateNodeContent(treeNode.id, `（AI 请求失败：${error.message}）`);
@@ -1024,9 +1045,15 @@ class GraphViewController {
         if (!treeNode) return;
         treeNode.text = text;
         graphNodesStore.setContent(nodeId, text);
+        this.renderNodeBody(nodeId, text);
+    }
+
+    renderNodeBody(nodeId, text) {
         const body = document.querySelector(`#${CSS.escape(this.domId(nodeId))} .graph-bubble__body`);
         if (body) {
             body.innerHTML = marked.parse(text || '');
+            // 流式输出时正文持续增长，钉在底部跟随阅读
+            body.scrollTop = body.scrollHeight;
         }
     }
 
