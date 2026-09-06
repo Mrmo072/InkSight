@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useMemo } from 'react';
+import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
 import { zhTranslations, enTranslations, ruTranslations,arTranslations } from './translations';
 import { Language, Translations, I18nContextType, I18nProviderProps } from './types';
 
@@ -27,6 +27,15 @@ export const I18nProvider: React.FC<I18nProviderProps> = ({
         localStorage.setItem('language', newLanguage);
         setLanguageState(newLanguage);
     };
+
+    useEffect(() => {
+        const handleLocaleChanged = (event: Event) => {
+            const locale = (event as CustomEvent<{ locale?: string }>).detail?.locale;
+            setLanguageState(locale?.startsWith('zh') ? 'zh' : 'en');
+        };
+        window.addEventListener('inksight:locale-changed', handleLocaleChanged);
+        return () => window.removeEventListener('inksight:locale-changed', handleLocaleChanged);
+    }, []);
 
     const t = (key: keyof Translations): string => {
         return translations[language][key] || key;

@@ -1,5 +1,6 @@
 import { getAppContext } from './app-context.js';
 import { renderRecoveryWorkbenchMarkup, buildRecoveryWorkbenchModel } from './recovery-workbench.js';
+import { getLocale, t } from '../i18n/index.js';
 
 function escapeHtml(value) {
     return String(value ?? '')
@@ -40,11 +41,11 @@ function documentTypeBadge(file) {
 function formatSnapshotTime(savedAt) {
     const timestamp = Date.parse(savedAt || 0);
     if (!timestamp) {
-        return 'Not saved yet';
+        return t('library.notSaved');
     }
 
     try {
-        return new Intl.DateTimeFormat(undefined, {
+        return new Intl.DateTimeFormat(getLocale(), {
             month: 'short',
             day: 'numeric',
             hour: '2-digit',
@@ -116,7 +117,7 @@ export function createFileLibraryRenderer({
         const projectStatus = getProjectStatus();
         const snapshotHistory = Array.isArray(projectStatus.snapshotHistory) ? projectStatus.snapshotHistory : [];
         const latestSnapshot = snapshotHistory[0] ?? null;
-        const projectStatusLabel = projectStatus.linkedToDirectory ? 'Linked' : 'Autosave';
+        const projectStatusLabel = projectStatus.linkedToDirectory ? t('library.linked') : t('library.autosave');
 
         const projectPanelMarkup = `
         <section class="library-project-panel workspace-card compact-footer" aria-label="Project actions">
@@ -131,26 +132,26 @@ export function createFileLibraryRenderer({
           </div>
           <div class="library-project-actions">
             <button type="button" class="library-project-btn labeled" data-project-action="snapshot" title="Save a workspace snapshot">
-              <span class="material-icons-round">bookmark_add</span><span>Snapshot</span>
+              <span class="material-icons-round">bookmark_add</span><span>${escapeHtml(t('library.snapshot'))}</span>
             </button>
             <button type="button" class="library-project-btn labeled" data-project-action="open" title="Open a project folder">
-              <span class="material-icons-round">folder_open</span><span>Open</span>
+              <span class="material-icons-round">folder_open</span><span>${escapeHtml(t('app.open'))}</span>
             </button>
             <button type="button" class="library-project-btn labeled" data-project-action="save" title="Save the project folder">
-              <span class="material-icons-round">save</span><span>Save</span>
+              <span class="material-icons-round">save</span><span>${escapeHtml(t('app.save'))}</span>
             </button>
             <button type="button" class="library-project-btn labeled" data-project-action="import" title="Import documents">
-              <span class="material-icons-round">library_add</span><span>Import</span>
+              <span class="material-icons-round">library_add</span><span>${escapeHtml(t('app.import'))}</span>
             </button>
           </div>
           ${latestSnapshot ? `
           <button type="button" class="library-project-snapshot-row" data-project-history-id="${escapeHtml(latestSnapshot.snapshotId)}" title="Restore this snapshot">
             <span class="material-icons-round">restore</span>
             <span class="library-project-snapshot-copy">
-              <span class="text-single-line">Last snapshot</span>
+              <span class="text-single-line">${escapeHtml(t('library.lastSnapshot'))}</span>
               <span class="text-single-line">${formatSnapshotTime(latestSnapshot.savedAt)}</span>
             </span>
-            <span class="library-project-snapshot-restore">Restore</span>
+            <span class="library-project-snapshot-restore">${escapeHtml(t('library.restore'))}</span>
           </button>` : ''}
         </section>
     `;
@@ -159,8 +160,8 @@ export function createFileLibraryRenderer({
             fileListElement.innerHTML = `
             <div class="library-empty-state">
               <span class="material-icons-round">upload_file</span>
-              <h3>Empty</h3>
-              <p>Import or open</p>
+              <h3>${escapeHtml(t('library.empty'))}</h3>
+              <p>${escapeHtml(t('library.importOrOpen'))}</p>
             </div>
         `;
             return;

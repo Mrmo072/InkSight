@@ -5,21 +5,22 @@ import { chatComplete } from '../core/ai-client.js';
 import { modalManager } from './modal-manager.js';
 import { emitAppNotification } from './app-notifications.js';
 import { resetWorkspace } from '../app/workspace-reset.js';
+import { getLocale, setLocale, supportedLocales, t } from '../i18n/index.js';
 
 const THEME_OPTIONS = [
-    { value: 'default', label: '默认' },
-    { value: 'colorful', label: '缤纷' },
-    { value: 'soft', label: '柔和' },
-    { value: 'retro', label: '复古' },
-    { value: 'dark', label: '暗夜' },
-    { value: 'starry', label: '星空' }
+    { value: 'default', labelKey: 'theme.default' },
+    { value: 'colorful', labelKey: 'theme.colorful' },
+    { value: 'soft', labelKey: 'theme.soft' },
+    { value: 'retro', labelKey: 'theme.retro' },
+    { value: 'dark', labelKey: 'theme.dark' },
+    { value: 'starry', labelKey: 'theme.starry' }
 ];
 
 const SETTINGS_SECTIONS = [
-    { key: 'appearance', label: '外观' },
-    { key: 'reading', label: '阅读' },
-    { key: 'ai', label: 'AI 接口' },
-    { key: 'workspace', label: '工作区' }
+    { key: 'appearance', labelKey: 'settings.appearance' },
+    { key: 'reading', labelKey: 'settings.reading' },
+    { key: 'ai', labelKey: 'settings.ai' },
+    { key: 'workspace', labelKey: 'settings.workspace' }
 ];
 
 /**
@@ -57,15 +58,17 @@ class SettingsModal {
 
         const sidebarTitle = document.createElement('div');
         sidebarTitle.className = 'settings-modal__sidebar-title';
-        sidebarTitle.textContent = '设置';
+        sidebarTitle.dataset.i18n = 'settings.title';
+        sidebarTitle.textContent = t('settings.title');
         this.sidebar.appendChild(sidebarTitle);
 
         this.navButtons = new Map();
-        SETTINGS_SECTIONS.forEach(({ key, label }) => {
+        SETTINGS_SECTIONS.forEach(({ key, labelKey }) => {
             const item = document.createElement('button');
             item.type = 'button';
             item.className = 'settings-modal__nav-item';
-            item.textContent = label;
+            item.dataset.i18n = labelKey;
+            item.textContent = t(labelKey);
             item.dataset.section = key;
             item.onclick = () => this.setActiveSection(key);
             this.sidebar.appendChild(item);
@@ -98,13 +101,15 @@ class SettingsModal {
         this.resetBtn = document.createElement('button');
         this.resetBtn.type = 'button';
         this.resetBtn.className = 'modal-btn';
-        this.resetBtn.textContent = '恢复默认';
+        this.resetBtn.dataset.i18n = 'settings.restoreDefaults';
+        this.resetBtn.textContent = t('settings.restoreDefaults');
         this.resetBtn.onclick = () => this.handleReset();
 
         const closeActionBtn = document.createElement('button');
         closeActionBtn.type = 'button';
         closeActionBtn.className = 'modal-btn modal-btn-primary';
-        closeActionBtn.textContent = '关闭';
+        closeActionBtn.dataset.i18n = 'common.close';
+        closeActionBtn.textContent = t('common.close');
         closeActionBtn.onclick = () => this.hide();
 
         actions.appendChild(this.resetBtn);
@@ -155,7 +160,8 @@ class SettingsModal {
 
         const heading = document.createElement('h4');
         heading.className = 'settings-modal__group-title';
-        heading.textContent = '外观';
+        heading.dataset.i18n = 'settings.appearance';
+        heading.textContent = t('settings.appearance');
         section.appendChild(heading);
 
         const row = document.createElement('div');
@@ -163,15 +169,17 @@ class SettingsModal {
 
         const label = document.createElement('label');
         label.className = 'settings-modal__label';
-        label.textContent = '主题';
+        label.dataset.i18n = 'settings.theme';
+        label.textContent = t('settings.theme');
 
         this.themeSelect = document.createElement('select');
         this.themeSelect.className = 'settings-modal__select';
         this.themeSelect.setAttribute('aria-label', 'Theme');
-        THEME_OPTIONS.forEach(({ value, label: text }) => {
+        THEME_OPTIONS.forEach(({ value, labelKey }) => {
             const option = document.createElement('option');
             option.value = value;
-            option.textContent = text;
+            option.dataset.i18n = labelKey;
+            option.textContent = t(labelKey);
             this.themeSelect.appendChild(option);
         });
         this.themeSelect.value = themeManager.getTheme();
@@ -182,6 +190,35 @@ class SettingsModal {
         row.appendChild(label);
         row.appendChild(this.themeSelect);
         section.appendChild(row);
+
+        const languageRow = document.createElement('div');
+        languageRow.className = 'settings-modal__row settings-modal__row--tall';
+        const languageLabel = document.createElement('label');
+        languageLabel.className = 'settings-modal__label';
+        languageLabel.dataset.i18n = 'settings.language';
+        languageLabel.textContent = t('settings.language');
+        this.languageSelect = document.createElement('select');
+        this.languageSelect.className = 'settings-modal__select';
+        this.languageSelect.setAttribute('aria-label', t('settings.language'));
+        this.languageSelect.dataset.i18nAriaLabel = 'settings.language';
+        supportedLocales.forEach((locale) => {
+            const option = document.createElement('option');
+            option.value = locale;
+            option.dataset.i18n = `language.${locale}`;
+            option.textContent = t(`language.${locale}`);
+            this.languageSelect.appendChild(option);
+        });
+        this.languageSelect.value = getLocale();
+        this.languageSelect.addEventListener('change', () => setLocale(this.languageSelect.value));
+        languageRow.appendChild(languageLabel);
+        languageRow.appendChild(this.languageSelect);
+        section.appendChild(languageRow);
+
+        const languageHint = document.createElement('p');
+        languageHint.className = 'settings-modal__hint';
+        languageHint.dataset.i18n = 'settings.languageHint';
+        languageHint.textContent = t('settings.languageHint');
+        section.appendChild(languageHint);
         return section;
     }
 
@@ -191,14 +228,16 @@ class SettingsModal {
 
         const heading = document.createElement('h4');
         heading.className = 'settings-modal__group-title';
-        heading.textContent = '阅读';
+        heading.dataset.i18n = 'settings.reading';
+        heading.textContent = t('settings.reading');
         section.appendChild(heading);
 
         const limits = preferencesManager.getLimits();
         const prefs = preferencesManager.get();
 
         this.fontSizeSlider = this.buildSliderRow(section, {
-            label: '字号',
+            label: t('settings.fontSize'),
+            labelKey: 'settings.fontSize',
             min: limits.fontSize.min,
             max: limits.fontSize.max,
             step: 1,
@@ -208,7 +247,8 @@ class SettingsModal {
         });
 
         this.lineHeightSlider = this.buildSliderRow(section, {
-            label: '行高',
+            label: t('settings.lineHeight'),
+            labelKey: 'settings.lineHeight',
             min: limits.lineHeight.min,
             max: limits.lineHeight.max,
             step: 0.1,
@@ -220,13 +260,14 @@ class SettingsModal {
         return section;
     }
 
-    buildSliderRow(container, { label, min, max, step, value, format, onChange }) {
+    buildSliderRow(container, { label, labelKey, min, max, step, value, format, onChange }) {
         const row = document.createElement('div');
         row.className = 'settings-modal__row';
 
         const labelEl = document.createElement('label');
         labelEl.className = 'settings-modal__label';
         labelEl.textContent = label;
+        if (labelKey) labelEl.dataset.i18n = labelKey;
 
         const slider = document.createElement('input');
         slider.type = 'range';
@@ -261,18 +302,21 @@ class SettingsModal {
 
         const heading = document.createElement('h4');
         heading.className = 'settings-modal__group-title';
-        heading.textContent = '工作区';
+        heading.dataset.i18n = 'settings.workspace';
+        heading.textContent = t('settings.workspace');
         section.appendChild(heading);
 
         const hint = document.createElement('p');
         hint.className = 'settings-modal__hint';
-        hint.textContent = '清空画布、标注、高亮、文档与图谱节点，并重置项目身份。下次启动将从一个空白工作区开始。';
+        hint.dataset.i18n = 'workspace.clearHint';
+        hint.textContent = t('workspace.clearHint');
         section.appendChild(hint);
 
         const resetBtn = document.createElement('button');
         resetBtn.type = 'button';
         resetBtn.className = 'modal-btn modal-btn-primary danger';
-        resetBtn.textContent = '清空工作区…';
+        resetBtn.dataset.i18n = 'workspace.clear';
+        resetBtn.textContent = t('workspace.clear');
         resetBtn.onclick = () => this.handleWorkspaceReset();
         section.appendChild(resetBtn);
 
@@ -281,10 +325,10 @@ class SettingsModal {
 
     async handleWorkspaceReset() {
         const confirmed = await modalManager.confirm({
-            title: '清空工作区',
-            message: '将删除当前工作区的全部内容：画布节点、标注卡片、高亮、已导入文档、图谱思考节点，并重置项目身份。此操作不可撤销，确定继续？',
-            confirmLabel: '全部清空',
-            cancelLabel: '取消',
+            title: t('workspace.clearTitle'),
+            message: t('workspace.clearMessage'),
+            confirmLabel: t('workspace.clearAll'),
+            cancelLabel: t('common.cancel'),
             danger: true
         });
         if (!confirmed) {
@@ -293,10 +337,10 @@ class SettingsModal {
 
         try {
             resetWorkspace();
-            emitAppNotification({ message: '工作区已清空，即将重新加载…', level: 'success' });
+            emitAppNotification({ message: t('workspace.cleared'), level: 'success' });
             setTimeout(() => window.location.reload(), 800);
         } catch (error) {
-            emitAppNotification({ message: `清空失败：${error.message}`, level: 'error' });
+            emitAppNotification({ message: t('workspace.clearFailed', { message: error.message }), level: 'error' });
         }
     }
 
@@ -308,26 +352,29 @@ class SettingsModal {
 
         const heading = document.createElement('h4');
         heading.className = 'settings-modal__group-title';
-        heading.textContent = 'AI 接口';
+        heading.dataset.i18n = 'settings.ai';
+        heading.textContent = t('settings.ai');
         section.appendChild(heading);
 
-        const buildRow = (labelText, control) => {
+        const buildRow = (labelText, control, labelKey = '') => {
             const row = document.createElement('div');
             row.className = 'settings-modal__row';
             const label = document.createElement('label');
             label.className = 'settings-modal__label';
             label.textContent = labelText;
+            if (labelKey) label.dataset.i18n = labelKey;
             row.appendChild(label);
             row.appendChild(control);
             section.appendChild(row);
             return row;
         };
 
-        const buildInput = (placeholder, type = 'text') => {
+        const buildInput = (placeholder, type = 'text', placeholderKey = '') => {
             const input = document.createElement('input');
             input.type = type;
             input.className = 'settings-modal__input';
             input.placeholder = placeholder;
+            if (placeholderKey) input.dataset.i18nPlaceholder = placeholderKey;
             input.spellcheck = false;
             return input;
         };
@@ -342,7 +389,7 @@ class SettingsModal {
             this.aiProviderSelect.appendChild(option);
         });
         this.aiProviderSelect.value = config.provider;
-        buildRow('厂商', this.aiProviderSelect).classList.add('settings-modal__row--tall');
+        buildRow(t('ai.provider'), this.aiProviderSelect, 'ai.provider').classList.add('settings-modal__row--tall');
         this.aiProviderSelect.addEventListener('change', () => {
             const next = aiConfigManager.set({ provider: this.aiProviderSelect.value });
             this.syncAiSection(next);
@@ -361,21 +408,21 @@ class SettingsModal {
             option.textContent = label;
             this.aiProtocolSelect.appendChild(option);
         });
-        buildRow('协议', this.aiProtocolSelect).classList.add('settings-modal__row--tall');
+        buildRow(t('ai.protocol'), this.aiProtocolSelect, 'ai.protocol').classList.add('settings-modal__row--tall');
         this.aiProtocolSelect.addEventListener('change', () => {
             aiConfigManager.set({ protocol: this.aiProtocolSelect.value });
         });
 
         // Base URL
-        this.aiBaseUrlInput = buildInput('https://…（接口地址）');
+        this.aiBaseUrlInput = buildInput(t('ai.urlPlaceholder'), 'text', 'ai.urlPlaceholder');
         this.aiBaseUrlInput.value = config.baseUrl;
-        buildRow('地址', this.aiBaseUrlInput).classList.add('settings-modal__row--tall');
+        buildRow(t('ai.address'), this.aiBaseUrlInput, 'ai.address').classList.add('settings-modal__row--tall');
         this.aiBaseUrlInput.addEventListener('change', () => {
             aiConfigManager.set({ baseUrl: this.aiBaseUrlInput.value });
         });
 
         // API Key
-        this.aiApiKeyInput = buildInput('sk-…（密钥仅保存在本机）', 'password');
+        this.aiApiKeyInput = buildInput(t('ai.keyPlaceholder'), 'password', 'ai.keyPlaceholder');
         this.aiApiKeyInput.value = config.apiKey;
         buildRow('API Key', this.aiApiKeyInput).classList.add('settings-modal__row--tall');
         this.aiApiKeyInput.addEventListener('change', () => {
@@ -383,9 +430,9 @@ class SettingsModal {
         });
 
         // 模型名
-        this.aiModelInput = buildInput('模型名，如 deepseek-chat');
+        this.aiModelInput = buildInput(t('ai.modelPlaceholder'), 'text', 'ai.modelPlaceholder');
         this.aiModelInput.value = config.model;
-        buildRow('模型', this.aiModelInput).classList.add('settings-modal__row--tall');
+        buildRow(t('ai.model'), this.aiModelInput, 'ai.model').classList.add('settings-modal__row--tall');
         this.aiModelInput.addEventListener('change', () => {
             aiConfigManager.set({ model: this.aiModelInput.value });
         });
@@ -396,7 +443,8 @@ class SettingsModal {
         this.aiTestBtn = document.createElement('button');
         this.aiTestBtn.type = 'button';
         this.aiTestBtn.className = 'modal-btn';
-        this.aiTestBtn.textContent = '测试连接';
+        this.aiTestBtn.dataset.i18n = 'ai.test';
+        this.aiTestBtn.textContent = t('ai.test');
         this.aiTestBtn.onclick = () => this.handleAiTest();
         testRow.appendChild(this.aiTestBtn);
         // 结果内联显示在弹窗内：全局通知会被设置弹窗的遮罩挡住
@@ -430,31 +478,31 @@ class SettingsModal {
     async handleAiTest() {
         const config = aiConfigManager.get();
         if (!config.baseUrl || !config.apiKey || !config.model) {
-            this.setAiTestStatus('请先填写完整的接口地址、API Key 和模型名', 'is-error');
+            this.setAiTestStatus(t('ai.incomplete'), 'is-error');
             return;
         }
 
         this.aiTestBtn.disabled = true;
-        this.aiTestBtn.textContent = '测试中…';
-        this.setAiTestStatus('正在连接接口…', 'is-pending');
+        this.aiTestBtn.textContent = t('ai.testing');
+        this.setAiTestStatus(t('ai.connecting'), 'is-pending');
         try {
             const reply = await chatComplete(config, {
                 system: '你是连接测试助手，请只回复：连接成功',
                 messages: [{ role: 'user', content: 'ping' }]
             });
-            this.setAiTestStatus(`连接成功：${reply.slice(0, 40)}`, 'is-success');
+            this.setAiTestStatus(t('ai.success', { reply: reply.slice(0, 40) }), 'is-success');
         } catch (error) {
-            this.setAiTestStatus(`连接失败：${error.message}`, 'is-error');
+            this.setAiTestStatus(t('ai.failed', { message: error.message }), 'is-error');
         } finally {
             this.aiTestBtn.disabled = false;
-            this.aiTestBtn.textContent = '测试连接';
+            this.aiTestBtn.textContent = t('ai.test');
         }
     }
 
     handleReset() {
         if (!this._resetArmed) {
             this._resetArmed = true;
-            this.resetBtn.textContent = '确认恢复？';
+            this.resetBtn.textContent = t('settings.confirmRestore');
             this.resetBtn.classList.add('danger');
             this._resetTimer = setTimeout(() => this.disarmReset(), 3000);
             return;
@@ -469,7 +517,7 @@ class SettingsModal {
         this._resetArmed = false;
         clearTimeout(this._resetTimer);
         this._resetTimer = null;
-        this.resetBtn.textContent = '恢复默认';
+        this.resetBtn.textContent = t('settings.restoreDefaults');
         this.resetBtn.classList.remove('danger');
     }
 
@@ -487,6 +535,7 @@ class SettingsModal {
 
     open() {
         this.themeSelect.value = themeManager.getTheme();
+        this.languageSelect.value = getLocale();
         this.syncFromPreferences();
         this.disarmReset();
         this.show();

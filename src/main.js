@@ -19,10 +19,13 @@ import { buildWorkspaceSearchIndex, queryWorkspaceSearch } from './app/search-in
 import { createSearchController } from './app/search-controller.js';
 import { createLogger } from './core/logger.js';
 import { buildProjectHomeModel, renderProjectHome as renderProjectHomeMarkup } from './app/project-home.js';
+import { initializeI18n, LOCALE_CHANGED_EVENT, t } from './i18n/index.js';
 
 const logger = createLogger('Main');
 
 suppressResizeObserverLoop();
+
+initializeI18n();
 
 initAppContext();
 
@@ -153,6 +156,14 @@ function renderProjectHome() {
         projectWorkspace.getProjectStatus(state.files)
     ));
 }
+
+window.addEventListener(LOCALE_CHANGED_EVENT, () => {
+    updateToolbarSummary();
+    renderFileList();
+    renderProjectHome();
+    annotationList?.refresh?.();
+    updateToolAvailability(state.currentFile?.type);
+});
 
 workspaceDocuments = createWorkspaceDocumentsController({
     logger,
@@ -421,7 +432,7 @@ function findHighlightById(highlightId) {
 }
 
 function updateToolbarSummary() {
-    const title = state.currentFile?.name || 'No doc';
+    const title = state.currentFile?.name || t('app.noDoc');
     const hasDocument = Boolean(state.currentFile);
     elements.readerContainer?.classList.toggle('no-document-open', !hasDocument);
     elements.readerToolbar?.classList.toggle('toolbar-home', !hasDocument);

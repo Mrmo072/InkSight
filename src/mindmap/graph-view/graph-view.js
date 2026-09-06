@@ -14,6 +14,7 @@ import { aiConfigManager } from '../../core/ai-config-manager.js';
 import { chatStream } from '../../core/ai-client.js';
 import { modalManager } from '../../ui/modal-manager.js';
 import { emitAppNotification } from '../../ui/app-notifications.js';
+import { t } from '../../i18n/index.js';
 import { marked } from 'marked';
 import './graph-view.css';
 
@@ -55,13 +56,13 @@ class GraphViewController {
         overlay.innerHTML = `
             <div class="graph-view__hud">
                 <button type="button" class="graph-view__back">
-                    <span>←</span> 返回脑图
+                    ${t('graph.back')}
                 </button>
                 <div class="graph-view__title"></div>
             </div>
             <div class="graph-view__controls">
                 <button type="button" class="graph-view__btn graph-view__center">
-                    ◎ 居中视图
+                    ${t('graph.center')}
                 </button>
             </div>
             <div class="graph-view__viewport">
@@ -72,13 +73,13 @@ class GraphViewController {
             </div>
             <div class="graph-view__dialog" hidden>
                 <div class="graph-view__dialog-card">
-                    <div class="graph-view__dialog-title">延伸思考</div>
+                    <div class="graph-view__dialog-title">${t('graph.extend')}</div>
                     <textarea class="graph-view__dialog-input" rows="3"
-                        placeholder="输入要传递给 AI 的问题…（Enter 发送，Shift+Enter 换行）"></textarea>
+                        placeholder="${t('graph.promptPlaceholder')}"></textarea>
                     <div class="graph-view__dialog-actions">
-                        <button type="button" class="graph-view__dialog-btn" data-action="cancel">取消</button>
-                        <button type="button" class="graph-view__dialog-btn" data-action="manual">仅创建节点</button>
-                        <button type="button" class="graph-view__dialog-btn graph-view__dialog-btn--primary" data-action="ai">AI 回答</button>
+                        <button type="button" class="graph-view__dialog-btn" data-action="cancel">${t('common.cancel')}</button>
+                        <button type="button" class="graph-view__dialog-btn" data-action="manual">${t('graph.manual')}</button>
+                        <button type="button" class="graph-view__dialog-btn graph-view__dialog-btn--primary" data-action="ai">${t('graph.aiAnswer')}</button>
                     </div>
                 </div>
             </div>
@@ -89,7 +90,7 @@ class GraphViewController {
         // 选区胶囊挂到 body：面板祖先链上的 transform 会劫持 fixed 定位
         const selectionPill = document.createElement('div');
         selectionPill.className = 'graph-view__pill';
-        selectionPill.textContent = '延伸思考节点';
+        selectionPill.textContent = t('graph.extendNode');
         document.body.appendChild(selectionPill);
         this.selectionPill = selectionPill;
 
@@ -349,7 +350,7 @@ class GraphViewController {
         const toTreeNode = (n) => ({
             id: n.id,
             tag: n.title,
-            text: n.content || '（无内容）',
+            text: !n.content || n.content === '（无内容）' ? t('graph.empty') : n.content,
             color: n.kind === 'ai' ? '#a855f7' : '#38bdf8',
             kind: n.kind,
             children: []
@@ -419,7 +420,7 @@ class GraphViewController {
         const treeNode = {
             id: storeNode.id,
             tag: storeNode.title,
-            text: storeNode.content || '（无内容）',
+            text: !storeNode.content || storeNode.content === '（无内容）' ? t('graph.empty') : storeNode.content,
             color: storeNode.kind === 'ai' ? '#a855f7' : '#38bdf8',
             kind: storeNode.kind,
             children: []
@@ -470,7 +471,7 @@ class GraphViewController {
                 messages.push({ role: 'user', content: node.tag });
                 messages.push({ role: 'assistant', content: node.text });
             } else {
-                messages.push({ role: 'user', content: `[文献摘录｜${node.tag}]\n${node.text}` });
+                messages.push({ role: 'user', content: `[${t('graph.excerptContext')} | ${node.tag}]\n${node.text}` });
             }
         });
         messages.push({ role: 'user', content: question });
@@ -639,14 +640,14 @@ class GraphViewController {
         tagTitle.className = 'graph-bubble__tag-title';
         escapelessText(tagTitle, node.tag);
         if (node.kind && node.kind !== 'card') {
-            tagTitle.title = '点击修改标题';
+            tagTitle.title = t('graph.editTitle');
             tagTitle.classList.add('graph-bubble__tag-title--editable');
             tagTitle.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this.startTitleEdit(node.id, tagTitle);
             });
         } else {
-            tagTitle.title = '卡片节点标题由来源文档管理';
+            tagTitle.title = t('graph.managedTitle');
         }
         tag.appendChild(tagTitle);
 
@@ -657,13 +658,13 @@ class GraphViewController {
         addChildBtn.type = 'button';
         addChildBtn.className = 'graph-bubble__action-btn';
         addChildBtn.textContent = '＋';
-        addChildBtn.title = '创建子节点';
+        addChildBtn.title = t('graph.createChild');
         addChildBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             const childNode = this.createChildNode({
                 parentId: node.id,
-                title: '新思考节点',
-                content: '（待补充）',
+                title: t('graph.newThought'),
+                content: t('graph.pending'),
                 kind: 'manual'
             });
             if (childNode) {
@@ -687,13 +688,13 @@ class GraphViewController {
             aiFillBtn.type = 'button';
             aiFillBtn.className = 'graph-bubble__action-btn graph-bubble__action-btn--ai';
             aiFillBtn.textContent = '✨';
-            aiFillBtn.title = '以标题为问题，调用 AI 生成内容';
+            aiFillBtn.title = t('graph.aiFromTitle');
             aiFillBtn.addEventListener('click', async (e) => {
                 e.stopPropagation();
                 // 以树节点的实时标题为准（视图节点可能因刚编辑而不同步）
                 const treeNode = this.nodeById?.get(node.id);
-                if (!treeNode || treeNode.tag === '新思考节点' || !treeNode.tag?.trim()) {
-                    emitAppNotification({ message: '请先把标题改写成你要问 AI 的问题', level: 'info' });
+                if (!treeNode || treeNode.tag === t('graph.newThought') || !treeNode.tag?.trim()) {
+                    emitAppNotification({ message: t('graph.questionRequired'), level: 'info' });
                     return;
                 }
                 const parentId = this.parentByNodeId?.get(node.id) || null;
@@ -707,14 +708,14 @@ class GraphViewController {
             deleteBtn.type = 'button';
             deleteBtn.className = 'graph-bubble__action-btn graph-bubble__action-btn--danger';
             deleteBtn.textContent = '🗑';
-            deleteBtn.title = '删除此节点及其所有子节点';
+            deleteBtn.title = t('graph.deleteBranch');
             deleteBtn.addEventListener('click', async (e) => {
                 e.stopPropagation();
                 const confirmed = await modalManager.confirm({
-                    title: '删除思考分支',
-                    message: '将删除该节点及其所有子节点（脑图上的卡片节点不受影响）。确定删除？',
-                    confirmLabel: '删除',
-                    cancelLabel: '取消',
+                    title: t('graph.deleteBranch'),
+                    message: t('graph.deleteBranchMessage'),
+                    confirmLabel: t('common.delete'),
+                    cancelLabel: t('common.cancel'),
                     danger: true
                 });
                 if (confirmed) {
@@ -934,7 +935,7 @@ class GraphViewController {
     showExtendDialog() {
         const ctx = this.selectedTextContext;
         if (!ctx || !this.rawTree) return;
-        this.openDialog(ctx, '延伸思考', ctx.text || '');
+        this.openDialog(ctx, t('graph.extend'), ctx.text || '');
     }
 
     openDialog(context, titleText, prefill = '') {
@@ -966,7 +967,7 @@ class GraphViewController {
         const node = this.createChildNode({
             parentId,
             title: question,
-            content: mode === 'ai' ? '（AI 思考中…）' : '（待补充）',
+            content: mode === 'ai' ? t('graph.aiThinking') : t('graph.pending'),
             kind: mode === 'ai' ? 'ai' : 'manual'
         });
         if (!node) {
@@ -977,7 +978,7 @@ class GraphViewController {
             const mark = document.createElement('mark');
             mark.className = 'graph-mark';
             mark.setAttribute('data-target-id', node.id);
-            mark.title = '点击跳转追踪此思考分支';
+            mark.title = t('graph.traceBranch');
             this.wrapRangeWithMark(range, mark);
         }
 
@@ -997,15 +998,15 @@ class GraphViewController {
     async requestAiAnswer(treeNode, question, parentId) {
         const config = aiConfigManager.get();
         if (!aiConfigManager.isConfigured()) {
-            this.updateNodeContent(treeNode.id, '（AI 接口未配置：请在设置中填写接口地址、API Key 和模型名）');
-            emitAppNotification({ message: 'AI 接口尚未配置，已在设置中新增“AI 接口”分组', level: 'warning' });
+            this.updateNodeContent(treeNode.id, t('graph.aiNotConfigured'));
+            emitAppNotification({ message: t('graph.aiNotConfiguredNotice'), level: 'warning' });
             return;
         }
 
         const bubbleEl = document.getElementById(this.domId(treeNode.id));
         bubbleEl?.classList.add('graph-bubble--loading');
         // 两种入口（选区延伸 / 气泡 ✨ 按钮）统一进入可见的思考中状态
-        this.updateNodeContent(treeNode.id, '（AI 思考中…）');
+        this.updateNodeContent(treeNode.id, t('graph.aiThinking'));
 
         try {
             let answer = '';
@@ -1020,7 +1021,7 @@ class GraphViewController {
                 this.renderNodeBody(treeNode.id, answer);
             };
             await chatStream(config, {
-                system: '你是深度阅读助手。用户正在阅读文献并对摘录内容做渐进式思考。请基于给定的文献摘录上下文和此前的思考对话，回答用户的新问题；回答应简明、紧扣上下文。',
+                system: t('graph.aiSystem'),
                 messages: this.buildConversation(parentId, question),
                 onDelta: (delta, full) => {
                     answer = full;
@@ -1033,8 +1034,8 @@ class GraphViewController {
             clearTimeout(flushTimer);
             this.updateNodeContent(treeNode.id, answer);
         } catch (error) {
-            this.updateNodeContent(treeNode.id, `（AI 请求失败：${error.message}）`);
-            emitAppNotification({ message: `AI 请求失败：${error.message}`, level: 'error' });
+            this.updateNodeContent(treeNode.id, `(${t('graph.aiRequestFailed', { message: error.message })})`);
+            emitAppNotification({ message: t('graph.aiRequestFailed', { message: error.message }), level: 'error' });
         } finally {
             bubbleEl?.classList.remove('graph-bubble--loading');
         }

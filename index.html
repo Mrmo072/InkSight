@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-US">
 
 <head>
   <meta charset="UTF-8">
@@ -75,10 +75,10 @@
             </div>
         </div>
         <div class="sidebar-header-actions">
-          <button id="sidebar-width-preset" class="icon-btn panel-width-btn" title="Cycle File List Width">
+          <button id="sidebar-width-preset" class="icon-btn panel-width-btn" title="Cycle File List Width" data-i18n-title="tool.fileWidth">
             <span class="material-icons-round">width_normal</span>
           </button>
-          <button id="close-sidebar-panel" class="icon-btn close-sidebar-btn" title="Close Library Panel">
+          <button id="close-sidebar-panel" class="icon-btn close-sidebar-btn" title="Close Library Panel" data-i18n-title="tool.toggleFiles">
             <span class="material-icons-round">close</span>
           </button>
         </div>
@@ -92,29 +92,29 @@
     <main id="reader-container" class="reader-container">
       <div id="reader-toolbar" class="toolbar">
         <div class="toolbar-section toolbar-section-leading">
-          <button id="toggle-sidebar" class="icon-btn" title="Toggle File List">
+          <button id="toggle-sidebar" class="icon-btn" title="Toggle File List" data-i18n-title="tool.toggleFiles">
             <span class="material-icons-round">menu_open</span>
           </button>
-          <button id="toolbar-search" class="icon-btn" title="Search Workspace">
+          <button id="toolbar-search" class="icon-btn" title="Search Workspace" data-i18n-title="tool.search">
             <span class="material-icons-round">search</span>
           </button>
-          <button id="toolbar-sidebar-width-preset" class="icon-btn panel-width-btn" title="Cycle File List Width">
+          <button id="toolbar-sidebar-width-preset" class="icon-btn panel-width-btn" title="Cycle File List Width" data-i18n-title="tool.fileWidth">
             <span class="material-icons-round">width_normal</span>
           </button>
-          <button id="toggle-outline" class="icon-btn" title="Toggle Outline">
+          <button id="toggle-outline" class="icon-btn" title="Toggle Outline" data-i18n-title="tool.toggleOutline">
             <span class="material-icons-round">toc</span>
           </button>
         </div>
 
         <div class="toolbar-mobile-summary" aria-live="polite">
-          <span id="mobile-doc-summary" class="toolbar-mobile-title">No doc</span>
+          <span id="mobile-doc-summary" class="toolbar-mobile-title" data-i18n="app.noDoc">No doc</span>
           <span id="mobile-page-info" class="toolbar-mobile-meta">—</span>
         </div>
 
         <div class="toolbar-section toolbar-section-center">
           <div class="toolbar-doc-block">
             <div class="toolbar-doc-copy">
-              <div id="doc-title" class="text-two-line" title="No doc">No doc</div>
+              <div id="doc-title" class="text-two-line" title="No doc" data-i18n="app.noDoc">No doc</div>
             </div>
             <div class="toolbar-doc-actions">
               <div class="toolbar-action-group" aria-label="Project actions">
@@ -142,32 +142,32 @@
             </div>
           </div>
           <div class="workspace-mode-group" role="tablist" aria-label="Workspace mode">
-            <button id="workspace-mode-reading" class="workspace-mode-btn active" type="button" role="tab" aria-selected="true" title="Read — document & file list" aria-label="Read">
+            <button id="workspace-mode-reading" class="workspace-mode-btn active" type="button" role="tab" aria-selected="true" title="Read — document & file list" aria-label="Read" data-i18n-aria-label="app.read">
               <span class="material-icons-round">auto_stories</span>
-              <span class="mode-label">Read</span>
+              <span class="mode-label" data-i18n="app.read">Read</span>
             </button>
-            <button id="workspace-mode-capture" class="workspace-mode-btn" type="button" role="tab" aria-selected="false" title="Capture — annotations & notes" aria-label="Capture">
+            <button id="workspace-mode-capture" class="workspace-mode-btn" type="button" role="tab" aria-selected="false" title="Capture — annotations & notes" aria-label="Capture" data-i18n-aria-label="app.capture">
               <span class="material-icons-round">edit_note</span>
-              <span class="mode-label">Capture</span>
+              <span class="mode-label" data-i18n="app.capture">Capture</span>
             </button>
-            <button id="workspace-mode-map" class="workspace-mode-btn" type="button" role="tab" aria-selected="false" title="Map — mind map canvas" aria-label="Map">
+            <button id="workspace-mode-map" class="workspace-mode-btn" type="button" role="tab" aria-selected="false" title="Map — mind map canvas" aria-label="Map" data-i18n-aria-label="app.map">
               <span class="material-icons-round">account_tree</span>
-              <span class="mode-label">Map</span>
+              <span class="mode-label" data-i18n="app.map">Map</span>
             </button>
           </div>
         </div>
 
         <div class="toolbar-section toolbar-section-trailing">
-          <button id="toolbar-settings" class="icon-btn" title="Settings" aria-label="Settings">
+          <button id="toolbar-settings" class="icon-btn" title="Settings" aria-label="Settings" data-i18n-title="app.settings" data-i18n-aria-label="app.settings">
             <span class="material-icons-round">settings</span>
           </button>
-          <button id="toggle-mobile-tools" class="icon-btn" title="Toggle Reader Tools" aria-expanded="false">
+          <button id="toggle-mobile-tools" class="icon-btn" title="Toggle Reader Tools" aria-expanded="false" data-i18n-title="tool.readerTools">
             <span class="material-icons-round">more_horiz</span>
           </button>
-          <button id="toolbar-notes-width-preset" class="icon-btn panel-width-btn" title="Cycle Notes Width">
+          <button id="toolbar-notes-width-preset" class="icon-btn panel-width-btn" title="Cycle Notes Width" data-i18n-title="tool.notesWidth">
             <span class="material-icons-round">width_wide</span>
           </button>
-          <button id="toggle-notes" class="icon-btn" title="Toggle Notes">
+          <button id="toggle-notes" class="icon-btn" title="Toggle Notes" data-i18n-title="tool.toggleNotes">
             <span class="material-icons-round">vertical_split</span>
           </button>
         </div>
@@ -188,25 +188,25 @@
         <div class="mobile-context-row">
           <div class="mobile-workspace-mode-group" role="tablist" aria-label="Mobile workspace mode">
             <button id="mobile-workspace-mode-reading" class="workspace-mode-btn active" type="button" role="tab" aria-selected="true">
-              Read
+              <span data-i18n="app.read">Read</span>
             </button>
             <button id="mobile-workspace-mode-capture" class="workspace-mode-btn" type="button" role="tab" aria-selected="false">
-              Capture
+              <span data-i18n="app.capture">Capture</span>
             </button>
             <button id="mobile-workspace-mode-map" class="workspace-mode-btn" type="button" role="tab" aria-selected="false">
-              Map
+              <span data-i18n="app.map">Map</span>
             </button>
           </div>
         </div>
         <div class="mobile-context-row mobile-project-actions" aria-label="Mobile project actions">
-          <button id="mobile-import-documents" class="mobile-project-btn primary" type="button"><span class="material-icons-round">library_add</span><span>Import</span></button>
-          <button id="mobile-open-project" class="mobile-project-btn" type="button"><span class="material-icons-round">folder_open</span><span>Open</span></button>
-          <button id="mobile-save-project" class="mobile-project-btn" type="button"><span class="material-icons-round">save</span><span>Save</span></button>
+          <button id="mobile-import-documents" class="mobile-project-btn primary" type="button"><span class="material-icons-round">library_add</span><span data-i18n="app.import">Import</span></button>
+          <button id="mobile-open-project" class="mobile-project-btn" type="button"><span class="material-icons-round">folder_open</span><span data-i18n="app.open">Open</span></button>
+          <button id="mobile-save-project" class="mobile-project-btn" type="button"><span class="material-icons-round">save</span><span data-i18n="app.save">Save</span></button>
         </div>
         <div class="mobile-context-row mobile-project-actions" aria-label="Mobile export actions">
-          <button id="mobile-export-outline" class="mobile-project-btn subtle" type="button"><span class="material-icons-round">segment</span><span>Outline</span></button>
-          <button id="mobile-export-citations" class="mobile-project-btn subtle" type="button"><span class="material-icons-round">format_quote</span><span>Cite</span></button>
-          <button id="mobile-export-notes" class="mobile-project-btn subtle" type="button"><span class="material-icons-round">note_add</span><span>Notes</span></button>
+          <button id="mobile-export-outline" class="mobile-project-btn subtle" type="button"><span class="material-icons-round">segment</span><span data-i18n="app.outline">Outline</span></button>
+          <button id="mobile-export-citations" class="mobile-project-btn subtle" type="button"><span class="material-icons-round">format_quote</span><span data-i18n="app.cite">Cite</span></button>
+          <button id="mobile-export-notes" class="mobile-project-btn subtle" type="button"><span class="material-icons-round">note_add</span><span data-i18n="app.notes">Notes</span></button>
         </div>
       </div>
 
@@ -214,32 +214,32 @@
         <div id="workspace-search-panel" class="workspace-search-panel" aria-label="Workspace search">
           <div class="workspace-search-header">
             <span class="material-icons-round">search</span>
-            <input id="workspace-search-input" type="search" placeholder="Search documents, cards, and highlights" />
+            <input id="workspace-search-input" type="search" placeholder="Search documents, cards, and highlights" data-i18n-placeholder="app.searchPlaceholder" />
           </div>
-          <div id="workspace-search-empty" class="workspace-search-empty">Type to search across documents, cards, and highlights.</div>
+          <div id="workspace-search-empty" class="workspace-search-empty" data-i18n="app.searchHint">Type to search across documents, cards, and highlights.</div>
           <div id="workspace-search-results" class="workspace-search-results"></div>
         </div>
 
         <div id="outline-sidebar" class="outline-sidebar collapsed">
           <div class="outline-header">
             <div class="panel-title-group">
-              <span class="panel-title-text">Outline</span>
+              <span class="panel-title-text" data-i18n="app.outline">Outline</span>
             </div>
             <div class="panel-actions">
-              <button id="close-outline-panel" class="icon-btn close-outline-btn" title="Close Outline">
+              <button id="close-outline-panel" class="icon-btn close-outline-btn" title="Close Outline" data-i18n-title="tool.closeOutline">
                 <span class="material-icons-round">close</span>
               </button>
             </div>
           </div>
           <div id="outline-content" class="outline-content">
-            <div class="outline-empty">No outline available</div>
+            <div class="outline-empty" data-i18n="app.noOutline">No outline available</div>
           </div>
         </div>
 
         <div id="viewer" class="viewer">
           <div class="empty-state">
             <span class="material-icons-round" style="font-size: 48px; color: var(--text-secondary);">library_books</span>
-            <p>Loading workspace...</p>
+            <p data-i18n="app.loading">Loading workspace...</p>
           </div>
         </div>
 
@@ -254,36 +254,36 @@
         </div>
 
         <div id="selection-mode-floating" class="selection-mode-group selection-mode-floating">
-          <button id="selection-mode-drag-handle" class="icon-btn selection-mode-drag-handle" type="button" title="Drag Toolbar" aria-label="Drag toolbar">
+          <button id="selection-mode-drag-handle" class="icon-btn selection-mode-drag-handle" type="button" title="Drag Toolbar" aria-label="Drag toolbar" data-i18n-title="tool.dragToolbar" data-i18n-aria-label="tool.dragToolbar">
             <span class="material-icons-round">drag_indicator</span>
           </button>
-          <button id="pan-mode" class="icon-btn mode-btn" title="Pan">
+          <button id="pan-mode" class="icon-btn mode-btn" title="Pan" data-i18n-title="tool.pan">
             <span class="material-icons-round">pan_tool</span>
           </button>
-          <button id="text-mode" class="icon-btn mode-btn active" title="Text Selection">
+          <button id="text-mode" class="icon-btn mode-btn active" title="Text Selection" data-i18n-title="tool.textSelection">
             <span class="material-icons-round">text_fields</span>
           </button>
-          <button id="rect-mode" class="icon-btn mode-btn" title="Rectangle Selection">
+          <button id="rect-mode" class="icon-btn mode-btn" title="Rectangle Selection" data-i18n-title="tool.rectangleSelection">
             <span class="material-icons-round">crop_square</span>
           </button>
-          <button id="ellipse-mode" class="icon-btn mode-btn" title="Ellipse Selection">
+          <button id="ellipse-mode" class="icon-btn mode-btn" title="Ellipse Selection" data-i18n-title="tool.ellipseSelection">
             <span class="material-icons-round">circle</span>
           </button>
-          <button id="highlighter-mode" class="icon-btn mode-btn" data-mode="highlighter" title="Highlighter">
+          <button id="highlighter-mode" class="icon-btn mode-btn" data-mode="highlighter" title="Highlighter" data-i18n-title="tool.highlighter">
             <span class="material-icons-round">edit</span>
           </button>
         </div>
 
         <div id="highlighter-panel" class="highlighter-panel">
-          <div class="panel-title">Highlighter Size</div>
+          <div class="panel-title" data-i18n="app.highlighterSize">Highlighter Size</div>
           <div class="slider-container">
             <div class="slider-track-visual"></div>
             <input type="range" id="highlighter-height" min="8" max="48" value="16" step="4">
           </div>
           <div class="height-labels">
-            <span>Thin</span>
-            <span>Mid</span>
-            <span>Bold</span>
+            <span data-i18n="app.thin">Thin</span>
+            <span data-i18n="app.medium">Mid</span>
+            <span data-i18n="app.bold">Bold</span>
           </div>
         </div>
       </div>
@@ -294,36 +294,36 @@
     <aside id="notes-panel" class="notes-panel">
       <div class="panel-header notes-header">
         <div class="panel-title-group">
-          <button id="toggle-annotations" class="icon-btn active annotations-toggle-btn" title="Toggle Annotations List">
+          <button id="toggle-annotations" class="icon-btn active annotations-toggle-btn" title="Toggle Annotations List" data-i18n-title="tool.toggleAnnotations">
             <span class="material-icons-round">view_sidebar</span>
           </button>
-          <span class="panel-title-text">Mind Map & Notes</span>
+          <span class="panel-title-text" data-i18n="app.mindMapNotes">Mind Map & Notes</span>
         </div>
         <div class="panel-actions">
           <div class="mobile-notes-switch" role="tablist" aria-label="Notes view switcher">
-            <button id="show-annotations" class="notes-view-btn active" type="button" role="tab" aria-selected="true" title="Annotations view (click again to show both)" aria-label="Annotations view">
+            <button id="show-annotations" class="notes-view-btn active" type="button" role="tab" aria-selected="true" title="Annotations view (click again to show both)" aria-label="Annotations view" data-i18n-aria-label="tool.annotationsView">
               <span class="material-icons-round">edit_note</span>
             </button>
-            <button id="show-mindmap" class="notes-view-btn" type="button" role="tab" aria-selected="false" title="Mind map view (click again to show both)" aria-label="Mind map view">
+            <button id="show-mindmap" class="notes-view-btn" type="button" role="tab" aria-selected="false" title="Mind map view (click again to show both)" aria-label="Mind map view" data-i18n-aria-label="tool.mindMapView">
               <span class="material-icons-round">account_tree</span>
             </button>
           </div>
-          <button id="notes-width-preset" class="icon-btn small panel-width-btn" title="Cycle Notes Width">
+          <button id="notes-width-preset" class="icon-btn small panel-width-btn" title="Cycle Notes Width" data-i18n-title="tool.notesWidth">
             <span class="material-icons-round">width_wide</span>
           </button>
-          <button id="layout-btn" class="icon-btn small" title="Auto Layout">
+          <button id="layout-btn" class="icon-btn small" title="Auto Layout" data-i18n-title="tool.autoLayout">
             <span class="material-icons-round">auto_fix_high</span>
           </button>
-          <button id="layout-by-source-btn" class="icon-btn small" title="Organize By Source">
+          <button id="layout-by-source-btn" class="icon-btn small" title="Organize By Source" data-i18n-title="tool.organizeSource">
             <span class="material-icons-round">account_tree</span>
           </button>
-          <button id="layout-by-time-btn" class="icon-btn small" title="Organize By Time">
+          <button id="layout-by-time-btn" class="icon-btn small" title="Organize By Time" data-i18n-title="tool.organizeTime">
             <span class="material-icons-round">schedule</span>
           </button>
-          <button id="layout-loose-btn" class="icon-btn small" title="Collect Loose Cards">
+          <button id="layout-loose-btn" class="icon-btn small" title="Collect Loose Cards" data-i18n-title="tool.collectLoose">
             <span class="material-icons-round">join_right</span>
           </button>
-          <button id="close-notes-panel" class="icon-btn small close-notes-btn" title="Close Notes Panel">
+          <button id="close-notes-panel" class="icon-btn small close-notes-btn" title="Close Notes Panel" data-i18n-title="tool.closeNotes">
             <span class="material-icons-round">close</span>
           </button>
         </div>
@@ -333,7 +333,7 @@
         <div id="annotation-list" class="annotation-list">
           <div class="empty-state">
             <span class="material-icons-round">edit_note</span>
-            <p>No annotations yet</p>
+            <p data-i18n="app.noAnnotations">No annotations yet</p>
           </div>
         </div>
 
@@ -342,7 +342,7 @@
         <div id="mindmap-container" class="mindmap-container">
           <div class="mindmap-placeholder">
             <span class="material-icons-round">psychology</span>
-            <p>Select text to create nodes</p>
+            <p data-i18n="app.selectToCreate">Select text to create nodes</p>
           </div>
           <div id="mindmap-doc-info" class="doc-info-badge" style="display: none;"></div>
         </div>

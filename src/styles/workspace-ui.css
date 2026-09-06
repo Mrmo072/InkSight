@@ -1810,6 +1810,10 @@ span.material-icons-round.project-home-card-icon {
   opacity: 0.9;
 }
 
+html[lang="zh-CN"] .mindmap-container.mindmap-empty::after {
+  content: "开始构建思维导图\A 双击画布创建节点\A 或从文档拖入高亮内容";
+}
+
 /* The Google Material Icons stylesheet loads after this file and resets
    .material-icons-round to display: inline-block at equal specificity, which
    breaks the icon badge centering above. Re-assert it with higher specificity. */

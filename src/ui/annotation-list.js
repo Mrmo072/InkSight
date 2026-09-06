@@ -3,6 +3,7 @@ import { registerEventListeners } from '../app/event-listeners.js';
 import { createLogger } from '../core/logger.js';
 import { APP_EVENTS } from '../core/event-names.js';
 import { modalManager } from './modal-manager.js';
+import { t } from '../i18n/index.js';
 
 const logger = createLogger('AnnotationList');
 
@@ -146,7 +147,7 @@ export class AnnotationList {
             this.container.insertAdjacentHTML('beforeend', `
                 <div class="empty-state annotation-empty-state">
                     <span class="material-icons-round">edit_note</span>
-                    <p>No annotations yet</p>
+                    <p>${t('app.noAnnotations')}</p>
                 </div>`);
             return;
         }
@@ -176,11 +177,12 @@ export class AnnotationList {
         const filterGroup = document.createElement('div');
         filterGroup.className = 'annotation-filter-group';
         [
-            ['all', 'apps', 'All annotations'],
-            ['needs-map', 'playlist_add_check_circle', 'Need mapping'],
-            ['on-map', 'account_tree', 'On map'],
-            ['missing-links', 'link_off', 'Missing links']
-        ].forEach(([value, icon, label]) => {
+            ['all', 'apps', 'annotation.all'],
+            ['needs-map', 'playlist_add_check_circle', 'annotation.needsMap'],
+            ['on-map', 'account_tree', 'annotation.onMap'],
+            ['missing-links', 'link_off', 'annotation.missingLinks']
+        ].forEach(([value, icon, labelKey]) => {
+            const label = t(labelKey);
             const button = document.createElement('button');
             button.type = 'button';
             button.className = 'annotation-filter-btn';
@@ -204,7 +206,7 @@ export class AnnotationList {
         basketMeta.className = 'annotation-basket-meta';
         basketMeta.innerHTML = `
             <span class="material-icons-round">done_all</span>
-            <span>${this.selectedCardIds.size} selected</span>
+            <span>${t('annotation.selected', { count: this.selectedCardIds.size })}</span>
         `;
 
         const toolbarSide = document.createElement('div');
@@ -213,8 +215,8 @@ export class AnnotationList {
         const addSelectedBtn = document.createElement('button');
         addSelectedBtn.type = 'button';
         addSelectedBtn.className = 'annotation-basket-btn';
-        addSelectedBtn.title = 'Add selected to mind map';
-        addSelectedBtn.setAttribute('aria-label', 'Add selected annotations to mind map');
+        addSelectedBtn.title = t('annotation.addSelected');
+        addSelectedBtn.setAttribute('aria-label', t('annotation.addSelected'));
         addSelectedBtn.innerHTML = '<span class="material-icons-round">account_tree</span>';
         addSelectedBtn.disabled = this.selectedCardIds.size === 0;
         addSelectedBtn.addEventListener('click', (event) => {
@@ -225,8 +227,8 @@ export class AnnotationList {
         const clearSelectedBtn = document.createElement('button');
         clearSelectedBtn.type = 'button';
         clearSelectedBtn.className = 'annotation-basket-btn secondary';
-        clearSelectedBtn.title = 'Clear selection basket';
-        clearSelectedBtn.setAttribute('aria-label', 'Clear selection basket');
+        clearSelectedBtn.title = t('annotation.clearSelected');
+        clearSelectedBtn.setAttribute('aria-label', t('annotation.clearSelected'));
         clearSelectedBtn.innerHTML = '<span class="material-icons-round">clear_all</span>';
         clearSelectedBtn.disabled = this.selectedCardIds.size === 0;
         clearSelectedBtn.addEventListener('click', (event) => {
@@ -335,11 +337,11 @@ export class AnnotationList {
         const pageSpan = document.createElement('span');
         pageSpan.className = 'page-tag';
         const location = highlight?.location || card.location || null;
-        let locationLabel = pageNum === 9999 ? 'Page ?' : `Page ${pageNum}`;
+        let locationLabel = pageNum === 9999 ? t('annotation.pageUnknown') : t('annotation.page', { page: pageNum });
         if (Number.isFinite(location?.lineStart)) {
             locationLabel = Number.isFinite(location?.lineEnd) && location.lineEnd > location.lineStart
-                ? `Lines ${location.lineStart}-${location.lineEnd}`
-                : `Line ${location.lineStart}`;
+                ? t('annotation.lines', { start: location.lineStart, end: location.lineEnd })
+                : t('annotation.line', { line: location.lineStart });
         }
         pageSpan.innerHTML = `<span class="material-icons-round">article</span><span>${locationLabel}</span>`;
 
@@ -366,10 +368,10 @@ export class AnnotationList {
             statusTag.title = 'Missing link — re-import the source to relink';
         } else if (card.isOnBoard === false) {
             statusIcon.textContent = 'account_tree';
-            statusTag.title = 'Not on map yet';
+            statusTag.title = t('annotation.notOnMap');
         } else {
             statusIcon.textContent = 'check_circle';
-            statusTag.title = 'On map';
+            statusTag.title = t('annotation.onMap');
         }
         statusTag.appendChild(statusIcon);
         statusTag.setAttribute('role', 'img');
@@ -383,13 +385,13 @@ export class AnnotationList {
         const sourceToggleBtn = document.createElement('button');
         sourceToggleBtn.className = 'action-btn annotation-source-toggle';
         sourceToggleBtn.innerHTML = '<span class="material-icons-round">description</span>';
-        sourceToggleBtn.title = 'Show source document';
-        sourceToggleBtn.setAttribute('aria-label', 'Show source document');
+        sourceToggleBtn.title = t('annotation.showSource');
+        sourceToggleBtn.setAttribute('aria-label', t('annotation.showSource'));
         sourceToggleBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             const shown = div.classList.toggle('show-source');
             sourceToggleBtn.classList.toggle('active', shown);
-            sourceToggleBtn.title = shown ? 'Hide source document' : 'Show source document';
+            sourceToggleBtn.title = shown ? t('annotation.hideSource') : t('annotation.showSource');
         });
         headerActions.appendChild(sourceToggleBtn);
 
@@ -399,8 +401,8 @@ export class AnnotationList {
             selectBtn.classList.add('active');
         }
         selectBtn.innerHTML = '<span class="material-icons-round">check_circle</span>';
-        selectBtn.title = 'Select for batch actions';
-        selectBtn.setAttribute('aria-label', 'Select annotation for batch actions');
+        selectBtn.title = t('annotation.selectBatch');
+        selectBtn.setAttribute('aria-label', t('annotation.selectBatch'));
         selectBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             if (this.selectedCardIds.has(card.id)) {
@@ -419,7 +421,7 @@ export class AnnotationList {
         sourceMeta.className = 'annotation-source-meta text-two-line';
         sourceMeta.innerHTML = `
             <span class="material-icons-round annotation-source-icon">description</span>
-            <span>${card.sourceName || 'Unknown source'}</span>
+            <span>${card.sourceName || t('annotation.unknownSource')}</span>
         `;
         // Hidden by default; the header source button reveals it so the card
         // stays compact — most of the time the name is redundant context.
@@ -437,7 +439,7 @@ export class AnnotationList {
             img.style.marginTop = '4px';
             quote.appendChild(img);
         } else {
-            quote.textContent = card.content || highlight?.text || '(Image)';
+            quote.textContent = card.content || highlight?.text || t('annotation.image');
         }
 
         if (highlight?.color) {
@@ -451,7 +453,7 @@ export class AnnotationList {
         const buildNoteInput = () => {
             const input = document.createElement('textarea');
             input.className = 'annotation-note-input';
-            input.placeholder = 'Add a note...';
+            input.placeholder = t('annotation.notePlaceholder');
             input.value = card.note || '';
             input.rows = 1;
 
@@ -488,8 +490,8 @@ export class AnnotationList {
             const addNoteBtn = document.createElement('button');
             addNoteBtn.className = 'action-btn add-note-btn';
             addNoteBtn.innerHTML = '<span class="material-icons-round">note_add</span>';
-            addNoteBtn.title = 'Add note';
-            addNoteBtn.setAttribute('aria-label', 'Add note');
+            addNoteBtn.title = t('annotation.addNote');
+            addNoteBtn.setAttribute('aria-label', t('annotation.addNote'));
             addNoteBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const input = buildNoteInput();
@@ -509,14 +511,14 @@ export class AnnotationList {
         const delBtn = document.createElement('button');
         delBtn.className = 'action-btn danger';
         delBtn.innerHTML = '<span class="material-icons-round">delete</span>';
-        delBtn.title = 'Delete';
-        delBtn.setAttribute('aria-label', 'Delete annotation');
+        delBtn.title = t('common.delete');
+        delBtn.setAttribute('aria-label', t('annotation.deleteTitle'));
         delBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             void modalManager.confirm({
-                title: 'Delete Annotation',
-                message: 'Delete this annotation? The linked mind map card will be removed as well.',
-                confirmLabel: 'Delete',
+                title: t('annotation.deleteTitle'),
+                message: t('annotation.deleteMessage'),
+                confirmLabel: t('common.delete'),
                 danger: true
             }).then((confirmed) => {
                 if (!confirmed) return;
@@ -535,8 +537,8 @@ export class AnnotationList {
             addToMapBtn.classList.add('active');
         }
         addToMapBtn.innerHTML = '<span class="material-icons-round">account_tree</span>';
-        addToMapBtn.title = 'Add to mind map';
-        addToMapBtn.setAttribute('aria-label', 'Add annotation to mind map');
+        addToMapBtn.title = t('annotation.addToMap');
+        addToMapBtn.setAttribute('aria-label', t('annotation.addToMap'));
         addToMapBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             this.addCardToMindMap(card, highlight);
@@ -546,8 +548,8 @@ export class AnnotationList {
         const jumpBtn = document.createElement('button');
         jumpBtn.className = 'action-btn annotation-jump-btn';
         jumpBtn.innerHTML = '<span class="material-icons-round">north_east</span>';
-        jumpBtn.title = 'Open in reader';
-        jumpBtn.setAttribute('aria-label', 'Open annotation in reader');
+        jumpBtn.title = t('annotation.openReader');
+        jumpBtn.setAttribute('aria-label', t('annotation.openReader'));
         jumpBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             this.handleItemClick(card.id, card.highlightId);
