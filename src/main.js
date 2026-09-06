@@ -1,4 +1,6 @@
-import './styles/styles.css';
+// styles.css / themes.css / workspace-ui.css 由 index.html 的 <link> 按顺序加载。
+// 不要在这里重复 import —— dev 模式下 Vite 会把 JS 导入的 CSS 注入到 <link> 之后，
+// 导致 styles.css 的旧规则覆盖 workspace-ui.css 的新设计（如批注控制区被压回三列布局）。
 import { highlightManager } from './core/highlight-manager.js';
 import { emitAppNotification } from './ui/app-notifications.js';
 import { suppressResizeObserverLoop } from './drawnix/react-board/src/utils/resizeObserverFix.js';

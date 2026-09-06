@@ -1,122 +1,356 @@
-/* Global Theme System - CSS Variables for all 6 themes */
+/* ============================================================
+   InkSight · "Paper & Ink" Theme System
+   ------------------------------------------------------------
+   Single source of truth for every color / typography / motion
+   token in the app shell. Themes only remap tokens here; no
+   component CSS may hardcode a theme color.
 
-/* Default & Colorful Themes (Clean white) */
+   Token naming:
+     --paper-*   surfaces (canvas → surface → raised → hover)
+     --ink-*     text hierarchy (strong → body → muted → faint)
+     --line-*    hairline borders
+     --brand-*   primary ink-blue action color
+     --gold-*    secondary accent (capture / highlight moments)
+     --reader-*  document reading surface
+   Legacy variable names consumed by older component CSS are
+   mapped to tokens at the bottom of each theme block.
+   ============================================================ */
+
+/* ---------- Shared: type, radius, motion (theme-agnostic) ---------- */
+:root {
+  --font-ui: 'Inter', 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Manrope', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-reading: 'Noto Serif SC', Georgia, 'Times New Roman', serif;
+
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-full: 999px;
+
+  --motion-fast: 120ms;
+  --motion-base: 180ms;
+  --motion-slow: 280ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+
+  --shadow-1: 0 1px 2px rgba(28, 25, 20, 0.05);
+  --shadow-2: 0 4px 16px rgba(28, 25, 20, 0.09);
+  --shadow-3: 0 18px 44px rgba(28, 25, 20, 0.18);
+
+  --header-height: 52px;
+
+  /* Highlighter keeps its classic marker yellow across light themes */
+  --highlight-color: rgba(255, 213, 79, 0.4);
+
+  /* Default ("Paper" light) palette as a no-JS fallback; the
+     [data-theme] blocks below override these with the same values. */
+  --paper-canvas: #f4f2ec;
+  --paper-surface: #fbfaf7;
+  --paper-raised: #ffffff;
+  --paper-hover: #eeebe3;
+  --paper-active: #e7e3d8;
+
+  --ink-strong: #23211c;
+  --ink-body: #3b3833;
+  --ink-muted: #6e6961;
+  --ink-faint: #99938a;
+  --ink-inverse: #fbfaf7;
+
+  --line: #e4e0d5;
+  --line-strong: #d2ccbd;
+
+  --brand: #1d4ed8;
+  --brand-strong: #1e40af;
+  --brand-soft: rgba(29, 78, 216, 0.08);
+  --brand-soft-strong: rgba(29, 78, 216, 0.16);
+
+  --gold: #b45309;
+  --gold-strong: #92400e;
+  --gold-soft: rgba(180, 83, 9, 0.1);
+  --gold-soft-strong: rgba(180, 83, 9, 0.2);
+
+  --ok: #15803d;
+  --warn: #b45309;
+  --danger: #b3261e;
+
+  --reader-bg: #f2f0ea;
+}
+
+/* ============================================================
+   default — Paper (warm light, the identity theme)
+   ============================================================ */
 :root[data-theme="default"],
 :root[data-theme="colorful"] {
-    --theme-bg-main: #ffffff;
-    --theme-bg-secondary: #f8fafc;
-    --theme-bg-tertiary: #f1f5f9;
-    --theme-border: #e2e8f0;
-    --theme-text-main: #0f172a;
-    --theme-text-secondary: #64748b;
-    --theme-shadow: rgba(0, 0, 0, 0.1);
-    --theme-shadow-sm: rgba(0, 0, 0, 0.05);
-    --theme-shadow-md: rgba(0, 0, 0, 0.12);
-    --theme-primary: #2563eb;
-    --theme-primary-hover: #1d4ed8;
+  --paper-canvas: #f4f2ec;
+  --paper-surface: #fbfaf7;
+  --paper-raised: #ffffff;
+  --paper-hover: #eeebe3;
+  --paper-active: #e7e3d8;
 
-    /* Map to standard variables */
-    --bg-main: var(--theme-bg-main);
-    --bg-secondary: var(--theme-bg-secondary);
-    --bg-tertiary: var(--theme-bg-tertiary);
-    --border: var(--theme-border);
-    --text-main: var(--theme-text-main);
-    --text-secondary: var(--theme-text-secondary);
+  --ink-strong: #23211c;
+  --ink-body: #3b3833;
+  --ink-muted: #6e6961;
+  --ink-faint: #99938a;
+  --ink-inverse: #fbfaf7;
+
+  --line: #e4e0d5;
+  --line-strong: #d2ccbd;
+
+  --brand: #1d4ed8;
+  --brand-strong: #1e40af;
+  --brand-soft: rgba(29, 78, 216, 0.08);
+  --brand-soft-strong: rgba(29, 78, 216, 0.16);
+
+  --gold: #b45309;
+  --gold-strong: #92400e;
+  --gold-soft: rgba(180, 83, 9, 0.1);
+  --gold-soft-strong: rgba(180, 83, 9, 0.2);
+
+  --ok: #15803d;
+  --warn: #b45309;
+  --danger: #b3261e;
+
+  --reader-bg: #f2f0ea;
 }
 
-/* Soft Theme (Gentle gray) */
+:root[data-theme="colorful"] {
+  --brand: #0f766e;
+  --brand-strong: #115e59;
+  --brand-soft: rgba(15, 118, 110, 0.09);
+  --brand-soft-strong: rgba(15, 118, 110, 0.18);
+}
+
+/* ============================================================
+   soft — calm cool-gray paper
+   ============================================================ */
 :root[data-theme="soft"] {
-    --theme-bg-main: #f5f5f5;
-    --theme-bg-secondary: #ebebeb;
-    --theme-bg-tertiary: #e0e0e0;
-    --theme-border: #d0d0d0;
-    --theme-text-main: #2c2c2c;
-    --theme-text-secondary: #5c5c5c;
-    --theme-shadow: rgba(0, 0, 0, 0.08);
-    --theme-shadow-sm: rgba(0, 0, 0, 0.04);
-    --theme-shadow-md: rgba(0, 0, 0, 0.1);
-    --theme-primary: #4a90e2;
-    --theme-primary-hover: #357abd;
+  --paper-canvas: #efefec;
+  --paper-surface: #f7f7f5;
+  --paper-raised: #ffffff;
+  --paper-hover: #e8e8e4;
+  --paper-active: #e0e0db;
 
-    /* Map to standard variables */
-    --bg-main: var(--theme-bg-main);
-    --bg-secondary: var(--theme-bg-secondary);
-    --bg-tertiary: var(--theme-bg-tertiary);
-    --border: var(--theme-border);
-    --text-main: var(--theme-text-main);
-    --text-secondary: var(--theme-text-secondary);
+  --ink-strong: #26251f;
+  --ink-body: #3d3c36;
+  --ink-muted: #6d6c65;
+  --ink-faint: #96948c;
+  --ink-inverse: #f7f7f5;
+
+  --line: #dededb;
+  --line-strong: #cbcac4;
+
+  --brand: #2b6cb0;
+  --brand-strong: #2c5282;
+  --brand-soft: rgba(43, 108, 176, 0.09);
+  --brand-soft-strong: rgba(43, 108, 176, 0.18);
+
+  --gold: #a16207;
+  --gold-strong: #854d0e;
+  --gold-soft: rgba(161, 98, 7, 0.1);
+  --gold-soft-strong: rgba(161, 98, 7, 0.2);
+
+  --ok: #15803d;
+  --warn: #a16207;
+  --danger: #b3261e;
+
+  --reader-bg: #f1f1ee;
 }
 
-/* Retro Theme (Vintage warm) */
+/* ============================================================
+   retro — parchment & leather
+   ============================================================ */
 :root[data-theme="retro"] {
-    --theme-bg-main: #f9f8ed;
-    --theme-bg-secondary: #f0ede0;
-    --theme-bg-tertiary: #e8e4d3;
-    --theme-border: #d4cdb6;
-    --theme-text-main: #3d3520;
-    --theme-text-secondary: #6b6040;
-    --theme-shadow: rgba(61, 53, 32, 0.12);
-    --theme-shadow-sm: rgba(61, 53, 32, 0.06);
-    --theme-shadow-md: rgba(61, 53, 32, 0.15);
-    --theme-primary: #8b7355;
-    --theme-primary-hover: #6d5940;
+  --paper-canvas: #f1ebdc;
+  --paper-surface: #f8f4e8;
+  --paper-raised: #fffdf6;
+  --paper-hover: #eae2cd;
+  --paper-active: #e2d8bd;
 
-    /* Map to standard variables */
-    --bg-main: var(--theme-bg-main);
-    --bg-secondary: var(--theme-bg-secondary);
-    --bg-tertiary: var(--theme-bg-tertiary);
-    --border: var(--theme-border);
-    --text-main: var(--theme-text-main);
-    --text-secondary: var(--theme-text-secondary);
+  --ink-strong: #332c19;
+  --ink-body: #453c24;
+  --ink-muted: #6f6444;
+  --ink-faint: #94896a;
+  --ink-inverse: #f8f4e8;
+
+  --line: #dcd2b8;
+  --line-strong: #c8bb9a;
+
+  --brand: #7a5c2e;
+  --brand-strong: #5e4720;
+  --brand-soft: rgba(122, 92, 46, 0.1);
+  --brand-soft-strong: rgba(122, 92, 46, 0.2);
+
+  --gold: #a16207;
+  --gold-strong: #854d0e;
+  --gold-soft: rgba(161, 98, 7, 0.12);
+  --gold-soft-strong: rgba(161, 98, 7, 0.22);
+
+  --ok: #3f6212;
+  --warn: #a16207;
+  --danger: #9f1d1d;
+
+  --reader-bg: #ede6d4;
 }
 
-/* Dark Theme (Dark mode) */
+/* ============================================================
+   dark — ink night (warm charcoal)
+   ============================================================ */
 :root[data-theme="dark"] {
-    --theme-bg-main: #141414;
-    --theme-bg-secondary: #1e1e1e;
-    --theme-bg-tertiary: #2a2a2a;
-    --theme-border: #3d3d3d;
-    --theme-text-main: #e0e0e0;
-    --theme-text-secondary: #b0b0b0;
-    --theme-shadow: rgba(0, 0, 0, 0.5);
-    --theme-shadow-sm: rgba(0, 0, 0, 0.3);
-    --theme-shadow-md: rgba(0, 0, 0, 0.6);
-    --theme-primary: #6698ff;
-    --theme-primary-hover: #80acff;
+  --paper-canvas: #161512;
+  --paper-surface: #1d1c18;
+  --paper-raised: #25241f;
+  --paper-hover: #2b2a24;
+  --paper-active: #333129;
 
-    /* Map to standard variables */
-    --bg-main: var(--theme-bg-main);
-    --bg-secondary: var(--theme-bg-secondary);
-    --bg-tertiary: var(--theme-bg-tertiary);
-    --border: var(--theme-border);
-    --text-main: var(--theme-text-main);
-    --text-secondary: var(--theme-text-secondary);
+  --ink-strong: #f0ede5;
+  --ink-body: #d6d2c8;
+  --ink-muted: #a29d92;
+  --ink-faint: #7b766c;
+  --ink-inverse: #1d1c18;
+
+  --line: #32302a;
+  --line-strong: #403d35;
+
+  --brand: #8ab0f8;
+  --brand-strong: #a5c2fa;
+  --brand-soft: rgba(138, 176, 248, 0.14);
+  --brand-soft-strong: rgba(138, 176, 248, 0.24);
+
+  --gold: #e0a458;
+  --gold-strong: #ecb96f;
+  --gold-soft: rgba(224, 164, 88, 0.14);
+  --gold-soft-strong: rgba(224, 164, 88, 0.24);
+
+  --ok: #6fc288;
+  --warn: #e0a458;
+  --danger: #e5735f;
+
+  --reader-bg: #1d1c18;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-2: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-3: 0 18px 44px rgba(0, 0, 0, 0.55);
+
+  --highlight-color: rgba(255, 214, 90, 0.3);
 }
 
-/* Starry Theme (Deep blue-black) */
+/* ============================================================
+   starry — deep blue night
+   ============================================================ */
 :root[data-theme="starry"] {
-    --theme-bg-main: #0d2537;
-    --theme-bg-secondary: #162f44;
-    --theme-bg-tertiary: #1f3a52;
-    --theme-border: #2d4a63;
-    --theme-text-main: #e8f0f8;
-    --theme-text-secondary: #b4d0e7;
-    --theme-shadow: rgba(0, 0, 0, 0.7);
-    --theme-shadow-sm: rgba(0, 0, 0, 0.4);
-    --theme-shadow-md: rgba(0, 0, 0, 0.8);
-    --theme-primary: #4a9eff;
-    --theme-primary-hover: #6bb0ff;
+  --paper-canvas: #0d1b29;
+  --paper-surface: #122236;
+  --paper-raised: #182c44;
+  --paper-hover: #1d344f;
+  --paper-active: #233c59;
 
-    /* Map to standard variables */
-    --bg-main: var(--theme-bg-main);
-    --bg-secondary: var(--theme-bg-secondary);
-    --bg-tertiary: var(--theme-bg-tertiary);
-    --border: var(--theme-border);
-    --text-main: var(--theme-text-main);
-    --text-secondary: var(--theme-text-secondary);
+  --ink-strong: #eaf2fb;
+  --ink-body: #cfe0ef;
+  --ink-muted: #9db8d2;
+  --ink-faint: #7492ad;
+  --ink-inverse: #122236;
+
+  --line: #24405c;
+  --line-strong: #2e4e6e;
+
+  --brand: #6fb1ff;
+  --brand-strong: #8fc5ff;
+  --brand-soft: rgba(111, 177, 255, 0.15);
+  --brand-soft-strong: rgba(111, 177, 255, 0.26);
+
+  --gold: #e5b567;
+  --gold-strong: #eec57c;
+  --gold-soft: rgba(229, 181, 103, 0.15);
+  --gold-soft-strong: rgba(229, 181, 103, 0.25);
+
+  --ok: #6fc288;
+  --warn: #e5b567;
+  --danger: #e5735f;
+
+  --reader-bg: #122236;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-2: 0 4px 16px rgba(0, 0, 0, 0.45);
+  --shadow-3: 0 18px 44px rgba(0, 0, 0, 0.6);
+
+  --highlight-color: rgba(255, 214, 90, 0.3);
 }
 
-/* Ensure smooth theme transitions */
+/* ============================================================
+   Legacy variable mapping — every name that component CSS
+   already consumes, pointed at the token layer above.
+   ============================================================ */
+:root,
+:root[data-theme="default"],
+:root[data-theme="colorful"],
+:root[data-theme="soft"],
+:root[data-theme="retro"],
+:root[data-theme="dark"],
+:root[data-theme="starry"] {
+  /* App background + shell surfaces */
+  --app-bg: var(--paper-canvas);
+  --app-bg-start: var(--paper-canvas);
+  --app-bg-end: var(--paper-canvas);
+  --surface-base: var(--paper-surface);
+  --surface-soft: var(--paper-surface);
+  --surface-muted: var(--paper-hover);
+  --surface-border: var(--line);
+  --surface-border-strong: var(--line-strong);
+  --surface-shadow: var(--shadow-2);
+  --surface-shadow-soft: var(--shadow-1);
+
+  /* Classic trio + text */
+  --bg-main: var(--paper-raised);
+  --bg-secondary: var(--paper-surface);
+  --bg-tertiary: var(--paper-hover);
+  --border: var(--line);
+  --border-color: var(--line);
+  --text-strong: var(--ink-strong);
+  --text-main: var(--ink-body);
+  --text-secondary: var(--ink-muted);
+  --text-muted: var(--ink-muted);
+  --text-subtle: var(--ink-faint);
+
+  /* Brand + accents */
+  --primary: var(--brand);
+  --primary-hover: var(--brand-strong);
+  --accent: var(--brand);
+  --accent-strong: var(--brand-strong);
+  --accent-soft: var(--brand-soft);
+  --success-soft: rgba(22, 163, 74, 0.12);
+  --warning-soft: var(--gold-soft);
+  --danger-soft: rgba(220, 38, 38, 0.12);
+
+  /* Semantic tints & on-tint text used across panels */
+  --accent-text: var(--brand-strong);
+  --info-strong: var(--brand-strong);
+  --warn-text: var(--gold-strong);
+  --warn-text-alt: var(--gold-strong);
+  --warn-text-deep: var(--gold-strong);
+  --neutral-strong: var(--ink-body);
+  --neutral-text: var(--ink-muted);
+  --danger-text: var(--danger);
+  --tint-warn-bg: var(--gold-soft);
+  --tint-info-bg: var(--brand-soft);
+
+  /* Legacy --theme-* namespace (graph view, settings modal, PDF chrome) */
+  --theme-primary: var(--brand);
+  --theme-primary-hover: var(--brand-strong);
+  --theme-shadow: var(--shadow-2);
+  --theme-shadow-sm: var(--shadow-1);
+  --theme-shadow-md: var(--shadow-2);
+  --theme-bg-main: var(--paper-raised);
+  --theme-bg-secondary: var(--paper-surface);
+  --theme-bg-tertiary: var(--paper-hover);
+  --theme-border: var(--line);
+  --theme-text-main: var(--ink-body);
+  --theme-text-secondary: var(--ink-muted);
+}
+
+/* ============================================================
+   Smooth theme transitions
+   ============================================================ */
 body,
 .sidebar,
 .sidebar-header,
@@ -130,50 +364,36 @@ body,
 .mindmap-container,
 .empty-state,
 .icon-btn {
-    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+  transition: background-color var(--motion-base) var(--ease-out),
+    color var(--motion-base) var(--ease-out),
+    border-color var(--motion-base) var(--ease-out);
 }
 
-/* Special handling: Keep PDF pages white in dark themes for readability */
+/* ============================================================
+   Reading-surface guarantees
+   PDF pages stay readable in night themes (inverted for
+   contrast) and the canvas behind them follows the token layer.
+   ============================================================ */
 :root[data-theme="dark"] .pdf-page-wrapper,
 :root[data-theme="dark"] #viewer .page,
 :root[data-theme="starry"] .pdf-page-wrapper,
 :root[data-theme="starry"] #viewer .page {
-    background-color: #ffffff !important;
-    filter: invert(0.9) hue-rotate(180deg);
+  background-color: #ffffff !important;
+  filter: invert(0.9) hue-rotate(180deg);
 }
 
-/* Adjust viewer background in dark themes */
 :root[data-theme="dark"] .viewer,
 :root[data-theme="starry"] .viewer {
-    background-color: var(--theme-bg-tertiary) !important;
+  background-color: var(--paper-canvas) !important;
 }
 
-/* Mind map grid pattern - adjust for dark themes */
+/* Mind map dot grid follows the hairline token on every theme */
+.mindmap-container {
+  background-image: radial-gradient(var(--line) 1px, transparent 1px) !important;
+}
+
+/* Night themes get a lighter dot so the grid stays visible */
 :root[data-theme="dark"] .mindmap-container,
 :root[data-theme="starry"] .mindmap-container {
-    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.15) 1px, transparent 1px) !important;
-}
-
-:root[data-theme="soft"] .mindmap-container {
-    background-image: radial-gradient(circle, #cbd5e1 1px, transparent 1px) !important;
-    background-color: var(--theme-bg-secondary) !important;
-}
-
-:root[data-theme="retro"] .mindmap-container {
-    background-image: radial-gradient(circle, #d4cdb6 1px, transparent 1px) !important;
-    background-color: var(--theme-bg-secondary) !important;
-}
-/* Dark-theme remapping for semantic tints & on-tint text used by styles.css */
-:root[data-theme="dark"],
-:root[data-theme="starry"] {
-    --accent-text: #93c5fd;
-    --info-strong: #bfdbfe;
-    --warn-text: #fcd34d;
-    --warn-text-alt: #fdba74;
-    --warn-text-deep: #fdba74;
-    --neutral-strong: #cbd5e1;
-    --neutral-text: #94a3b8;
-    --danger-text: #fca5a5;
-    --tint-warn-bg: #32250f;
-    --tint-info-bg: #16283f;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.12) 1px, transparent 1px) !important;
 }

@@ -22,6 +22,39 @@ function describeDocumentStatus(file, index) {
     return 'Missing';
 }
 
+function documentTypeBadge(file) {
+    const fromMime = String(file.type || '').toLowerCase();
+    const extension = String(file.name || '').split('.').pop().toLowerCase();
+    if (fromMime.includes('pdf') || extension === 'pdf') {
+        return { icon: 'picture_as_pdf', modifier: 'pdf' };
+    }
+    if (fromMime.includes('epub') || extension === 'epub') {
+        return { icon: 'menu_book', modifier: 'epub' };
+    }
+    if (extension === 'md' || fromMime.includes('markdown')) {
+        return { icon: 'article', modifier: 'md' };
+    }
+    return { icon: 'description', modifier: 'txt' };
+}
+
+function formatSnapshotTime(savedAt) {
+    const timestamp = Date.parse(savedAt || 0);
+    if (!timestamp) {
+        return 'Not saved yet';
+    }
+
+    try {
+        return new Intl.DateTimeFormat(undefined, {
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        }).format(new Date(timestamp));
+    } catch {
+        return new Date(timestamp).toLocaleString();
+    }
+}
+
 export function getCardsCollection(cardSystem = getAppContext().cardSystem) {
     const cards = cardSystem?.cards;
     if (cards instanceof Map) {
@@ -88,20 +121,37 @@ export function createFileLibraryRenderer({
         const projectPanelMarkup = `
         <section class="library-project-panel workspace-card compact-footer" aria-label="Project actions">
           <div class="library-project-header">
-            <span class="material-icons-round">folder_managed</span>
             <div class="library-project-copy">
               <strong class="text-single-line">${projectStatus.title}</strong>
               <span class="library-project-status text-single-line">${projectStatusLabel}</span>
             </div>
+            <button type="button" class="library-project-refresh-btn" data-project-action="history" title="Refresh project history" aria-label="Refresh project history">
+              <span class="material-icons-round">refresh</span>
+            </button>
           </div>
-          <div class="library-project-actions icon-row">
-            ${latestSnapshot ? `<button type="button" class="library-project-btn icon-only-btn" data-project-history-id="${escapeHtml(latestSnapshot.snapshotId)}" title="Restore Latest Snapshot" aria-label="Restore Latest Snapshot"><span class="material-icons-round">restore</span></button>` : ''}
-            <button type="button" class="library-project-btn primary icon-only-btn" data-project-action="snapshot" title="Save Snapshot" aria-label="Save Snapshot"><span class="material-icons-round">bookmark_add</span></button>
-            <button type="button" class="library-project-btn primary icon-only-btn" data-project-action="open" title="Open Project Folder" aria-label="Open Project Folder"><span class="material-icons-round">folder_open</span></button>
-            <button type="button" class="library-project-btn icon-only-btn" data-project-action="save" title="Save Project Folder" aria-label="Save Project Folder"><span class="material-icons-round">save</span></button>
-            <button type="button" class="library-project-btn icon-only-btn" data-project-action="import" title="Import Documents" aria-label="Import Documents"><span class="material-icons-round">library_add</span></button>
-            <button type="button" class="library-project-btn icon-only-btn" data-project-action="history" title="Refresh History" aria-label="Refresh History"><span class="material-icons-round">history</span></button>
+          <div class="library-project-actions">
+            <button type="button" class="library-project-btn labeled" data-project-action="snapshot" title="Save a workspace snapshot">
+              <span class="material-icons-round">bookmark_add</span><span>Snapshot</span>
+            </button>
+            <button type="button" class="library-project-btn labeled" data-project-action="open" title="Open a project folder">
+              <span class="material-icons-round">folder_open</span><span>Open</span>
+            </button>
+            <button type="button" class="library-project-btn labeled" data-project-action="save" title="Save the project folder">
+              <span class="material-icons-round">save</span><span>Save</span>
+            </button>
+            <button type="button" class="library-project-btn labeled" data-project-action="import" title="Import documents">
+              <span class="material-icons-round">library_add</span><span>Import</span>
+            </button>
           </div>
+          ${latestSnapshot ? `
+          <button type="button" class="library-project-snapshot-row" data-project-history-id="${escapeHtml(latestSnapshot.snapshotId)}" title="Restore this snapshot">
+            <span class="material-icons-round">restore</span>
+            <span class="library-project-snapshot-copy">
+              <span class="text-single-line">Last snapshot</span>
+              <span class="text-single-line">${formatSnapshotTime(latestSnapshot.savedAt)}</span>
+            </span>
+            <span class="library-project-snapshot-restore">Restore</span>
+          </button>` : ''}
         </section>
     `;
 
@@ -121,12 +171,15 @@ export function createFileLibraryRenderer({
         fileListElement.innerHTML = `
         <div class="library-documents">
         ${visibleDocuments.map((file, index) => `
-        <div class="file-item ${getCurrentFileId() === file.id ? 'active' : ''} ${file.loaded ? '' : 'disabled'}" 
+        <div class="file-item ${getCurrentFileId() === file.id ? 'active' : ''} ${file.loaded ? '' : 'disabled'}"
              data-open-file-id="${escapeHtml(file.id)}"
              data-file-index="${index}"
              draggable="${file.loaded ? 'true' : 'false'}"
              title="${escapeHtml(file.loaded ? file.name : `${file.name} - re-import this source file to relink annotations`)}">
-          <span class="material-icons-round file-item-icon">description</span>
+          ${(() => {
+              const badge = documentTypeBadge(file);
+              return `<span class="material-icons-round file-item-icon file-item-icon--${badge.modifier}">${badge.icon}</span>`;
+          })()}
           <span class="file-item-body">
             <span class="file-item-name text-two-line">${escapeHtml(file.name)}</span>
             <span class="file-item-meta text-single-line">${escapeHtml(describeDocumentStatus(file, index))}</span>
