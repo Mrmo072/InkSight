@@ -46,6 +46,38 @@ export function findLoadedDocumentMatch({ document, loadedDocuments = [], docume
     }) ?? null;
 }
 
+/**
+ * Aligns documentManager registration flags with the actual file library.
+ * A document whose binary sits in the library is never "missing" — stale
+ * unloaded flags (e.g. after a mid-session snapshot restore) would otherwise
+ * flag every annotation of that file as "missing link" even though source
+ * navigation still works. Files removed by the user are dropped from
+ * `files` and stay unregistered, so removals are not resurrected.
+ * Returns the number of repaired/registered entries.
+ */
+export function reconcileDocumentRegistrationState({ files = [], documentManager } = {}) {
+    if (!documentManager || !Array.isArray(files)) {
+        return 0;
+    }
+
+    let repaired = 0;
+    files.forEach((file) => {
+        if (!file?.id) {
+            return;
+        }
+
+        const registered = documentManager.getDocumentInfo?.(file.id);
+        if (registered && !registered.loaded) {
+            documentManager.markDocumentLoaded?.(file.id, true);
+            repaired += 1;
+        } else if (!registered) {
+            documentManager.registerDocument?.(file.id, file.name, file.type, true);
+            repaired += 1;
+        }
+    });
+    return repaired;
+}
+
 export function buildRecoveryDiagnostics(appContext = {}) {
     const documents = appContext.documentManager?.getAllDocuments?.() ?? [];
     const missingDocuments = appContext.documentManager?.getMissingDocuments?.() ?? [];

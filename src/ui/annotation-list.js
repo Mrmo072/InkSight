@@ -127,9 +127,22 @@ export class AnnotationList {
     render(items) {
         const controls = this.createControlsElement(items);
 
+        this.container.innerHTML = '';
+        this.container.appendChild(controls);
+
+        // 当前文件处于未加载状态时，逐条的 link_off 图标不够醒目，
+        // 顶部给出明确的恢复引导
+        if (this.currentFileId && this.getMissingSourceIds().has(this.currentFileId)) {
+            const banner = document.createElement('div');
+            banner.className = 'annotation-missing-banner';
+            banner.innerHTML = `
+                <span class="material-icons-round">link_off</span>
+                <span>Source file is missing — re-import it from the library (or use Relink Source) to restore source navigation for these annotations.</span>
+            `;
+            this.container.appendChild(banner);
+        }
+
         if (items.length === 0) {
-            this.container.innerHTML = '';
-            this.container.appendChild(controls);
             this.container.insertAdjacentHTML('beforeend', `
                 <div class="empty-state annotation-empty-state">
                     <span class="material-icons-round">edit_note</span>
@@ -138,8 +151,6 @@ export class AnnotationList {
             return;
         }
 
-        this.container.innerHTML = '';
-        this.container.appendChild(controls);
         const fragment = document.createDocumentFragment();
 
         items.forEach(item => {

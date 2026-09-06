@@ -68,6 +68,26 @@ describe('DocumentManager', () => {
         }));
     });
 
+    it('keeps currently open documents loaded across a restore', () => {
+        documentManager.registerDocument('doc-1', 'Book.pdf', 'application/pdf', true);
+        documentManager.registerDocument('doc-2', 'Other.pdf', 'application/pdf', true);
+
+        // doc-1 当前打开且在 payload 中，恢复后必须保持 loaded；
+        // doc-2 当前打开但不在 payload 中，注册也不能丢；
+        // doc-3 只存在于 payload，按未加载引用恢复
+        documentManager.restorePersistenceData({
+            documents: [
+                ['doc-1', { id: 'doc-1', name: 'Book.pdf', type: 'application/pdf', loaded: true }],
+                ['doc-3', { id: 'doc-3', name: 'Fresh.pdf', type: 'application/pdf', loaded: true }]
+            ]
+        });
+
+        expect(documentManager.isDocumentLoaded('doc-1')).toBe(true);
+        expect(documentManager.isDocumentLoaded('doc-2')).toBe(true);
+        expect(documentManager.isDocumentLoaded('doc-3')).toBe(false);
+        expect(documentManager.getMissingDocuments().map((doc) => doc.id)).toEqual(['doc-3']);
+    });
+
     it('finds matching unloaded documents for source relinking', () => {
         documentManager.restorePersistenceData({
             documents: [

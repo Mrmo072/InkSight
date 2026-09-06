@@ -76,6 +76,9 @@ export function createWorkspaceEventListeners({
             target: windowTarget,
             event: APP_EVENTS.DOCUMENTS_RESTORED,
             handler: () => {
+                // 恢复会把所有注册降级为未加载——先用文件库对账，
+                // 否则还在项目里的文件会被误判为 missing link
+                ui.reconcileDocumentRegistrations?.();
                 ui.attemptAutoRelinkRecoveredDocuments();
                 ui.renderFileList();
             }

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildRecoveryDiagnostics, chooseDocumentTarget, findLoadedDocumentMatch } from '../document-relink.js';
+import { buildRecoveryDiagnostics, chooseDocumentTarget, findLoadedDocumentMatch, reconcileDocumentRegistrationState } from '../document-relink.js';
 
 function createDocumentManager(overrides = {}) {
     const documents = overrides.documents ?? [
@@ -7,14 +7,24 @@ function createDocumentManager(overrides = {}) {
         { id: 'doc-2', name: 'Notes.md', type: 'text/markdown', loaded: false }
     ];
 
-    return {
+    const manager = {
         getDocumentInfo: vi.fn((id) => documents.find((doc) => doc.id === id) ?? null),
         findRestorableMatch: vi.fn(({ name, type }) => documents.find((doc) => doc.name === name && doc.type === type && !doc.loaded) ?? null),
         isTypeCompatible: vi.fn((expected, actual) => !expected || !actual || expected === actual),
         getAllDocuments: vi.fn(() => documents),
         getMissingDocuments: vi.fn(() => documents.filter((doc) => !doc.loaded)),
+        markDocumentLoaded: vi.fn((id, loaded) => {
+            const doc = documents.find((item) => item.id === id);
+            if (doc) {
+                doc.loaded = loaded;
+            }
+        }),
+        registerDocument: vi.fn((id, name, type, loaded) => {
+            documents.push({ id, name, type, loaded });
+        }),
         ...overrides
     };
+    return manager;
 }
 
 describe('document relink helpers', () => {
@@ -88,5 +98,45 @@ describe('document relink helpers', () => {
         });
 
         expect(match).toEqual(expect.objectContaining({ id: 'loaded-1' }));
+    });
+
+    it('reconciles stale unloaded flags against the file library', () => {
+        const documentManager = createDocumentManager({
+            documents: [
+                { id: 'doc-1', name: 'Book.pdf', type: 'application/pdf', loaded: false },
+                { id: 'doc-2', name: 'Notes.md', type: 'text/markdown', loaded: true }
+            ]
+        });
+
+        const repaired = reconcileDocumentRegistrationState({
+            files: [
+                { id: 'doc-1', name: 'Book.pdf', type: 'application/pdf' },
+                { id: 'doc-2', name: 'Notes.md', type: 'text/markdown' }
+            ],
+            documentManager
+        });
+
+        expect(repaired).toBe(1);
+        expect(documentManager.markDocumentLoaded).toHaveBeenCalledWith('doc-1', true);
+        expect(documentManager.getMissingDocuments()).toHaveLength(0);
+    });
+
+    it('registers library files that are missing from the document registry', () => {
+        const documentManager = createDocumentManager({
+            documents: []
+        });
+
+        const repaired = reconcileDocumentRegistrationState({
+            files: [{ id: 'doc-9', name: 'New.pdf', type: 'application/pdf' }],
+            documentManager
+        });
+
+        expect(repaired).toBe(1);
+        expect(documentManager.registerDocument).toHaveBeenCalledWith('doc-9', 'New.pdf', 'application/pdf', true);
+    });
+
+    it('ignores empty inputs', () => {
+        expect(reconcileDocumentRegistrationState({ files: [], documentManager: null })).toBe(0);
+        expect(reconcileDocumentRegistrationState({ files: null })).toBe(0);
     });
 });

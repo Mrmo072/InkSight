@@ -183,8 +183,11 @@ export class DocumentManager {
 
     /**
      * Restore documents from persistence data
-     * Note: Documents will be marked as NOT loaded (loaded=false)
-     * since they need to be re-imported by the user
+     * Note: Documents are marked as NOT loaded (loaded=false) since their
+     * source binaries usually need to be re-imported — except documents that
+     * are currently open in this session: a mid-session restore (snapshot or
+     * .inksight import) must not downgrade the active book, or every one of
+     * its annotations would suddenly show up as "missing link".
      * @param {object} data - Persistence data
      */
     restorePersistenceData(data) {
@@ -195,16 +198,30 @@ export class DocumentManager {
             return;
         }
 
+        const currentlyLoaded = new Map();
+        this.documents.forEach((docInfo, id) => {
+            if (docInfo.loaded) {
+                currentlyLoaded.set(id, docInfo);
+            }
+        });
+
         this.documents.clear();
 
-        // Restore documents but mark as not loaded
+        // Restore documents, keeping the loaded flag for open ones
         if (Array.isArray(data.documents)) {
             data.documents.forEach(([id, docInfo]) => {
-                // Mark as not loaded since we're restoring from file
-                docInfo.loaded = false;
+                docInfo.loaded = currentlyLoaded.has(id) ? true : false;
                 this.documents.set(id, docInfo);
             });
         }
+
+        // Documents open right now but absent from the payload stay
+        // registered so the active reader keeps its source link.
+        currentlyLoaded.forEach((docInfo, id) => {
+            if (!this.documents.has(id)) {
+                this.documents.set(id, docInfo);
+            }
+        });
 
         logger.debug(`Restored ${this.documents.size} document references`);
 

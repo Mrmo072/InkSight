@@ -12,6 +12,7 @@ import { createWorkspaceDocumentsController } from './app/workspace-documents.js
 import { createProjectWorkspaceController } from './app/project-workspace.js';
 import { navigateToLinkedSource } from './app/source-navigation.js';
 import { createRecoveryWorkbenchController } from './app/recovery-workbench.js';
+import { reconcileDocumentRegistrationState } from './app/document-relink.js';
 import { buildWorkspaceSearchIndex, queryWorkspaceSearch } from './app/search-index.js';
 import { createSearchController } from './app/search-controller.js';
 import { createLogger } from './core/logger.js';
@@ -382,6 +383,10 @@ function promptImportDocument() {
 
 function attemptAutoRelinkRecoveredDocuments(options) {
     return recoveryWorkbench.attemptAutoRelinkRecoveredDocuments(options);
+}
+
+function reconcileDocumentRegistrations() {
+    return reconcileDocumentRegistrationState({ files: state.files, documentManager });
 }
 
 function showRecoveryValidation() {
@@ -771,6 +776,7 @@ function setupMainEventListeners() {
             matchRecoveredDocument,
             setWorkspaceMode,
             attemptAutoRelinkRecoveredDocuments,
+            reconcileDocumentRegistrations,
             renderFileList,
             showRecoveryValidation,
             promptRelinkDocument

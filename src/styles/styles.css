@@ -1155,6 +1155,27 @@ body.split-resizing {
   align-items: center;
 }
 
+.annotation-missing-banner {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, #d97706 35%, transparent);
+  background: color-mix(in srgb, #d97706 10%, transparent);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-main);
+}
+
+.annotation-missing-banner .material-icons-round {
+  font-size: 16px;
+  color: #d97706;
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
 .annotation-filter-select {
   min-width: 0;
   border: 1px solid var(--border);
