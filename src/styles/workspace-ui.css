@@ -1374,8 +1374,77 @@ body.mobile-layout .notes-inner-resizer {
 .reader-container.mode-transitioning .mindmap-container,
 .reader-container.mode-transitioning .selection-mode-floating,
 .reader-container.mode-transitioning .page-nav-floating {
-  opacity: 0.94;
-  transform: translateY(4px);
+  opacity: 0.72;
+  transform: translateY(7px);
+}
+
+/* ---- Workspace continuity motion ----
+   The paper desk rearranges instead of snapping: panels glide between preset
+   widths and collapse points, overlays slide from their screen edge, dialogs
+   settle like a card laid on paper. Transform/opacity/width only, bounded to
+   the existing duration tokens, and fully silenced while the user drags a
+   resizer or prefers reduced motion. */
+
+body:not(.mobile-layout):not(.compact-layout) .sidebar,
+body:not(.mobile-layout):not(.compact-layout) .notes-panel,
+body:not(.mobile-layout):not(.compact-layout) .outline-sidebar {
+  transition: width var(--motion-slow) var(--ease-out),
+    opacity 0.22s ease, transform 0.22s ease;
+}
+
+/* The collapsed state forces flex-basis: 0 !important, which would snap the
+   used width instantly (auto → 0 does not interpolate). On desktop, keep
+   flex-basis at auto while collapsed so the width transition carries the
+   collapse instead. */
+body:not(.mobile-layout):not(.compact-layout) .sidebar.collapsed,
+body:not(.mobile-layout):not(.compact-layout) .notes-panel.collapsed,
+body:not(.mobile-layout):not(.compact-layout) .outline-sidebar.collapsed {
+  flex-basis: auto !important;
+}
+
+/* Live drags must track the pointer exactly — no easing catch-up. The
+   !important beats the higher-specificity desktop transition rules above. */
+body.split-resizing .sidebar,
+body.split-resizing .notes-panel,
+body.split-resizing .outline-sidebar,
+.sidebar.resizing,
+.notes-panel.resizing,
+.outline-sidebar.resizing {
+  transition: none !important;
+}
+
+body:not(.mobile-layout):not(.compact-layout) .annotation-list {
+  transition: width var(--motion-slow) var(--ease-out),
+    opacity 0.22s ease, transform 0.22s ease;
+}
+
+body.notes-split-resizing .annotation-list {
+  transition: none !important;
+}
+
+/* Compact/mobile panels are edge overlays: slide instead of snap. */
+body.compact-layout .sidebar,
+body.compact-layout .notes-panel,
+body.compact-layout .outline-sidebar,
+body.mobile-layout .sidebar,
+body.mobile-layout .notes-panel,
+body.mobile-layout .outline-sidebar {
+  transition: transform var(--motion-slow) var(--ease-out),
+    opacity var(--motion-base) var(--ease-out);
+}
+
+/* Dialogs settle: content rises 10px and un-scales as the overlay fades. */
+@keyframes overlay-settle {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+}
+
+.modal-overlay.active .modal-content,
+.settings-modal__page.active,
+.highlighter-panel.visible {
+  animation: overlay-settle var(--motion-slow) var(--ease-out);
 }
 
 .mobile-context-bar,
@@ -1482,6 +1551,27 @@ body:not(.mobile-layout) .selection-mode-floating .icon-btn:hover {
   .page-nav-floating,
   .toolbar {
     transition: none;
+  }
+
+  /* Width glides, overlay slides and dialog settle are spatial movement —
+     drop them, but keep the quick opacity feedback that confirms actions. */
+  body:not(.mobile-layout):not(.compact-layout) .sidebar,
+  body:not(.mobile-layout):not(.compact-layout) .notes-panel,
+  body:not(.mobile-layout):not(.compact-layout) .outline-sidebar,
+  body:not(.mobile-layout):not(.compact-layout) .annotation-list,
+  body.compact-layout .sidebar,
+  body.compact-layout .notes-panel,
+  body.compact-layout .outline-sidebar,
+  body.mobile-layout .sidebar,
+  body.mobile-layout .notes-panel,
+  body.mobile-layout .outline-sidebar {
+    transition: opacity 0.16s ease;
+  }
+
+  .modal-overlay.active .modal-content,
+  .settings-modal__page.active,
+  .highlighter-panel.visible {
+    animation: none;
   }
 }
 
