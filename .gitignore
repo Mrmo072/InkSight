@@ -34,3 +34,6 @@ files/
 # Local runtime data
 .runtime/
 runtime-data/
+
+# ZCode
+.zcode/
