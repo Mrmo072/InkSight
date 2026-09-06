@@ -664,31 +664,20 @@ function applyWorkspaceLayout(mode) {
             splitView.setRightCollapsed(true);
             splitView.setPanelWidth('left', 292);
         }
-        setMobileNotesView('annotations');
+        setMobileNotesView('split');
     }
 
-    if (mode === 'capture') {
-        if (isMobile || isCompact) {
-            splitView.setRightCollapsed(true);
-            splitView.setLeftCollapsed(true);
-            setMobileNotesView('annotations');
-        } else {
-            splitView.setLeftCollapsed(true);
-            splitView.setRightCollapsed(false);
-            splitView.setPanelWidth('right', CAPTURE_NOTES_FOCUS_WIDTH);
+    // Capture and Map share one panel arrangement — document focus with the
+    // notes panel open. Capture focuses the annotation list; Map keeps both
+    // panes visible side by side. On touch layouts the panel is a fixed-size
+    // overlay, so preset widths do not apply there.
+    if (mode === 'capture' || mode === 'map') {
+        splitView.setLeftCollapsed(true);
+        splitView.setRightCollapsed(false);
+        if (!isMobile && !isCompact) {
+            splitView.setPanelWidth('right', mode === 'capture' ? CAPTURE_NOTES_FOCUS_WIDTH : getMapNotesFocusWidth());
         }
-    }
-
-    if (mode === 'map') {
-        if (isMobile || isCompact) {
-            splitView.setRightCollapsed(false);
-            splitView.setLeftCollapsed(true);
-            setMobileNotesView('mindmap');
-        } else {
-            splitView.setLeftCollapsed(true);
-            splitView.setRightCollapsed(false);
-            splitView.setPanelWidth('right', getMapNotesFocusWidth());
-        }
+        setMobileNotesView(mode === 'capture' ? 'annotations' : 'split');
     }
 
     updatePanelControls();

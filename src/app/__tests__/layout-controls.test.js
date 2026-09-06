@@ -90,15 +90,22 @@ describe('layout-controls', () => {
         return cleanups;
     }
 
-    it('switches to capture/map modes from the mobile notes toggles', () => {
+    it('switches notes panel views without forcing a workspace mode', () => {
         setup();
+        // setup() keeps the split layout when no view was chosen yet.
+        expect(document.body.dataset.notesView).toBe('split');
 
         document.getElementById('show-annotations').click();
-        document.getElementById('show-mindmap').click();
+        expect(document.body.dataset.notesView).toBe('annotations');
 
-        expect(setWorkspaceMode).toHaveBeenNthCalledWith(1, 'capture');
-        expect(setWorkspaceMode).toHaveBeenNthCalledWith(2, 'map');
-        expect(mobileNotesViewHandler).toHaveBeenCalledOnce();
+        // Clicking the active view again returns to the split layout.
+        document.getElementById('show-annotations').click();
+        expect(document.body.dataset.notesView).toBe('split');
+
+        document.getElementById('show-mindmap').click();
+        expect(document.body.dataset.notesView).toBe('mindmap');
+
+        expect(setWorkspaceMode).not.toHaveBeenCalled();
     });
 
     it('handles sidebar and notes buttons through split view controls', () => {

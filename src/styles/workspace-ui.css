@@ -286,17 +286,9 @@ body:not(.mobile-layout) .workspace-mode-group .workspace-mode-btn {
 
 body:not(.mobile-layout) .workspace-mode-group {
   display: grid;
-  grid-template-columns: repeat(3, minmax(78px, 1fr));
+  grid-template-columns: repeat(3, minmax(max-content, 1fr));
   gap: 4px;
   align-items: stretch;
-}
-
-#workspace-mode-capture {
-  gap: 3px;
-}
-
-#workspace-mode-capture .material-icons-round {
-  font-size: 15px;
 }
 
 .sidebar-header,
@@ -958,6 +950,33 @@ body.notes-split-resizing .notes-inner-resizer::before {
   background: var(--brand);
 }
 
+/* Notes panel view states. Workspace modes and the in-panel switcher set
+   body[data-notes-view]; 'split' (or unset) keeps both panes with the
+   resizer, 'annotations'/'mindmap' give a single pane the full panel.
+   !important wins over the inline width left by the split resizer and over
+   the narrow-container collapse of the mindmap canvas. */
+body[data-notes-view="annotations"] .panel-content .mindmap-container,
+body[data-notes-view="annotations"] .notes-inner-resizer,
+body[data-notes-view="mindmap"] .panel-content .annotation-list,
+body[data-notes-view="mindmap"] .notes-inner-resizer {
+  display: none !important;
+}
+
+body[data-notes-view="annotations"] .panel-content .annotation-list:not(.collapsed) {
+  flex: 1 1 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  max-height: none !important;
+}
+
+body[data-notes-view="mindmap"] .panel-content .mindmap-container {
+  flex: 1 1 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+}
+
 .annotation-controls {
   position: sticky;
   top: 0;
@@ -1612,9 +1631,11 @@ body:not(.mobile-layout) .selection-mode-floating .icon-btn:hover {
   container-type: inline-size;
 }
 
-/* Tier 1: reader pane below ~950px (incl. full window at 1280 viewport) —
-   icon-only mode tabs and tighter doc actions before anything overlaps. */
-@container (max-width: 950px) {
+/* Tier 1: reader pane below ~1000px (incl. full window at 1280 viewport) —
+   icon-only mode tabs and tighter doc actions before anything overlaps. The
+   labeled tabs need slightly more room than the old icon-only trio, so the
+   threshold sits just above the 950px overlap point. */
+@container (max-width: 1000px) {
   body:not(.mobile-layout) .workspace-mode-group {
     grid-template-columns: repeat(3, minmax(40px, 1fr));
   }

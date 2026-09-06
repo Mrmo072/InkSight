@@ -16,8 +16,11 @@ export function setupLayoutToggles({
     const showAnnotationsBtn = document.getElementById('show-annotations');
     const showMindmapBtn = document.getElementById('show-mindmap');
 
-    const setMobileNotesView = (view) => {
-        const nextView = view === 'mindmap' ? 'mindmap' : 'annotations';
+    // Notes panel view state, shared by every layout: 'annotations' and
+    // 'mindmap' focus a single pane, 'split' keeps both with the resizer.
+    // Workspace modes preset this value; the panel switcher refines it.
+    const setNotesView = (view) => {
+        const nextView = view === 'mindmap' || view === 'split' ? view : 'annotations';
         document.body.dataset.notesView = nextView;
         showAnnotationsBtn?.classList.toggle('active', nextView === 'annotations');
         showAnnotationsBtn?.setAttribute('aria-selected', String(nextView === 'annotations'));
@@ -25,21 +28,15 @@ export function setupLayoutToggles({
         showMindmapBtn?.setAttribute('aria-selected', String(nextView === 'mindmap'));
     };
 
-    setMobileNotesViewHandler(setMobileNotesView);
+    setMobileNotesViewHandler(setNotesView);
 
     const syncNotesLayoutMode = () => {
         if (document.body.classList.contains('mobile-layout')) {
             annotationListContainer?.classList.remove('collapsed');
             toggleAnnotationsBtn?.classList.add('active');
-            setMobileNotesView(document.body.dataset.notesView || 'annotations');
-            return;
         }
 
-        delete document.body.dataset.notesView;
-        showAnnotationsBtn?.classList.remove('active');
-        showAnnotationsBtn?.setAttribute('aria-selected', 'false');
-        showMindmapBtn?.classList.remove('active');
-        showMindmapBtn?.setAttribute('aria-selected', 'false');
+        setNotesView(document.body.dataset.notesView || 'split');
     };
 
     if (toggleAnnotationsBtn && annotationListContainer) {
@@ -65,16 +62,16 @@ export function setupLayoutToggles({
             target: showAnnotationsBtn,
             event: 'click',
             handler: () => {
-                setMobileNotesView('annotations');
-                setWorkspaceMode('capture');
+                // View switcher only: picking the active view again returns to
+                // the split layout. Workspace modes are not changed here.
+                setNotesView(document.body.dataset.notesView === 'annotations' ? 'split' : 'annotations');
             }
         },
         {
             target: showMindmapBtn,
             event: 'click',
             handler: () => {
-                setMobileNotesView('mindmap');
-                setWorkspaceMode('map');
+                setNotesView(document.body.dataset.notesView === 'mindmap' ? 'split' : 'mindmap');
             }
         },
         {
