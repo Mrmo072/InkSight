@@ -1,7 +1,8 @@
 /**
  * AIConfigManager - LLM API configuration (provider preset, endpoint, key, model).
- * Single active config, persisted to localStorage. Same singleton pattern as
- * PreferencesManager.
+ * Single active config. Under Electron the API key is persisted encrypted via
+ * the main process (safeStorage); browser builds fall back to localStorage.
+ * Same singleton pattern as PreferencesManager.
  */
 
 const STORAGE_KEY = 'inksight:ai-config';
@@ -36,6 +37,16 @@ function sanitizeString(value, fallback = '') {
     return typeof value === 'string' ? value : fallback;
 }
 
+function parseConfig(parsed) {
+    return {
+        provider: sanitizeString(parsed?.provider, DEFAULT_CONFIG.provider),
+        protocol: PROTOCOLS.includes(parsed?.protocol) ? parsed.protocol : DEFAULT_CONFIG.protocol,
+        baseUrl: sanitizeString(parsed?.baseUrl, DEFAULT_CONFIG.baseUrl).replace(/\/+$/, ''),
+        apiKey: sanitizeString(parsed?.apiKey),
+        model: sanitizeString(parsed?.model, DEFAULT_CONFIG.model)
+    };
+}
+
 class AIConfigManager {
     constructor() {
         this.config = { ...DEFAULT_CONFIG };
@@ -48,20 +59,49 @@ class AIConfigManager {
 
     init() {
         this.config = { ...DEFAULT_CONFIG };
+        // Electron: the key is encrypted by the main process (safeStorage).
+        // Browser builds keep localStorage persistence.
+        this.secureStorage = Boolean(
+            typeof window !== 'undefined'
+            && window.electronAPI?.aiConfigLoad
+            && window.electronAPI?.aiConfigSave
+        );
+        let storedInLocalStorage = false;
         try {
             const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(this.STORAGE_KEY) : null;
             if (stored) {
-                const parsed = JSON.parse(stored);
-                this.config = {
-                    provider: sanitizeString(parsed?.provider, DEFAULT_CONFIG.provider),
-                    protocol: PROTOCOLS.includes(parsed?.protocol) ? parsed.protocol : DEFAULT_CONFIG.protocol,
-                    baseUrl: sanitizeString(parsed?.baseUrl, DEFAULT_CONFIG.baseUrl).replace(/\/+$/, ''),
-                    apiKey: sanitizeString(parsed?.apiKey),
-                    model: sanitizeString(parsed?.model, DEFAULT_CONFIG.model)
-                };
+                this.config = parseConfig(JSON.parse(stored));
+                storedInLocalStorage = true;
             }
         } catch {
             this.config = { ...DEFAULT_CONFIG };
+        }
+
+        if (this.secureStorage) {
+            this.loadSecureConfig({ migrateFromLocalStorage: storedInLocalStorage });
+        }
+    }
+
+    async loadSecureConfig({ migrateFromLocalStorage }) {
+        try {
+            const result = await window.electronAPI.aiConfigLoad();
+            if (result?.success && result.config) {
+                this.config = parseConfig(result.config);
+                this.listeners.forEach((fn) => fn(this.get()));
+            } else if (migrateFromLocalStorage && this.config.apiKey) {
+                // First run after the upgrade: move the plaintext key out of
+                // localStorage into the encrypted main-process store.
+                this.persist();
+            }
+            if (migrateFromLocalStorage) {
+                try {
+                    localStorage.removeItem(this.STORAGE_KEY);
+                } catch {
+                    // Non-fatal: config already lives in secure storage.
+                }
+            }
+        } catch {
+            // Keep the config loaded from localStorage, if any.
         }
     }
     get() {
@@ -113,6 +153,12 @@ class AIConfigManager {
     }
 
     persist() {
+        if (this.secureStorage) {
+            window.electronAPI.aiConfigSave({ ...this.config }).catch(() => {
+                // Persistence failure keeps session config applied.
+            });
+            return;
+        }
         try {
             localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.config));
         } catch {

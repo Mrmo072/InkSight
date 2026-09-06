@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, safeStorage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -73,12 +73,18 @@ const RUNTIME_PROJECT_HISTORY_LIMIT = 10;
 
 // Get the save directory path (Project Root/files/saves)
 const getSaveDir = () => {
-    // In dev: process.cwd() is project root
-    // In prod: process.cwd() might be app dir. 
-    // Secure defaults: app.getPath('userData')/saves
-    // But user specifically requested: "d:\Programs\Projects\InkSight\files\saves" style.
-    // We try to use process.cwd() which usually maps to execution folder.
-    return path.join(process.cwd(), 'files', 'saves');
+    if (!getSaveDir.cache) {
+        // In dev: process.cwd() is project root
+        // In prod: process.cwd() might be app dir.
+        // User preference: "d:\Programs\Projects\InkSight\files\saves" style
+        // (process.cwd()), kept whenever it is writable. When the install
+        // location is read-only (e.g. Program Files), fall back to userData.
+        const preferredDir = path.join(process.cwd(), 'files', 'saves');
+        getSaveDir.cache = app.isPackaged && !isDirWritable(preferredDir)
+            ? path.join(app.getPath('userData'), 'files', 'saves')
+            : preferredDir;
+    }
+    return getSaveDir.cache;
 };
 
 const ensureDir = (dirPath) => {
@@ -88,9 +94,48 @@ const ensureDir = (dirPath) => {
     return dirPath;
 };
 
+// Write to a sibling temp file first so a crash mid-save never leaves a
+// truncated target; rename within the same directory is atomic.
+const writeFileAtomic = (filePath, data) => {
+    const tmpPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
+    try {
+        fs.writeFileSync(tmpPath, data);
+        fs.renameSync(tmpPath, filePath);
+    } catch (error) {
+        try {
+            fs.rmSync(tmpPath, { force: true });
+        } catch {
+            // best-effort cleanup
+        }
+        throw error;
+    }
+};
+
+const isDirWritable = (dirPath) => {
+    try {
+        ensureDir(dirPath);
+        const probePath = path.join(dirPath, `.write-probe-${process.pid}`);
+        fs.writeFileSync(probePath, '1');
+        fs.rmSync(probePath, { force: true });
+        return true;
+    } catch {
+        return false;
+    }
+};
+
 const getInstallRuntimeDir = () => {
-    const baseDir = app.isPackaged ? path.dirname(process.execPath) : process.cwd();
-    return path.join(baseDir, 'runtime-data');
+    if (!getInstallRuntimeDir.cache) {
+        const baseDir = app.isPackaged ? path.dirname(process.execPath) : process.cwd();
+        const installDir = path.join(baseDir, 'runtime-data');
+        // Packaged installs under read-only locations (e.g. Program Files)
+        // cannot persist next to the executable; route those to userData so
+        // auto-save keeps working. Writable/portable installs keep the old
+        // location so existing runtime data is not orphaned.
+        getInstallRuntimeDir.cache = app.isPackaged && !isDirWritable(installDir)
+            ? path.join(app.getPath('userData'), 'runtime-data')
+            : installDir;
+    }
+    return getInstallRuntimeDir.cache;
 };
 
 const normalizeRuntimeSegment = (value, fallback) => {
@@ -147,7 +192,7 @@ const toBuffer = (value) => {
 const writeRuntimeBinaryFile = (rootDir, relativePath, bytes) => {
     const absolutePath = path.join(rootDir, relativePath);
     ensureDir(path.dirname(absolutePath));
-    fs.writeFileSync(absolutePath, toBuffer(bytes));
+    writeFileAtomic(absolutePath, toBuffer(bytes));
 };
 
 const slugifyRuntimeName = (value, fallback) => {
@@ -202,7 +247,7 @@ const writeRuntimeSnapshot = ({ rootDir, payload = {}, projectMeta = {}, history
     const metaPath = path.join(rootDir, RUNTIME_PROJECT_META);
 
     ensureDir(rootDir);
-    fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2), 'utf-8');
+    writeFileAtomic(manifestPath, JSON.stringify(manifest, null, 2));
 
     for (const assetEntry of assetEntries) {
         writeRuntimeBinaryFile(rootDir, assetEntry.path, assetEntry.bytes);
@@ -222,7 +267,7 @@ const writeRuntimeSnapshot = ({ rootDir, payload = {}, projectMeta = {}, history
         ...historyMeta,
         manifest: RUNTIME_PROJECT_MANIFEST
     };
-    fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), 'utf-8');
+    writeFileAtomic(metaPath, JSON.stringify(meta, null, 2));
 
     return {
         manifestPath,
@@ -327,7 +372,7 @@ ipcMain.handle('save-file', async (event, filename, content) => {
             fs.mkdirSync(dir, { recursive: true });
         }
         const filePath = path.join(dir, filename);
-        fs.writeFileSync(filePath, content, 'utf-8');
+        writeFileAtomic(filePath, content);
         return { success: true, path: filePath };
     } catch (e) {
         console.error('IPC save-file error:', e);
@@ -378,6 +423,53 @@ ipcMain.handle('find-save-by-md5', async (event, targetMd5) => {
     } catch (e) {
         console.error('IPC find-save-by-md5 error:', e);
         return { success: false, error: e.message };
+    }
+});
+
+// --- AI config: OS-encrypted credential storage (safeStorage) ---
+
+const AI_CONFIG_FILE = 'ai-config.bin';
+const AI_CONFIG_FIELDS = ['provider', 'protocol', 'baseUrl', 'apiKey', 'model'];
+
+const sanitizeAiConfig = (value) => {
+    const source = value && typeof value === 'object' ? value : {};
+    const config = {};
+    for (const field of AI_CONFIG_FIELDS) {
+        config[field] = typeof source[field] === 'string' ? source[field] : '';
+    }
+    return config;
+};
+
+ipcMain.handle('ai-config-load', async () => {
+    try {
+        const filePath = path.join(app.getPath('userData'), AI_CONFIG_FILE);
+        if (!fs.existsSync(filePath)) {
+            return { success: true, config: null };
+        }
+        const raw = fs.readFileSync(filePath);
+        if (!safeStorage.isEncryptionAvailable()) {
+            return { success: true, config: sanitizeAiConfig(JSON.parse(raw.toString('utf-8'))), encrypted: false };
+        }
+        return { success: true, config: sanitizeAiConfig(JSON.parse(safeStorage.decryptString(raw))), encrypted: true };
+    } catch (error) {
+        console.error('IPC ai-config-load error:', error);
+        return { success: false, error: error.message, config: null };
+    }
+});
+
+ipcMain.handle('ai-config-save', async (event, config) => {
+    try {
+        const filePath = path.join(app.getPath('userData'), AI_CONFIG_FILE);
+        ensureDir(path.dirname(filePath));
+        const json = JSON.stringify(sanitizeAiConfig(config));
+        // Without an OS keyring (some Linux setups) fall back to plain text in
+        // the user profile — no worse than the previous localStorage approach.
+        const encrypted = safeStorage.isEncryptionAvailable();
+        writeFileAtomic(filePath, encrypted ? safeStorage.encryptString(json) : Buffer.from(json, 'utf-8'));
+        return { success: true, encrypted };
+    } catch (error) {
+        console.error('IPC ai-config-save error:', error);
+        return { success: false, error: error.message };
     }
 });
 

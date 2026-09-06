@@ -10,5 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getRuntimeStorageInfo: () => invoke('get-runtime-storage-info'),
     saveRuntimeProject: (payload) => invoke('save-runtime-project', payload),
     listRuntimeProjectSnapshots: (payload) => invoke('list-runtime-project-snapshots', payload),
-    loadRuntimeProject: (payload) => invoke('load-runtime-project', payload)
+    loadRuntimeProject: (payload) => invoke('load-runtime-project', payload),
+    aiConfigLoad: () => invoke('ai-config-load'),
+    aiConfigSave: (config) => invoke('ai-config-save', config)
 });

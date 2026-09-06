@@ -37,6 +37,50 @@ describe('AIConfigManager', () => {
         expect(config.model).toBe('my-model');
     });
 
+    it('routes persistence through the encrypted main-process store when available', () => {
+        const saved = [];
+        window.electronAPI = {
+            aiConfigLoad: vi.fn().mockResolvedValue({ success: true, config: null }),
+            aiConfigSave: vi.fn().mockImplementation((config) => {
+                saved.push(config);
+                return Promise.resolve({ success: true, encrypted: true });
+            })
+        };
+        try {
+            aiConfigManager.init();
+            aiConfigManager.set({ apiKey: 'sk-secure' });
+
+            expect(saved.at(-1)).toMatchObject({ apiKey: 'sk-secure' });
+            expect(localStorage.getItem('inksight:ai-config')).toBeNull();
+        } finally {
+            delete window.electronAPI;
+            localStorage.clear();
+        }
+    });
+
+    it('migrates a plaintext localStorage key into secure storage and removes it', async () => {
+        localStorage.setItem('inksight:ai-config', JSON.stringify({ provider: 'custom', apiKey: 'sk-legacy' }));
+        const saved = [];
+        window.electronAPI = {
+            aiConfigLoad: vi.fn().mockResolvedValue({ success: true, config: null }),
+            aiConfigSave: vi.fn().mockImplementation((config) => {
+                saved.push(config);
+                return Promise.resolve({ success: true });
+            })
+        };
+        try {
+            aiConfigManager.init();
+
+            await vi.waitFor(() => expect(saved.length).toBeGreaterThan(0));
+            expect(saved.at(-1)).toMatchObject({ apiKey: 'sk-legacy' });
+            expect(localStorage.getItem('inksight:ai-config')).toBeNull();
+            expect(aiConfigManager.get().apiKey).toBe('sk-legacy');
+        } finally {
+            delete window.electronAPI;
+            localStorage.clear();
+        }
+    });
+
     it('ignores invalid protocol values', () => {
         aiConfigManager.set({ protocol: 'hacker' });
         expect(aiConfigManager.get().protocol).toBe('openai');
