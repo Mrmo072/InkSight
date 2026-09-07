@@ -11,6 +11,8 @@ describe('GraphNodesStore', () => {
 
         expect(node.title).toBe('什么是力导向？');
         expect(node.kind).toBe('ai');
+        expect(node.question).toBe('什么是力导向？');
+        expect(node.titleCustomized).toBe(false);
         expect(graphNodesStore.get('n1').content).toBe('回答');
     });
 
@@ -33,7 +35,7 @@ describe('GraphNodesStore', () => {
         graphNodesStore.upsert({ id: 'n2', parentId: 'n1', title: 'B', content: 'y' });
 
         const data = graphNodesStore.getPersistenceData();
-        expect(data.version).toBe(1);
+        expect(data.version).toBe(2);
         expect(data.nodes).toHaveLength(2);
 
         graphNodesStore.clear();
@@ -49,6 +51,20 @@ describe('GraphNodesStore', () => {
         expect(graphNodesStore.hasData()).toBe(true);
         expect(graphNodesStore.get('ok')).toBeTruthy();
         expect(graphNodesStore.get('bad')).toBeNull();
+    });
+
+    it('migrates version 1 AI titles into separate questions', () => {
+        graphNodesStore.restorePersistenceData({
+            version: 1,
+            nodes: [{ id: 'legacy', parentId: 'card-1', kind: 'ai', title: '旧问题', content: '旧回答' }]
+        });
+
+        expect(graphNodesStore.get('legacy')).toMatchObject({
+            title: '旧问题',
+            question: '旧问题',
+            titleCustomized: false,
+            content: '旧回答'
+        });
     });
 
     it('removes the whole subtree on removeSubtree', () => {
@@ -83,5 +99,26 @@ describe('GraphNodesStore', () => {
         expect(graphNodesStore.get('n').title).toBe('new title');
         expect(graphNodesStore.get('n').content).toBe('new content');
         expect(graphNodesStore.setTitle('missing', 'x')).toBeNull();
+    });
+
+    it('keeps custom titles independent while questions continue to update', () => {
+        graphNodesStore.upsert({ id: 'n', parentId: 'card-1', kind: 'ai', title: '原问题' });
+
+        graphNodesStore.setQuestion('n', '第一次修改');
+        expect(graphNodesStore.get('n').title).toBe('第一次修改');
+
+        graphNodesStore.setTitle('n', '短标题');
+        graphNodesStore.setQuestion('n', '完整的新问题');
+        expect(graphNodesStore.get('n')).toMatchObject({
+            title: '短标题',
+            question: '完整的新问题',
+            titleCustomized: true
+        });
+
+        graphNodesStore.resetTitleToQuestion('n');
+        expect(graphNodesStore.get('n')).toMatchObject({
+            title: '完整的新问题',
+            titleCustomized: false
+        });
     });
 });

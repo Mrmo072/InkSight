@@ -5,24 +5,33 @@
  * stored here.
  *
  * Data shape: { [nodeId]: { id, parentId, kind: 'manual'|'ai', title,
- * content, createdAt } }. The store is embedded into the InkSight project
+ * question, titleCustomized, content, createdAt } }. The store is embedded into the InkSight project
  * payload (graphNodes field) so it travels with .inksight files and runtime
  * snapshots.
  */
 
-const STORE_VERSION = 1;
+const STORE_VERSION = 2;
 
 function sanitizeNode(node) {
     if (!node || typeof node !== 'object' || typeof node.id !== 'string' || typeof node.parentId !== 'string') {
         return null;
     }
+    const kind = node.kind === 'ai' ? 'ai' : 'manual';
+    const title = typeof node.title === 'string' && node.title.trim()
+        ? node.title.trim()
+        : '延伸思考';
     return {
         id: node.id,
         parentId: node.parentId,
         // 每个 annotation 的图谱视图相互独立：节点归属于打开时的根标注
         rootCardId: typeof node.rootCardId === 'string' ? node.rootCardId : null,
-        kind: node.kind === 'ai' ? 'ai' : 'manual',
-        title: typeof node.title === 'string' ? node.title : '延伸思考',
+        kind,
+        title,
+        // v1 stored the AI question in title. Preserve it during migration.
+        question: typeof node.question === 'string'
+            ? node.question.trim()
+            : (kind === 'ai' ? title : ''),
+        titleCustomized: node.titleCustomized === true,
         content: typeof node.content === 'string' ? node.content : '',
         createdAt: Number.isFinite(node.createdAt) ? node.createdAt : Date.now()
     };
@@ -64,16 +73,22 @@ class GraphNodesStore {
     /**
      * Creates or updates a node and returns it.
      */
-    upsert({ id, parentId, rootCardId = null, kind = 'manual', title, content = '', createdAt = Date.now() }) {
+    upsert({ id, parentId, rootCardId = null, kind = 'manual', title, question, titleCustomized = false, content = '', createdAt = Date.now() }) {
         if (!id || !parentId) {
             throw new Error('graph node requires id and parentId');
         }
+        const normalizedKind = kind === 'ai' ? 'ai' : 'manual';
+        const normalizedTitle = typeof title === 'string' && title.trim() ? title.trim() : '延伸思考';
         const node = {
             id,
             parentId,
             rootCardId: typeof rootCardId === 'string' ? rootCardId : null,
-            kind: kind === 'ai' ? 'ai' : 'manual',
-            title: typeof title === 'string' && title.trim() ? title.trim() : '延伸思考',
+            kind: normalizedKind,
+            title: normalizedTitle,
+            question: typeof question === 'string'
+                ? question.trim()
+                : (normalizedKind === 'ai' ? normalizedTitle : ''),
+            titleCustomized: titleCustomized === true,
             content,
             createdAt
         };
@@ -85,12 +100,45 @@ class GraphNodesStore {
         return Array.from(this.nodes.values());
     }
 
-    setTitle(nodeId, title) {
+    setTitle(nodeId, title, { customized = true } = {}) {
         const node = this.nodes.get(nodeId);
         if (!node) {
             return null;
         }
         node.title = typeof title === 'string' && title.trim() ? title.trim() : node.title;
+        node.titleCustomized = customized;
+        return node;
+    }
+
+    setQuestion(nodeId, question) {
+        const node = this.nodes.get(nodeId);
+        const normalizedQuestion = typeof question === 'string' ? question.trim() : '';
+        if (!node || !normalizedQuestion) {
+            return null;
+        }
+        node.question = normalizedQuestion;
+        if (!node.titleCustomized) {
+            node.title = normalizedQuestion;
+        }
+        return node;
+    }
+
+    resetTitleToQuestion(nodeId) {
+        const node = this.nodes.get(nodeId);
+        if (!node || !node.question) {
+            return null;
+        }
+        node.title = node.question;
+        node.titleCustomized = false;
+        return node;
+    }
+
+    setKind(nodeId, kind) {
+        const node = this.nodes.get(nodeId);
+        if (!node) {
+            return null;
+        }
+        node.kind = kind === 'ai' ? 'ai' : 'manual';
         return node;
     }
 
