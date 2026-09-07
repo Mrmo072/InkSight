@@ -1,6 +1,6 @@
 # InkSight Packaging Guide
 
-This guide describes how to package InkSight as a standalone desktop application using Electron.
+This guide describes how to package InkSight as a self-contained desktop application directory using Electron.
 
 ## Prerequisites
 
@@ -23,6 +23,14 @@ After running `npm run dist:win`, the built application is located in:
 
 - **Directory:** `dist/win-unpacked/`
 - **Executable:** `InkSight.exe`
+
+`InkSight.exe` is not a standalone single file. It must remain beside the DLLs, resources, and other files generated in `dist/win-unpacked/`.
+
+## Distribution
+
+For a manual build, compress the entire `dist/win-unpacked/` directory into a ZIP archive. Tagged releases use the repository's Windows release workflow to create the same ZIP and a SHA-256 checksum, then attach both files to the GitHub Release.
+
+The current build is unsigned. Windows may display a SmartScreen warning until a trusted code-signing certificate and signing configuration are added.
 
 ## Troubleshooting
 

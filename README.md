@@ -43,6 +43,8 @@ Visit `http://localhost:5173` to start using it.
 - **[Features](./docs/FEATURES.md)**: Detailed feature introduction.
 - **[Architecture](./docs/ARCHITECTURE.md)**: Project structure, tech stack, and core module explanation.
 - **[Roadmap](./docs/ROADMAP.md)**: Development motivation and future plans.
+- **[Privacy](./PRIVACY.md)**: Local storage, AI data transmission, and API credential handling.
+- **[Windows Packaging](./docs/PACKAGING.md)**: Build output and distribution instructions.
 
 ## ✨ Key Features
 
@@ -57,7 +59,7 @@ Visit `http://localhost:5173` to start using it.
 
 ## 📦 Packaging (Windows Application)
 
-You can package InkSight as a standalone Windows executable (`.exe`) that runs without a server.
+You can package InkSight as a self-contained Windows application directory that runs without a development server. The current build target is an unpacked directory, not a single-file installer.
 
 ### Build Executable
 
@@ -65,9 +67,11 @@ You can package InkSight as a standalone Windows executable (`.exe`) that runs w
 # Build the application
 npm run dist:win
 
-# The executable will be generated at:
+# The complete application directory will be generated at:
 # dist/win-unpacked/InkSight.exe
 ```
+
+Keep `InkSight.exe` together with the other files in `dist/win-unpacked/`. For distribution, zip the entire directory or download the equivalent ZIP from a GitHub Release.
 
 ## 🛠️ Tech Stack
 

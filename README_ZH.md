@@ -44,6 +44,8 @@ npm run dev
 - **[功能清单 (Features)](./docs/FEATURES.md)**: 详细的功能介绍。
 - **[技术架构 (Architecture)](./docs/ARCHITECTURE.md)**: 项目结构、技术栈与核心模块说明。
 - **[背景与展望 (Roadmap)](./docs/ROADMAP.md)**: 开发初衷与未来计划。
+- **[隐私说明 (Privacy)](./PRIVACY.md)**: 本地存储、AI 数据传输与 API 凭据处理方式。
+- **[Windows 打包指南](./docs/PACKAGING.md)**: 构建产物与分发说明。
 
 ## ✨ 核心特性 (Key Features)
 
@@ -58,7 +60,7 @@ npm run dev
 
 ## 📦 打包 (Windows 应用程序)
 
-你可以将 InkSight 打包为无需服务器即可运行的独立 Windows 可执行文件 (`.exe`)。
+你可以将 InkSight 打包为无需开发服务器即可运行的完整 Windows 应用目录。当前构建目标是解包目录，而不是单文件安装程序。
 
 ### 构建可执行文件
 
@@ -66,9 +68,11 @@ npm run dev
 # 构建应用程序
 npm run dist:win
 
-# 可执行文件将生成于：
+# 完整应用目录将生成于：
 # dist/win-unpacked/InkSight.exe
 ```
+
+`InkSight.exe` 必须与 `dist/win-unpacked/` 中的其他文件保持在一起。分发时请压缩整个目录，或从 GitHub Release 下载对应的 ZIP 包。
 
 ## 🛠️ 技术栈 (Tech Stack)
 
