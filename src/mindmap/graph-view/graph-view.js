@@ -15,7 +15,7 @@ import { chatStream } from '../../core/ai-client.js';
 import { modalManager } from '../../ui/modal-manager.js';
 import { emitAppNotification } from '../../ui/app-notifications.js';
 import { t } from '../../i18n/index.js';
-import { marked } from 'marked';
+import { isSafeExternalUrl, renderSafeMarkdown } from '../../utils/safe-html.js';
 import './graph-view.css';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -735,11 +735,11 @@ class GraphViewController {
 
         const body = document.createElement('div');
         body.className = 'graph-bubble__body graph-bubble__body--md';
-        body.innerHTML = marked.parse(node.text || '');
+        body.innerHTML = renderSafeMarkdown(node.text);
         // Markdown 链接在新标签页打开，避免污染画布会话
         body.addEventListener('click', (e) => {
             const anchor = e.target.closest('a');
-            if (anchor?.href) {
+            if (anchor?.href && isSafeExternalUrl(anchor.href)) {
                 e.preventDefault();
                 window.open(anchor.href, '_blank', 'noopener');
             }
@@ -1052,7 +1052,7 @@ class GraphViewController {
     renderNodeBody(nodeId, text) {
         const body = document.querySelector(`#${CSS.escape(this.domId(nodeId))} .graph-bubble__body`);
         if (body) {
-            body.innerHTML = marked.parse(text || '');
+            body.innerHTML = renderSafeMarkdown(text);
             // 流式输出时正文持续增长，钉在底部跟随阅读
             body.scrollTop = body.scrollHeight;
         }

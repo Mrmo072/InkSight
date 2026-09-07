@@ -75,7 +75,7 @@ function manualChunks(id) {
 export default defineConfig({
   base: './',
   server: {
-    host: '0.0.0.0'
+    host: '127.0.0.1'
   },
   plugins: [react()],
   resolve: {
@@ -93,14 +93,6 @@ export default defineConfig({
       output: {
         manualChunks
       }
-    }
-  },
-  esbuild: {
-    target: 'es2020'
-  },
-  optimizeDeps: {
-    esbuildOptions: {
-      target: 'es2020'
     }
   },
   css: {

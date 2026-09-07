@@ -7,7 +7,7 @@
 > 一个集成了深度阅读、思维导图与知识管理的现代化 Web 应用。
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.0-green.svg)](https://github.com/MrmoLabs/InkSight/releases)
+[![Version](https://img.shields.io/badge/version-1.0.0-green.svg)](https://github.com/MrmoLabs/InkSight/releases)
 
 ## 📖 简介 (Introduction)
 
@@ -18,7 +18,7 @@ InkSight 旨在解决传统阅读工具“读”与“思”分离的痛点。�
 ## 🚀 快速开始 (Quick Start)
 
 ### 环境要求
-- Node.js 16+
+- Node.js 22.12+
 - npm or yarn
 
 ### 安装与运行
@@ -54,7 +54,7 @@ npm run dev
 - **大纲导航**: 集成文档大纲侧边栏，支持点击跳转和阅读进度自动定位。
 - **智能排版**: 强大的自动布局算法，一键理清思维脉络。
 - **双向溯源**: 点击笔记节点瞬间跳转回原文出处。
-- **隐私安全**: 所有数据存储在本地，无需联网。
+- **隐私安全**: 文档和项目保存在本机。仅当你主动使用已配置的 AI 服务时需要联网，届时提示词及相关上下文会发送给对应服务商。
 
 ## 📦 打包 (Windows 应用程序)
 

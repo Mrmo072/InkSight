@@ -385,7 +385,8 @@ class SettingsModal {
         Object.entries(presets).forEach(([value, preset]) => {
             const option = document.createElement('option');
             option.value = value;
-            option.textContent = preset.label;
+            option.dataset.i18n = preset.labelKey;
+            option.textContent = t(preset.labelKey);
             this.aiProviderSelect.appendChild(option);
         });
         this.aiProviderSelect.value = config.provider;
@@ -399,13 +400,14 @@ class SettingsModal {
         this.aiProtocolSelect = document.createElement('select');
         this.aiProtocolSelect.className = 'settings-modal__select';
         [
-            { value: 'openai', label: 'OpenAI 兼容' },
-            { value: 'anthropic', label: 'Anthropic (Claude)' },
-            { value: 'gemini', label: 'Google Gemini' }
-        ].forEach(({ value, label }) => {
+            { value: 'openai', labelKey: 'ai.protocol.openai' },
+            { value: 'anthropic', labelKey: 'ai.protocol.anthropic' },
+            { value: 'gemini', labelKey: 'ai.protocol.gemini' }
+        ].forEach(({ value, labelKey }) => {
             const option = document.createElement('option');
             option.value = value;
-            option.textContent = label;
+            option.dataset.i18n = labelKey;
+            option.textContent = t(labelKey);
             this.aiProtocolSelect.appendChild(option);
         });
         buildRow(t('ai.protocol'), this.aiProtocolSelect, 'ai.protocol').classList.add('settings-modal__row--tall');
@@ -487,7 +489,7 @@ class SettingsModal {
         this.setAiTestStatus(t('ai.connecting'), 'is-pending');
         try {
             const reply = await chatComplete(config, {
-                system: '你是连接测试助手，请只回复：连接成功',
+                system: t('ai.testSystem'),
                 messages: [{ role: 'user', content: 'ping' }]
             });
             this.setAiTestStatus(t('ai.success', { reply: reply.slice(0, 40) }), 'is-success');

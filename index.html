@@ -4,6 +4,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' http: https: ws: wss:; worker-src 'self' blob:; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'">
   <title>InkSight</title>
   <link rel="icon" type="image/svg+xml" href="./logo.svg" />
   <link rel="stylesheet" href="./vendor/pdfjs/pdf_viewer.css" />
@@ -11,53 +13,7 @@
   <link rel="stylesheet" href="./src/styles/themes.css" />
   <link rel="stylesheet" href="./src/styles/workspace-ui.css" />
   <link rel="stylesheet" href="./vendor/material-icons/material-icons-round.css">
-  <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@500;600;700&family=Noto+Serif+SC:wght@400;700&display=swap"
-    rel="stylesheet">
-  <script>
-    // Non-blocking global error reporting: shows a dismissible banner
-    // instead of alert(), which freezes the whole page.
-    (function () {
-      var shownErrors = 0;
-      function showFatalError(message) {
-        if (shownErrors >= 3) return;
-        shownErrors++;
-        var banner = document.getElementById('runtime-error-banner');
-        if (!banner) {
-          banner = document.createElement('div');
-          banner.id = 'runtime-error-banner';
-          banner.style.cssText = 'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);' +
-            'z-index:99999;max-width:min(92vw,640px);padding:10px 14px;border-radius:10px;' +
-            'background:rgba(185,28,28,0.96);color:#fff;font:12px/1.5 system-ui,sans-serif;' +
-            'box-shadow:0 10px 30px rgba(0,0,0,0.35);display:flex;gap:12px;align-items:flex-start;';
-          var text = document.createElement('div');
-          text.className = 'runtime-error-banner__text';
-          text.style.cssText = 'word-break:break-word;white-space:pre-wrap;';
-          var close = document.createElement('button');
-          close.textContent = '×';
-          close.style.cssText = 'background:none;border:none;color:#fff;font-size:16px;cursor:pointer;padding:0;line-height:1;';
-          close.onclick = function () { banner.remove(); };
-          banner.appendChild(text);
-          banner.appendChild(close);
-          document.body.appendChild(banner);
-        }
-        var textEl = banner.querySelector('.runtime-error-banner__text');
-        if (textEl) textEl.textContent = message;
-      }
-
-      window.onerror = function (msg, url, line, col, error) {
-        console.error('Global Error:', error || msg);
-        showFatalError('Error: ' + msg + '\n' + (url || '') + ':' + (line || ''));
-        return false;
-      };
-      window.addEventListener('error', function (e) {
-        if (e.target && e.target.tagName === 'SCRIPT') {
-          console.error('Script loading error:', e.target.src);
-          showFatalError('Script failed to load: ' + e.target.src);
-        }
-      }, true);
-    })();
-  </script>
+  <script type="module" src="/src/runtime-error-reporter.js"></script>
 </head>
 
 <body>

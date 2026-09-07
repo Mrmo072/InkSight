@@ -1,34 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 describe('document-history-ipc', () => {
-    let originalRequire;
-
     beforeEach(() => {
         vi.spyOn(console, 'log').mockImplementation(() => {});
         vi.spyOn(console, 'warn').mockImplementation(() => {});
         vi.spyOn(console, 'error').mockImplementation(() => {});
 
-        originalRequire = globalThis.require;
-        globalThis.require = undefined;
-        window.require = undefined;
-        window.ipcRenderer = undefined;
         window.electronAPI = undefined;
     });
 
     afterEach(() => {
-        globalThis.require = originalRequire;
-        delete window.require;
-        delete window.ipcRenderer;
         delete window.electronAPI;
         vi.restoreAllMocks();
     });
 
-    it('wraps window.ipcRenderer invoke calls', async () => {
+    it('wraps raw ipcRenderer invoke calls', async () => {
         const invoke = vi.fn().mockResolvedValue({ success: true });
-        window.ipcRenderer = { invoke };
-
-        const { resolveDocumentHistoryIpc } = await import('../document-history-ipc.js');
-        const ipc = resolveDocumentHistoryIpc();
+        const { createWrappedIpcRenderer } = await import('../document-history-ipc.js');
+        const ipc = createWrappedIpcRenderer({ invoke });
 
         await ipc.saveFile('Book.inksight', '{}');
         await ipc.loadFile('Book.inksight');
@@ -65,18 +54,6 @@ describe('document-history-ipc', () => {
         const { resolveDocumentHistoryIpc } = await import('../document-history-ipc.js');
 
         expect(resolveDocumentHistoryIpc()).toBe(electronAPI);
-    });
-
-    it('falls back to window.require electron ipcRenderer', async () => {
-        const invoke = vi.fn().mockResolvedValue({ success: true });
-        window.require = vi.fn(() => ({ ipcRenderer: { invoke } }));
-
-        const { resolveDocumentHistoryIpc } = await import('../document-history-ipc.js');
-        const ipc = resolveDocumentHistoryIpc();
-
-        await ipc.loadFile('Recovered.inksight');
-        expect(window.require).toHaveBeenCalledWith('electron');
-        expect(invoke).toHaveBeenCalledWith('load-file', 'Recovered.inksight');
     });
 
     it('falls back to the IndexedDB adapter when no IPC bridge is available', async () => {

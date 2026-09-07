@@ -1,3 +1,5 @@
+import { t } from '../i18n/index.js';
+
 /**
  * ai-client - Unified chat completion entry over three wire protocols.
  * The renderer calls provider HTTPS APIs directly (no CSP restrictions and
@@ -17,7 +19,7 @@ function extractErrorMessage(payload, response) {
     if (detail) {
         return detail;
     }
-    return `AI 请求失败（HTTP ${response.status}）`;
+    return t('ai.error.http', { status: response.status });
 }
 
 async function requestJson(url, options) {
@@ -58,7 +60,7 @@ async function chatOpenAI(config, { system, messages }) {
     });
     const content = payload?.choices?.[0]?.message?.content;
     if (typeof content !== 'string') {
-        throw new Error('AI 响应格式异常：缺少 choices[0].message.content');
+        throw new Error(t('ai.error.openaiContent'));
     }
     return content.trim();
 }
@@ -84,7 +86,7 @@ async function chatAnthropic(config, { system, messages }) {
         .map((block) => block.text)
         .join('');
     if (!text) {
-        throw new Error('AI 响应格式异常：content 为空');
+        throw new Error(t('ai.error.anthropicContent'));
     }
     return text.trim();
 }
@@ -107,7 +109,7 @@ async function chatGemini(config, { system, messages }) {
         .map((part) => part.text || '')
         .join('');
     if (!text) {
-        throw new Error('AI 响应格式异常：candidates 为空');
+        throw new Error(t('ai.error.geminiContent'));
     }
     return text.trim();
 }
@@ -141,7 +143,7 @@ async function requestSse(url, options, onData) {
             throw new Error(extractErrorMessage(payload, response));
         }
         if (!response.body) {
-            throw new Error('AI 流式响应不可用（无响应体）');
+            throw new Error(t('ai.error.streamUnavailable'));
         }
 
         const reader = response.body.getReader();
@@ -171,7 +173,7 @@ async function requestSse(url, options, onData) {
 function finishStreamText(text) {
     const trimmed = text.trim();
     if (!trimmed) {
-        throw new Error('AI 响应格式异常：流式返回为空');
+        throw new Error(t('ai.error.streamEmpty'));
     }
     return trimmed;
 }
@@ -234,7 +236,7 @@ async function streamAnthropic(config, { system, messages, onDelta }) {
                     onDelta(delta, full);
                 }
             } else if (payload?.type === 'error') {
-                throw new Error(payload?.error?.message || 'AI 流式请求失败');
+                throw new Error(payload?.error?.message || t('ai.error.streamFailed'));
             }
         } catch (error) {
             if (error instanceof SyntaxError) {
@@ -289,7 +291,7 @@ const STREAM_ADAPTERS = {
  */
 export async function chatComplete(config, { system, messages }) {
     if (!config?.baseUrl || !config?.apiKey || !config?.model) {
-        throw new Error('AI 接口尚未配置完整（需要 Base URL、API Key 和模型名）');
+        throw new Error(t('ai.error.incomplete'));
     }
     const adapter = ADAPTERS[config.protocol] || chatOpenAI;
     return adapter(config, { system, messages });
@@ -301,7 +303,7 @@ export async function chatComplete(config, { system, messages }) {
  */
 export async function chatStream(config, { system, messages, onDelta }) {
     if (!config?.baseUrl || !config?.apiKey || !config?.model) {
-        throw new Error('AI 接口尚未配置完整（需要 Base URL、API Key 和模型名）');
+        throw new Error(t('ai.error.incomplete'));
     }
     if (typeof onDelta !== 'function') {
         return chatComplete(config, { system, messages });

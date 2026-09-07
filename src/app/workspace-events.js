@@ -3,6 +3,7 @@ import { getAppContext } from './app-context.js';
 import { openGraphView } from '../mindmap/graph-view/graph-view.js';
 import { emitAppNotification } from '../ui/app-notifications.js';
 import { APP_EVENTS } from '../core/event-names.js';
+import { t } from '../i18n/index.js';
 
 export function createWorkspaceEventListeners({
     elements,
@@ -48,7 +49,7 @@ export function createWorkspaceEventListeners({
                 // 未上板的标注也可以展开图谱（单根视图，子节点来自图谱内创建）
                 const cardExists = getAppContext()?.cardSystem?.cards?.has?.(cardId);
                 if (!cardExists) {
-                    emitAppNotification({ message: '未找到该标注，可能已被删除', level: 'warning' });
+                    emitAppNotification({ message: t('workspace.annotationMissing'), level: 'warning' });
                     return;
                 }
 

@@ -14,15 +14,15 @@ const PROTOCOLS = Object.freeze(['openai', 'anthropic', 'gemini']);
  * Chinese providers expose an OpenAI-compatible chat completions endpoint.
  */
 const PROVIDER_PRESETS = Object.freeze({
-    deepseek: { label: 'DeepSeek', protocol: 'openai', baseUrl: 'https://api.deepseek.com', model: 'deepseek-chat' },
-    kimi: { label: 'Kimi（月之暗面）', protocol: 'openai', baseUrl: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k' },
-    qwen: { label: '通义千问', protocol: 'openai', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus' },
-    zhipu: { label: '智谱 GLM', protocol: 'openai', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4' },
-    openai: { label: 'OpenAI', protocol: 'openai', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
-    openrouter: { label: 'OpenRouter', protocol: 'openai', baseUrl: 'https://openrouter.ai/api/v1', model: '' },
-    anthropic: { label: 'Claude（Anthropic）', protocol: 'anthropic', baseUrl: 'https://api.anthropic.com', model: 'claude-sonnet-4-20250514' },
-    gemini: { label: 'Google Gemini', protocol: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com', model: 'gemini-2.0-flash' },
-    custom: { label: '自定义接口', protocol: 'openai', baseUrl: '', model: '' }
+    deepseek: { label: 'DeepSeek', labelKey: 'ai.provider.deepseek', protocol: 'openai', baseUrl: 'https://api.deepseek.com', model: 'deepseek-chat' },
+    kimi: { label: 'Kimi (Moonshot AI)', labelKey: 'ai.provider.kimi', protocol: 'openai', baseUrl: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k' },
+    qwen: { label: 'Qwen', labelKey: 'ai.provider.qwen', protocol: 'openai', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus' },
+    zhipu: { label: 'Zhipu GLM', labelKey: 'ai.provider.zhipu', protocol: 'openai', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4' },
+    openai: { label: 'OpenAI', labelKey: 'ai.provider.openai', protocol: 'openai', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+    openrouter: { label: 'OpenRouter', labelKey: 'ai.provider.openrouter', protocol: 'openai', baseUrl: 'https://openrouter.ai/api/v1', model: '' },
+    anthropic: { label: 'Claude (Anthropic)', labelKey: 'ai.provider.anthropic', protocol: 'anthropic', baseUrl: 'https://api.anthropic.com', model: 'claude-sonnet-4-20250514' },
+    gemini: { label: 'Google Gemini', labelKey: 'ai.provider.gemini', protocol: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com', model: 'gemini-2.0-flash' },
+    custom: { label: 'Custom API', labelKey: 'ai.provider.custom', protocol: 'openai', baseUrl: '', model: '' }
 });
 
 const DEFAULT_CONFIG = Object.freeze({

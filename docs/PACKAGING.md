@@ -4,7 +4,7 @@ This guide describes how to package InkSight as a standalone desktop application
 
 ## Prerequisites
 
-- Node.js 16+
+- Node.js 22.12+
 - NPM installed
 
 ## Build Commands
@@ -12,7 +12,8 @@ This guide describes how to package InkSight as a standalone desktop application
 Found in `package.json`:
 
 | Command | Description |
-| copy | `npm run electron` | Runs the app in Electron (Development mode) |
+| --- | --- |
+| `npm run electron` | Runs the app in Electron (Development mode) |
 | `npm run electron:dev` | Runs Electron + Vite dev server concurrently |
 | `npm run dist:win` | Packages the application for Windows (x64) |
 

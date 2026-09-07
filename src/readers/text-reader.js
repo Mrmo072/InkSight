@@ -1,6 +1,6 @@
-import { parse } from 'marked';
 import { highlightManager } from '../core/highlight-manager.js';
 import { getAppContext } from '../app/app-context.js';
+import { renderSafeMarkdown } from '../utils/safe-html.js';
 import {
     applyReaderSelectionMode,
     clearSelectedHighlightState,
@@ -140,7 +140,7 @@ export class TextReader {
             this.content.style.color = '#333';
 
             if (isMarkdown) {
-                this.content.innerHTML = parse(text);
+                this.content.innerHTML = renderSafeMarkdown(text);
             } else {
                 this.content.style.whiteSpace = 'pre-wrap';
                 this.content.style.fontFamily = 'monospace';

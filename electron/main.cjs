@@ -1,6 +1,46 @@
-const { app, BrowserWindow, ipcMain, safeStorage } = require('electron');
+const { app, BrowserWindow, ipcMain, safeStorage, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { pathToFileURL } = require('url');
+const { assertSafePathSegment, resolvePathWithin } = require('./path-security.cjs');
+
+const DEV_RENDERER_URL = 'http://localhost:5173/';
+
+const isAllowedRendererUrl = (rawUrl) => {
+    try {
+        const url = new URL(rawUrl);
+        if (!app.isPackaged) {
+            return url.protocol === 'http:'
+                && ['localhost', '127.0.0.1'].includes(url.hostname)
+                && url.port === '5173';
+        }
+        return url.protocol === 'file:' && url.pathname.endsWith('/dist/index.html');
+    } catch {
+        return false;
+    }
+};
+
+const isSafeExternalUrl = (rawUrl) => {
+    try {
+        return ['http:', 'https:'].includes(new URL(rawUrl).protocol);
+    } catch {
+        return false;
+    }
+};
+
+const assertTrustedIpcEvent = (event) => {
+    const senderUrl = event.senderFrame?.url || event.sender?.getURL?.() || '';
+    if (!isAllowedRendererUrl(senderUrl)) {
+        throw new Error('IPC request rejected from an untrusted renderer');
+    }
+};
+
+const handleTrustedIpc = (channel, handler) => {
+    ipcMain.handle(channel, async (event, ...args) => {
+        assertTrustedIpcEvent(event);
+        return handler(event, ...args);
+    });
+};
 
 function createWindow() {
     const preloadPath = path.join(__dirname, 'preload.cjs');
@@ -13,6 +53,7 @@ function createWindow() {
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
+            sandbox: true,
             preload: preloadPath
         }
     });
@@ -33,16 +74,26 @@ function createWindow() {
         }
     });
 
-    // In dev, load localhost. In prod, load index.html from dist
     const isDev = !app.isPackaged;
+    const entryUrl = isDev
+        ? DEV_RENDERER_URL
+        : pathToFileURL(path.join(__dirname, '../dist/index.html')).href;
 
-    if (isDev) {
-        win.loadURL('http://localhost:5173');
-        // win.webContents.openDevTools();
-    } else {
-        win.loadFile(path.join(__dirname, '../dist/index.html'));
-        // win.webContents.openDevTools(); // Disabled for production
-    }
+    win.webContents.on('will-navigate', (event, targetUrl) => {
+        if (!isAllowedRendererUrl(targetUrl)) {
+            event.preventDefault();
+        }
+    });
+    win.webContents.setWindowOpenHandler(({ url }) => {
+        if (isSafeExternalUrl(url)) {
+            shell.openExternal(url).catch((error) => {
+                console.error('[Main] Failed to open external URL:', error);
+            });
+        }
+        return { action: 'deny' };
+    });
+
+    win.loadURL(entryUrl);
 
     // Remove the default menu bar
     win.setMenu(null);
@@ -190,7 +241,7 @@ const toBuffer = (value) => {
 };
 
 const writeRuntimeBinaryFile = (rootDir, relativePath, bytes) => {
-    const absolutePath = path.join(rootDir, relativePath);
+    const absolutePath = resolvePathWithin(rootDir, relativePath, 'Runtime file path');
     ensureDir(path.dirname(absolutePath));
     writeFileAtomic(absolutePath, toBuffer(bytes));
 };
@@ -357,7 +408,7 @@ const resolveLatestRuntimeProjectDir = ({ userId, sessionId, projectId }) => {
     return bestMatch?.dir || null;
 };
 
-ipcMain.handle('ensure-save-dir', async () => {
+handleTrustedIpc('ensure-save-dir', async () => {
     const dir = getSaveDir();
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
@@ -365,13 +416,13 @@ ipcMain.handle('ensure-save-dir', async () => {
     return dir;
 });
 
-ipcMain.handle('save-file', async (event, filename, content) => {
+handleTrustedIpc('save-file', async (event, filename, content) => {
     try {
         const dir = getSaveDir();
         if (!fs.existsSync(dir)) {
             fs.mkdirSync(dir, { recursive: true });
         }
-        const filePath = path.join(dir, filename);
+        const filePath = resolvePathWithin(dir, filename, 'Save filename');
         writeFileAtomic(filePath, content);
         return { success: true, path: filePath };
     } catch (e) {
@@ -380,10 +431,10 @@ ipcMain.handle('save-file', async (event, filename, content) => {
     }
 });
 
-ipcMain.handle('load-file', async (event, filename) => {
+handleTrustedIpc('load-file', async (event, filename) => {
     try {
         const dir = getSaveDir();
-        const filePath = path.join(dir, filename);
+        const filePath = resolvePathWithin(dir, filename, 'Save filename');
         console.log('[Main] IPC load-file request:', filename);
         console.log('[Main] Resolved path:', filePath);
         if (!fs.existsSync(filePath)) {
@@ -398,7 +449,7 @@ ipcMain.handle('load-file', async (event, filename) => {
     }
 });
 
-ipcMain.handle('find-save-by-md5', async (event, targetMd5) => {
+handleTrustedIpc('find-save-by-md5', async (event, targetMd5) => {
     try {
         const dir = getSaveDir();
         if (!fs.existsSync(dir)) return { success: false, error: 'Save directory not found' };
@@ -440,7 +491,7 @@ const sanitizeAiConfig = (value) => {
     return config;
 };
 
-ipcMain.handle('ai-config-load', async () => {
+handleTrustedIpc('ai-config-load', async () => {
     try {
         const filePath = path.join(app.getPath('userData'), AI_CONFIG_FILE);
         if (!fs.existsSync(filePath)) {
@@ -457,7 +508,7 @@ ipcMain.handle('ai-config-load', async () => {
     }
 });
 
-ipcMain.handle('ai-config-save', async (event, config) => {
+handleTrustedIpc('ai-config-save', async (event, config) => {
     try {
         const filePath = path.join(app.getPath('userData'), AI_CONFIG_FILE);
         ensureDir(path.dirname(filePath));
@@ -473,7 +524,7 @@ ipcMain.handle('ai-config-save', async (event, config) => {
     }
 });
 
-ipcMain.handle('get-runtime-storage-info', async () => {
+handleTrustedIpc('get-runtime-storage-info', async () => {
     const rootPath = ensureDir(getInstallRuntimeDir());
     return {
         rootPath,
@@ -481,7 +532,7 @@ ipcMain.handle('get-runtime-storage-info', async () => {
     };
 });
 
-ipcMain.handle('save-runtime-project', async (event, payload = {}) => {
+handleTrustedIpc('save-runtime-project', async (event, payload = {}) => {
     try {
         const {
             userId,
@@ -543,7 +594,7 @@ ipcMain.handle('save-runtime-project', async (event, payload = {}) => {
     }
 });
 
-ipcMain.handle('list-runtime-project-snapshots', async (event, payload = {}) => {
+handleTrustedIpc('list-runtime-project-snapshots', async (event, payload = {}) => {
     try {
         const { userId, sessionId, projectId } = payload.runtimeIdentity || payload;
         const historyRoot = getRuntimeProjectHistoryDir({ userId, sessionId, projectId });
@@ -592,11 +643,15 @@ ipcMain.handle('list-runtime-project-snapshots', async (event, payload = {}) => 
     }
 });
 
-ipcMain.handle('load-runtime-project', async (event, payload = {}) => {
+handleTrustedIpc('load-runtime-project', async (event, payload = {}) => {
     try {
         const { userId, sessionId, projectId, snapshotId } = payload;
         const projectDir = snapshotId
-            ? path.join(getRuntimeProjectHistoryDir({ userId, sessionId, projectId }), snapshotId)
+            ? resolvePathWithin(
+                getRuntimeProjectHistoryDir({ userId, sessionId, projectId }),
+                assertSafePathSegment(snapshotId, 'Snapshot ID'),
+                'Snapshot path'
+            )
             : resolveLatestRuntimeProjectDir({ userId, sessionId, projectId });
         if (!projectDir) {
             return {
@@ -625,7 +680,7 @@ ipcMain.handle('load-runtime-project', async (event, payload = {}) => {
         }
 
         const files = Array.from(referencedPaths).map((relativePath) => {
-            const absolutePath = path.join(projectDir, relativePath);
+            const absolutePath = resolvePathWithin(projectDir, relativePath, 'Manifest file path');
             const bytes = fs.readFileSync(absolutePath);
             return {
                 path: relativePath,

@@ -38,11 +38,19 @@ describe('ai-client', () => {
     beforeEach(() => {
         vi.unstubAllGlobals();
         vi.restoreAllMocks();
+        localStorage.setItem('inksight:locale', 'zh-CN');
     });
 
     it('throws when the config is incomplete', async () => {
         await expect(chatComplete({ protocol: 'openai', baseUrl: '', apiKey: '', model: '' }, { messages: [] }))
             .rejects.toThrow('AI 接口尚未配置完整');
+    });
+
+    it('localizes client-side errors using the active app language', async () => {
+        localStorage.setItem('inksight:locale', 'en-US');
+
+        await expect(chatComplete({ protocol: 'openai', baseUrl: '', apiKey: '', model: '' }, { messages: [] }))
+            .rejects.toThrow('AI API configuration is incomplete');
     });
 
     it('rejects unknown protocol by falling back to OpenAI adapter', async () => {

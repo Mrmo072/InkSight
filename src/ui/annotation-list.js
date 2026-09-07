@@ -49,7 +49,7 @@ export class AnnotationList {
 
     refresh() {
         if (!this.currentFileId || !this.cardSystem) {
-            logger.warn('Missing fileId or cardSystem', { fileId: this.currentFileId, system: !!this.cardSystem });
+            logger.debug('Annotation list is waiting for an active document');
             return;
         }
 
@@ -138,7 +138,7 @@ export class AnnotationList {
             banner.className = 'annotation-missing-banner';
             banner.innerHTML = `
                 <span class="material-icons-round">link_off</span>
-                <span>Source file is missing — re-import it from the library (or use Relink Source) to restore source navigation for these annotations.</span>
+                <span data-i18n="annotation.sourceMissing">${t('annotation.sourceMissing')}</span>
             `;
             this.container.appendChild(banner);
         }
