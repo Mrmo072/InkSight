@@ -37,6 +37,33 @@ describe('AIConfigManager', () => {
         expect(config.model).toBe('my-model');
     });
 
+    it('keeps the API key in memory only when device persistence is disabled', () => {
+        aiConfigManager.set({ apiKey: 'sk-session', rememberApiKey: false });
+
+        expect(aiConfigManager.get().apiKey).toBe('sk-session');
+        expect(JSON.parse(localStorage.getItem('inksight:ai-config'))).toMatchObject({
+            apiKey: '',
+            rememberApiKey: false
+        });
+
+        aiConfigManager.init();
+        expect(aiConfigManager.get().apiKey).toBe('');
+        expect(aiConfigManager.get().rememberApiKey).toBe(false);
+    });
+
+    it('clears a remembered API key without resetting provider settings', () => {
+        aiConfigManager.set({ provider: 'custom', baseUrl: 'https://my.api.com/v1', apiKey: 'sk-remove', model: 'my-model' });
+        aiConfigManager.clearApiKey();
+
+        expect(aiConfigManager.get()).toMatchObject({
+            provider: 'custom',
+            baseUrl: 'https://my.api.com/v1',
+            apiKey: '',
+            model: 'my-model'
+        });
+        expect(JSON.parse(localStorage.getItem('inksight:ai-config')).apiKey).toBe('');
+    });
+
     it('routes persistence through the encrypted main-process store when available', () => {
         const saved = [];
         window.electronAPI = {

@@ -426,10 +426,57 @@ class SettingsModal {
         // API Key
         this.aiApiKeyInput = buildInput(t('ai.keyPlaceholder'), 'password', 'ai.keyPlaceholder');
         this.aiApiKeyInput.value = config.apiKey;
+        this.aiApiKeyInput.autocomplete = 'off';
         buildRow('API Key', this.aiApiKeyInput).classList.add('settings-modal__row--tall');
         this.aiApiKeyInput.addEventListener('change', () => {
             aiConfigManager.set({ apiKey: this.aiApiKeyInput.value });
         });
+
+        // Browser builds let users choose convenience or session-only storage.
+        // Electron always routes the key through the OS-backed secure store.
+        const storageRow = document.createElement('div');
+        storageRow.className = 'settings-modal__key-storage';
+        if (aiConfigManager.usesSecureStorage()) {
+            const secureHint = document.createElement('p');
+            secureHint.className = 'settings-modal__hint';
+            secureHint.dataset.i18n = 'ai.secureStorageHint';
+            secureHint.textContent = t('ai.secureStorageHint');
+            storageRow.appendChild(secureHint);
+        } else {
+            const rememberLabel = document.createElement('label');
+            rememberLabel.className = 'settings-modal__checkbox-label';
+            this.aiRememberKeyInput = document.createElement('input');
+            this.aiRememberKeyInput.type = 'checkbox';
+            this.aiRememberKeyInput.checked = config.rememberApiKey;
+            this.aiRememberKeyInput.addEventListener('change', () => {
+                aiConfigManager.set({ rememberApiKey: this.aiRememberKeyInput.checked });
+            });
+            const rememberText = document.createElement('span');
+            rememberText.dataset.i18n = 'ai.rememberKey';
+            rememberText.textContent = t('ai.rememberKey');
+            rememberLabel.append(this.aiRememberKeyInput, rememberText);
+            storageRow.appendChild(rememberLabel);
+
+            const storageHint = document.createElement('p');
+            storageHint.className = 'settings-modal__hint';
+            storageHint.dataset.i18n = 'ai.rememberKeyHint';
+            storageHint.textContent = t('ai.rememberKeyHint');
+            storageRow.appendChild(storageHint);
+        }
+
+        this.aiClearKeyBtn = document.createElement('button');
+        this.aiClearKeyBtn.type = 'button';
+        this.aiClearKeyBtn.className = 'modal-btn settings-modal__clear-key';
+        this.aiClearKeyBtn.dataset.i18n = 'ai.clearKey';
+        this.aiClearKeyBtn.textContent = t('ai.clearKey');
+        this.aiClearKeyBtn.disabled = !config.apiKey;
+        this.aiClearKeyBtn.addEventListener('click', () => {
+            const next = aiConfigManager.clearApiKey();
+            this.syncAiSection(next);
+            emitAppNotification({ message: t('ai.keyCleared'), level: 'success' });
+        });
+        storageRow.appendChild(this.aiClearKeyBtn);
+        section.appendChild(storageRow);
 
         // 模型名
         this.aiModelInput = buildInput(t('ai.modelPlaceholder'), 'text', 'ai.modelPlaceholder');
@@ -463,6 +510,8 @@ class SettingsModal {
         if (this.aiProtocolSelect) this.aiProtocolSelect.value = config.protocol;
         if (this.aiBaseUrlInput) this.aiBaseUrlInput.value = config.baseUrl;
         if (this.aiApiKeyInput) this.aiApiKeyInput.value = config.apiKey;
+        if (this.aiRememberKeyInput) this.aiRememberKeyInput.checked = config.rememberApiKey;
+        if (this.aiClearKeyBtn) this.aiClearKeyBtn.disabled = !config.apiKey;
         if (this.aiModelInput) this.aiModelInput.value = config.model;
     }
 

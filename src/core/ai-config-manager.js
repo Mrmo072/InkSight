@@ -30,7 +30,8 @@ const DEFAULT_CONFIG = Object.freeze({
     protocol: 'openai',
     baseUrl: PROVIDER_PRESETS.deepseek.baseUrl,
     apiKey: '',
-    model: PROVIDER_PRESETS.deepseek.model
+    model: PROVIDER_PRESETS.deepseek.model,
+    rememberApiKey: true
 });
 
 function sanitizeString(value, fallback = '') {
@@ -43,7 +44,10 @@ function parseConfig(parsed) {
         protocol: PROTOCOLS.includes(parsed?.protocol) ? parsed.protocol : DEFAULT_CONFIG.protocol,
         baseUrl: sanitizeString(parsed?.baseUrl, DEFAULT_CONFIG.baseUrl).replace(/\/+$/, ''),
         apiKey: sanitizeString(parsed?.apiKey),
-        model: sanitizeString(parsed?.model, DEFAULT_CONFIG.model)
+        model: sanitizeString(parsed?.model, DEFAULT_CONFIG.model),
+        // Existing browser configurations predate this preference and already
+        // opted into persistence, so preserve their current behaviour.
+        rememberApiKey: parsed?.rememberApiKey !== false
     };
 }
 
@@ -117,6 +121,10 @@ class AIConfigManager {
         return Boolean(baseUrl && apiKey && model);
     }
 
+    usesSecureStorage() {
+        return this.secureStorage;
+    }
+
     set(patch) {
         const next = { ...this.config };
 
@@ -140,6 +148,9 @@ class AIConfigManager {
         if (patch?.model !== undefined) {
             next.model = sanitizeString(patch.model).trim();
         }
+        if (patch?.rememberApiKey !== undefined) {
+            next.rememberApiKey = Boolean(patch.rememberApiKey);
+        }
 
         const changed = Object.keys(next).some((key) => next[key] !== this.config[key]);
         if (!changed) {
@@ -160,10 +171,18 @@ class AIConfigManager {
             return;
         }
         try {
-            localStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.config));
+            const storedConfig = {
+                ...this.config,
+                apiKey: this.config.rememberApiKey ? this.config.apiKey : ''
+            };
+            localStorage.setItem(this.STORAGE_KEY, JSON.stringify(storedConfig));
         } catch {
             // Ignore persistence failures — session config still applies.
         }
+    }
+
+    clearApiKey() {
+        return this.set({ apiKey: '' });
     }
 
     subscribe(callback) {

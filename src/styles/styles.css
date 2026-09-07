@@ -2628,6 +2628,37 @@ body.compact-layout .annotation-item {
   flex: 0 0 56px;
 }
 
+.settings-modal__key-storage {
+  margin: -2px 0 12px 68px;
+}
+
+.settings-modal__checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  font-size: 13px;
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.settings-modal__checkbox-label input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--primary);
+}
+
+.settings-modal__key-storage .settings-modal__hint {
+  margin: 2px 0 8px;
+}
+
+.settings-modal__clear-key {
+  min-height: 30px;
+  padding: 5px 10px;
+  color: var(--danger);
+}
+
 
 /* Keyboard focus visibility (a11y floor) */
 :focus-visible {
