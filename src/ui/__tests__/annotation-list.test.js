@@ -85,4 +85,16 @@ describe('annotation-list', () => {
         expect(labels[0]).toContain('Line 8');
         expect(labels[1]).toContain('Lines 12-14');
     });
+
+    it('renders document names as text instead of executable markup', () => {
+        cardSystem.cards.get('card-1').sourceName = '<img src=x onerror="window.__injected = true">';
+
+        const list = new AnnotationList('annotation-list', cardSystem);
+        list.load('doc-1');
+
+        const sourceMeta = document.querySelector('[data-card-id="card-1"] .annotation-source-meta');
+        expect(sourceMeta.textContent).toContain('<img src=x onerror="window.__injected = true">');
+        expect(sourceMeta.querySelector('img')).toBeNull();
+        expect(window.__injected).toBeUndefined();
+    });
 });

@@ -343,7 +343,12 @@ export class AnnotationList {
                 ? t('annotation.lines', { start: location.lineStart, end: location.lineEnd })
                 : t('annotation.line', { line: location.lineStart });
         }
-        pageSpan.innerHTML = `<span class="material-icons-round">article</span><span>${locationLabel}</span>`;
+        const pageIcon = document.createElement('span');
+        pageIcon.className = 'material-icons-round';
+        pageIcon.textContent = 'article';
+        const pageText = document.createElement('span');
+        pageText.textContent = locationLabel;
+        pageSpan.append(pageIcon, pageText);
 
         if (highlight?.color) {
             const dot = document.createElement('span');
@@ -419,10 +424,12 @@ export class AnnotationList {
 
         const sourceMeta = document.createElement('div');
         sourceMeta.className = 'annotation-source-meta text-two-line';
-        sourceMeta.innerHTML = `
-            <span class="material-icons-round annotation-source-icon">description</span>
-            <span>${card.sourceName || t('annotation.unknownSource')}</span>
-        `;
+        const sourceIcon = document.createElement('span');
+        sourceIcon.className = 'material-icons-round annotation-source-icon';
+        sourceIcon.textContent = 'description';
+        const sourceName = document.createElement('span');
+        sourceName.textContent = card.sourceName || t('annotation.unknownSource');
+        sourceMeta.append(sourceIcon, sourceName);
         // Hidden by default; the header source button reveals it so the card
         // stays compact — most of the time the name is redundant context.
         div.appendChild(sourceMeta);

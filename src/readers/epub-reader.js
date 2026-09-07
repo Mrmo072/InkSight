@@ -115,7 +115,10 @@ export class EpubReader {
                 height: '100%',
                 flow: 'paginated',
                 manager: 'default',
-                allowScriptedContent: true
+                // EPUB scripts are disabled deliberately. epub.js otherwise
+                // combines allow-scripts with allow-same-origin, which is not
+                // a safe boundary for untrusted books in the browser build.
+                allowScriptedContent: false
             });
 
             // Mouse wheel support & Keydown support inside iframe
@@ -219,11 +222,14 @@ export class EpubReader {
             return this.book;
         } catch (error) {
             console.error('Error loading EPUB:', error);
+            const errorElement = document.createElement('div');
+            errorElement.className = 'error';
             if (error.message && error.message.includes('No RootFile Found')) {
-                this.container.innerHTML = '<div class="error">Error: Invalid EPUB structure. Missing META-INF/container.xml.</div>';
+                errorElement.textContent = 'Error: Invalid EPUB structure. Missing META-INF/container.xml.';
             } else {
-                this.container.innerHTML = `<div class="error">Error loading EPUB: ${error.message}</div>`;
+                errorElement.textContent = `Error loading EPUB: ${error.message}`;
             }
+            this.container.replaceChildren(errorElement);
             throw error;
         }
     }

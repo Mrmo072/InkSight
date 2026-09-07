@@ -14,6 +14,13 @@ export function createReaderLoader({
 }) {
     const resolveOutlineSidebar = () => getOutlineSidebar?.() ?? null;
 
+    const showViewerMessage = (className, message) => {
+        const messageElement = document.createElement('div');
+        messageElement.className = className;
+        messageElement.textContent = message;
+        elements.viewer.replaceChildren(messageElement);
+    };
+
     const setPageInfo = (page, totalPages = state.totalPages) => {
         const normalizedTotalPages = Number.isFinite(totalPages) && totalPages > 0
             ? totalPages
@@ -160,14 +167,14 @@ export function createReaderLoader({
 
         if (!config) {
             resetAuxiliaryPanels();
-            elements.viewer.innerHTML = `<div class="error">Unsupported file type: ${fileData.type}</div>`;
+            showViewerMessage('error', `Unsupported file type: ${fileData.type}`);
             setAppService('pdfReader', null);
             return null;
         }
 
         config.beforeLoad?.();
         resetAuxiliaryPanels();
-        elements.viewer.innerHTML = `<div class="loading">${config.loadingText}</div>`;
+        showViewerMessage('loading', config.loadingText);
 
         const ReaderClass = await config.loadReaderModule();
         const reader = new ReaderClass(elements.viewer);
@@ -178,7 +185,7 @@ export function createReaderLoader({
             setToolMode?.(config.defaultMode);
             return reader;
         } catch (e) {
-            elements.viewer.innerHTML = `<div class="error">Error loading ${config.errorLabel}: ${e.message}</div>`;
+            showViewerMessage('error', `Error loading ${config.errorLabel}: ${e.message}`);
             logger.error(`Error loading ${config.errorLabel}`, e);
             return reader;
         }

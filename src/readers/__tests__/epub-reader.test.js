@@ -130,7 +130,8 @@ describe('EpubReader', () => {
         });
 
         expect(epubMockState.book.renderTo).toHaveBeenCalledWith(container, expect.objectContaining({
-            flow: 'paginated'
+            flow: 'paginated',
+            allowScriptedContent: false
         }));
         expect(epubMockState.rendition.display).toHaveBeenCalled();
         expect(onPageCountChange).toHaveBeenCalledWith(12);
