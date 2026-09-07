@@ -29,6 +29,9 @@ All notable changes to InkSight are documented in this file. This project follow
 - Improved source-link recovery, document registration reconciliation, annotation deletion, project persistence, and mobile interactions.
 - Added atomic local writes and a writable Electron user-data fallback for packaged installations.
 - Protected Electron AI credentials with operating-system secure storage when available.
+- Added trusted-device and session-only API key choices for the browser build, plus a dedicated key-clearing control.
+- Kept Gemini API keys out of request URLs by sending them through the provider's authentication header.
+- Disabled scripted EPUB content and rendered document-supplied names and loading errors as text to reduce injection risk.
 - Hardened local file path handling, external link handling, HTML rendering, and AI endpoint validation.
 - Stabilized deterministic GitHub Pages builds and expanded automated coverage for application and Electron workflows.
 
