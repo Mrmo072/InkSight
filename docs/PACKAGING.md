@@ -36,8 +36,9 @@ The current build is unsigned. Windows may display a SmartScreen warning until a
 
 ### White Screen / Resource Loading Errors
 If the application launches but shows a white screen or "Not allowed to load local resource" errors:
-- Ensure `asar` is set to `false` in `package.json`.
 - Ensure `vite.config.js` has `base: './'`.
+- Ensure packaged renderer assets are included under `dist/` and are loaded with relative URLs.
+- Keep runtime writes outside the application archive, using Electron's user-data or runtime-data directories.
 
 ### "require is not defined"
 Ensure the main process entry point is `.cjs` (CommonJS) or that `package.json` is configured correctly for ESM/CJS interop. InkSight currently uses `electron/main.cjs`.

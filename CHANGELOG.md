@@ -12,6 +12,7 @@ All notable changes to InkSight are documented in this file. This project follow
 - Responsive desktop, tablet, and phone layouts with mobile navigation and project actions.
 - Project home, recent projects, project-directory import/export, recovery snapshots, and outline/citation/notes exports.
 - Windows GitHub Release automation that builds a ZIP archive and publishes its SHA-256 checksum.
+- A Windows application icon derived from the InkSight logo.
 - A bilingual privacy notice covering local storage, AI requests, and API credential handling.
 
 ### Changed
@@ -21,6 +22,7 @@ All notable changes to InkSight are documented in this file. This project follow
 - Updated Drawnix integration and maintenance documentation while keeping InkSight-specific behavior isolated.
 - Raised the supported Node.js version to 22.12 or newer and refreshed application dependencies.
 - Updated documentation to match the current project, privacy, deployment, and Windows packaging behavior.
+- Enabled Electron `asar` packaging while keeping writable runtime data outside the application archive.
 
 ### Fixed
 
