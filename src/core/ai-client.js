@@ -96,10 +96,13 @@ async function chatGemini(config, { system, messages }) {
         role: message.role === 'assistant' ? 'model' : 'user',
         parts: [{ text: message.content }]
     }));
-    const url = joinUrl(config.baseUrl, `/v1beta/models/${encodeURIComponent(config.model)}:generateContent?key=${encodeURIComponent(config.apiKey)}`);
+    const url = joinUrl(config.baseUrl, `/v1beta/models/${encodeURIComponent(config.model)}:generateContent`);
     const payload = await requestJson(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': config.apiKey
+        },
         body: JSON.stringify({
             contents,
             ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {})
@@ -254,10 +257,13 @@ async function streamGemini(config, { system, messages, onDelta }) {
         role: message.role === 'assistant' ? 'model' : 'user',
         parts: [{ text: message.content }]
     }));
-    const url = joinUrl(config.baseUrl, `/v1beta/models/${encodeURIComponent(config.model)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(config.apiKey)}`);
+    const url = joinUrl(config.baseUrl, `/v1beta/models/${encodeURIComponent(config.model)}:streamGenerateContent?alt=sse`);
     await requestSse(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': config.apiKey
+        },
         body: JSON.stringify({
             contents,
             ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {})

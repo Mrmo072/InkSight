@@ -107,7 +107,7 @@ describe('ai-client', () => {
         expect(body.messages).toEqual([{ role: 'user', content: '问题' }]);
     });
 
-    it('maps assistant role to model role for Gemini and appends the key', async () => {
+    it('maps assistant role to model role for Gemini and sends the key in a header', async () => {
         const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
             candidates: [{ content: { parts: [{ text: 'Gemini 回答' }] } }]
         }));
@@ -124,7 +124,9 @@ describe('ai-client', () => {
 
         expect(text).toBe('Gemini 回答');
         const [url, options] = fetchMock.mock.calls[0];
-        expect(url).toContain('/v1beta/models/gemini-test:generateContent?key=gm-test');
+        expect(url).toContain('/v1beta/models/gemini-test:generateContent');
+        expect(url).not.toContain('gm-test');
+        expect(options.headers['x-goog-api-key']).toBe('gm-test');
         const body = JSON.parse(options.body);
         expect(body.systemInstruction.parts[0].text).toBe('系统提示');
         expect(body.contents.map((c) => c.role)).toEqual(['user', 'model', 'user']);
@@ -166,7 +168,7 @@ describe('ai-client', () => {
         expect(text).toBe('流式');
     });
 
-    it('streams Gemini SSE parts and appends the key', async () => {
+    it('streams Gemini SSE parts and sends the key in a header', async () => {
         const fetchMock = vi.fn().mockResolvedValue(sseResponse([
             'data: {"candidates":[{"content":{"parts":[{"text":"Gemini 流"}]}}]}\n\n'
         ]));
@@ -174,7 +176,10 @@ describe('ai-client', () => {
 
         const text = await chatStream(GEMINI_CONFIG, { messages: [{ role: 'user', content: '问题' }], onDelta: () => {} });
         expect(text).toBe('Gemini 流');
-        expect(fetchMock.mock.calls[0][0]).toContain(':streamGenerateContent?alt=sse&key=gm-test');
+        const [url, options] = fetchMock.mock.calls[0];
+        expect(url).toContain(':streamGenerateContent?alt=sse');
+        expect(url).not.toContain('gm-test');
+        expect(options.headers['x-goog-api-key']).toBe('gm-test');
     });
 
     it('surfaces provider errors on a streaming response', async () => {
