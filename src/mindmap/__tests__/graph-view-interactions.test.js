@@ -259,6 +259,55 @@ describe('graph bubble interactions', () => {
         expect(bubble.classList.contains('graph-bubble--expanded')).toBe(true);
     });
 
+    it('restores persisted text marks that locate a child bubble', () => {
+        const { controller, bubble } = setupNode();
+        controller.nodeById.set('child-1', { id: 'child-1' });
+        graphNodesStore.addLinkMark({
+            rootCardId: 'card-root',
+            parentId: 'node-1',
+            targetId: 'child-1',
+            startOffset: 0,
+            endOffset: 2,
+            text: '这是'
+        });
+        const answer = bubble.querySelector('.graph-bubble__answer-content');
+
+        controller.applyPersistedLinkMarks(answer, 'node-1');
+
+        const mark = answer.querySelector('mark.graph-mark');
+        expect(mark?.textContent).toBe('这是');
+        expect(mark?.dataset.targetId).toBe('child-1');
+    });
+
+    it('records stable text offsets for a selected answer passage', () => {
+        const { controller, bubble } = setupNode();
+        const answer = bubble.querySelector('.graph-bubble__answer-content');
+        const textNode = document.createTreeWalker(answer, NodeFilter.SHOW_TEXT).nextNode();
+        const range = document.createRange();
+        range.setStart(textNode, 3);
+        range.setEnd(textNode, 5);
+
+        expect(controller.getRangeTextAnchor(answer, range)).toEqual({
+            startOffset: 3,
+            endOffset: 5,
+            text: 'AI'
+        });
+    });
+
+    it('records offsets when the browser uses element range boundaries', () => {
+        const { controller, bubble } = setupNode();
+        const answer = bubble.querySelector('.graph-bubble__answer-content');
+        const paragraph = answer.querySelector('p');
+        const range = document.createRange();
+        range.selectNodeContents(paragraph);
+
+        expect(controller.getRangeTextAnchor(answer, range)).toEqual({
+            startOffset: 0,
+            endOffset: paragraph.textContent.length,
+            text: paragraph.textContent
+        });
+    });
+
     it('shows the full truncated title after the hover delay', () => {
         vi.useFakeTimers();
         try {

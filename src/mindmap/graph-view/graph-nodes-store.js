@@ -10,7 +10,7 @@
  * snapshots.
  */
 
-const STORE_VERSION = 3;
+const STORE_VERSION = 4;
 
 function sanitizeNode(node) {
     if (!node || typeof node !== 'object' || typeof node.id !== 'string' || typeof node.parentId !== 'string') {
@@ -46,6 +46,10 @@ class GraphNodesStore {
         // Keeping it in the project payload lets the same graph reopen where
         // the user left it without mixing state between root annotations.
         this.viewStates = new Map();
+        // Persisted text anchors that connect a parent passage to a child
+        // bubble. These marks may belong to real card nodes as well as
+        // graph-only nodes, so they live beside (not inside) node records.
+        this.linkMarks = [];
     }
 
     getPersistenceData() {
@@ -56,7 +60,8 @@ class GraphNodesStore {
                 rootCardId,
                 selectedNodeId: state.selectedNodeId,
                 expandedNodeIds: Array.from(state.expandedNodeIds)
-            }))
+            })),
+            linkMarks: this.linkMarks.map((mark) => ({ ...mark }))
         };
     }
 
@@ -82,10 +87,29 @@ class GraphNodesStore {
                 )
             });
         });
+        this.linkMarks = (Array.isArray(data?.linkMarks) ? data.linkMarks : [])
+            .filter((mark) => (
+                mark
+                && typeof mark.rootCardId === 'string'
+                && typeof mark.parentId === 'string'
+                && typeof mark.targetId === 'string'
+                && Number.isInteger(mark.startOffset)
+                && Number.isInteger(mark.endOffset)
+                && mark.startOffset >= 0
+                && mark.endOffset > mark.startOffset
+            ))
+            .map((mark) => ({
+                rootCardId: mark.rootCardId,
+                parentId: mark.parentId,
+                targetId: mark.targetId,
+                startOffset: mark.startOffset,
+                endOffset: mark.endOffset,
+                text: typeof mark.text === 'string' ? mark.text : ''
+            }));
     }
 
     hasData() {
-        return this.nodes.size > 0 || this.viewStates.size > 0;
+        return this.nodes.size > 0 || this.viewStates.size > 0 || this.linkMarks.length > 0;
     }
 
     getViewState(rootCardId) {
@@ -120,6 +144,42 @@ class GraphNodesStore {
             state.expandedNodeIds.delete(nodeId);
         }
         this.viewStates.set(rootCardId, state);
+    }
+
+    addLinkMark(mark) {
+        if (
+            !mark
+            || typeof mark.rootCardId !== 'string'
+            || typeof mark.parentId !== 'string'
+            || typeof mark.targetId !== 'string'
+            || !Number.isInteger(mark.startOffset)
+            || !Number.isInteger(mark.endOffset)
+            || mark.startOffset < 0
+            || mark.endOffset <= mark.startOffset
+        ) {
+            return null;
+        }
+        const stored = {
+            rootCardId: mark.rootCardId,
+            parentId: mark.parentId,
+            targetId: mark.targetId,
+            startOffset: mark.startOffset,
+            endOffset: mark.endOffset,
+            text: typeof mark.text === 'string' ? mark.text : ''
+        };
+        this.linkMarks = this.linkMarks.filter((item) => !(
+            item.rootCardId === stored.rootCardId
+            && item.parentId === stored.parentId
+            && item.targetId === stored.targetId
+        ));
+        this.linkMarks.push(stored);
+        return stored;
+    }
+
+    getLinkMarks(rootCardId, parentId) {
+        return this.linkMarks
+            .filter((mark) => mark.rootCardId === rootCardId && mark.parentId === parentId)
+            .map((mark) => ({ ...mark }));
     }
 
     get(nodeId) {
@@ -225,6 +285,12 @@ class GraphNodesStore {
             });
         };
         collect(nodeId);
+        if (removed.length > 0) {
+            const removedSet = new Set(removed);
+            this.linkMarks = this.linkMarks.filter((mark) => (
+                !removedSet.has(mark.parentId) && !removedSet.has(mark.targetId)
+            ));
+        }
         return removed;
     }
 
@@ -260,6 +326,7 @@ class GraphNodesStore {
     clear() {
         this.nodes = new Map();
         this.viewStates = new Map();
+        this.linkMarks = [];
     }
 }
 

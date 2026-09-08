@@ -262,10 +262,12 @@ export class GraphViewController {
         }
 
         const rect = range.getBoundingClientRect();
+        const answerContent = containerBubble.querySelector('.graph-bubble__answer-content');
         this.selectedTextContext = {
             text,
             parentId: containerBubble.dataset.cardId,
-            range: range.cloneRange()
+            range: range.cloneRange(),
+            textAnchor: this.getRangeTextAnchor(answerContent, range)
         };
 
         this.selectionPill.style.display = 'flex';
@@ -881,6 +883,7 @@ export class GraphViewController {
         const answerContent = document.createElement('div');
         answerContent.className = 'graph-bubble__answer-content graph-bubble__body--md';
         answerContent.innerHTML = renderSafeMarkdown(node.text);
+        this.applyPersistedLinkMarks(answerContent, node.id);
         answerSection.appendChild(answerContent);
         body.appendChild(answerSection);
 
@@ -1254,6 +1257,92 @@ export class GraphViewController {
         return wrappedAny;
     }
 
+    getRangeTextAnchor(container, range) {
+        if (
+            !container
+            || !range
+            || range.collapsed
+            || !container.contains(range.startContainer)
+            || !container.contains(range.endContainer)
+        ) {
+            return null;
+        }
+        // Native browser selections may use either text nodes or their
+        // surrounding elements as range boundaries. Measuring a prefix range
+        // handles both shapes and keeps the stored anchor DOM-independent.
+        const prefix = document.createRange();
+        prefix.selectNodeContents(container);
+        prefix.setEnd(range.startContainer, range.startOffset);
+        const startOffset = prefix.toString().length;
+        const text = range.toString();
+        const endOffset = startOffset + text.length;
+        if (!text || endOffset <= startOffset) {
+            return null;
+        }
+        return {
+            startOffset,
+            endOffset,
+            text
+        };
+    }
+
+    createRangeFromTextOffsets(container, startOffset, endOffset) {
+        const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+        const range = document.createRange();
+        let offset = 0;
+        let started = false;
+        let current;
+        while ((current = walker.nextNode())) {
+            const nextOffset = offset + current.textContent.length;
+            if (!started && startOffset >= offset && startOffset <= nextOffset) {
+                range.setStart(current, Math.min(startOffset - offset, current.textContent.length));
+                started = true;
+            }
+            if (started && endOffset >= offset && endOffset <= nextOffset) {
+                range.setEnd(current, Math.min(endOffset - offset, current.textContent.length));
+                return range.collapsed ? null : range;
+            }
+            offset = nextOffset;
+        }
+        return null;
+    }
+
+    applyPersistedLinkMarks(container, parentId) {
+        const rootCardId = this.rawTree?.id;
+        if (!rootCardId || !container) return;
+        const fullText = container.textContent || '';
+        const marks = graphNodesStore.getLinkMarks(rootCardId, parentId)
+            .filter((mark) => this.nodeById?.has(mark.targetId))
+            .map((mark) => {
+                if (mark.text && fullText.slice(mark.startOffset, mark.endOffset) !== mark.text) {
+                    const fallbackOffset = fullText.indexOf(mark.text);
+                    if (fallbackOffset < 0) return null;
+                    return {
+                        ...mark,
+                        startOffset: fallbackOffset,
+                        endOffset: fallbackOffset + mark.text.length
+                    };
+                }
+                return mark;
+            })
+            .filter(Boolean)
+            .sort((left, right) => right.startOffset - left.startOffset);
+
+        marks.forEach((storedMark) => {
+            const range = this.createRangeFromTextOffsets(
+                container,
+                storedMark.startOffset,
+                storedMark.endOffset
+            );
+            if (!range) return;
+            const mark = document.createElement('mark');
+            mark.className = 'graph-mark';
+            mark.setAttribute('data-target-id', storedMark.targetId);
+            mark.title = t('graph.traceBranch');
+            this.wrapRangeWithMark(range, mark);
+        });
+    }
+
     showExtendDialog() {
         const ctx = this.selectedTextContext;
         if (!ctx || !this.rawTree) return;
@@ -1283,6 +1372,20 @@ export class GraphViewController {
             return;
         }
         const { parentId, range } = ctx;
+        const parentAnswer = document.querySelector(
+            `#${CSS.escape(this.domId(parentId))} .graph-bubble__answer-content`
+        );
+        let textAnchor = ctx.textAnchor || (range ? this.getRangeTextAnchor(parentAnswer, range) : null);
+        if (!textAnchor && parentAnswer && ctx.text) {
+            const startOffset = (parentAnswer.textContent || '').indexOf(ctx.text);
+            if (startOffset >= 0) {
+                textAnchor = {
+                    startOffset,
+                    endOffset: startOffset + ctx.text.length,
+                    text: ctx.text
+                };
+            }
+        }
         this.hideDialog();
 
         // 选中文本包裹为可跳转的 mark，指向新生成的子节点
@@ -1297,7 +1400,16 @@ export class GraphViewController {
             return;
         }
 
-        if (range) {
+        let storedMark = null;
+        if (textAnchor) {
+            storedMark = graphNodesStore.addLinkMark({
+                rootCardId: this.rawTree.id,
+                parentId,
+                targetId: node.id,
+                ...textAnchor
+            });
+        }
+        if (range && storedMark) {
             const mark = document.createElement('mark');
             mark.className = 'graph-mark';
             mark.setAttribute('data-target-id', node.id);
@@ -1397,6 +1509,7 @@ export class GraphViewController {
         const answerContent = document.querySelector(`#${CSS.escape(this.domId(nodeId))} .graph-bubble__answer-content`);
         if (answerContent) {
             answerContent.innerHTML = renderSafeMarkdown(text);
+            this.applyPersistedLinkMarks(answerContent, nodeId);
             // 流式输出时正文持续增长，钉在底部跟随阅读
             const body = answerContent.closest('.graph-bubble__body');
             if (body) body.scrollTop = body.scrollHeight;

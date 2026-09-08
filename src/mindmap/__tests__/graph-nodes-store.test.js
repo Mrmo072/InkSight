@@ -35,7 +35,7 @@ describe('GraphNodesStore', () => {
         graphNodesStore.upsert({ id: 'n2', parentId: 'n1', title: 'B', content: 'y' });
 
         const data = graphNodesStore.getPersistenceData();
-        expect(data.version).toBe(3);
+        expect(data.version).toBe(4);
         expect(data.nodes).toHaveLength(2);
 
         graphNodesStore.clear();
@@ -58,6 +58,46 @@ describe('GraphNodesStore', () => {
             expandedNodeIds: ['node-1', 'node-2']
         });
         expect(graphNodesStore.hasData()).toBe(true);
+    });
+
+    it('persists text marks that link parent passages to child bubbles', () => {
+        graphNodesStore.addLinkMark({
+            rootCardId: 'root-1',
+            parentId: 'card-1',
+            targetId: 'node-1',
+            startOffset: 3,
+            endOffset: 8,
+            text: 'linked'
+        });
+        const data = graphNodesStore.getPersistenceData();
+
+        graphNodesStore.clear();
+        graphNodesStore.restorePersistenceData(data);
+
+        expect(graphNodesStore.getLinkMarks('root-1', 'card-1')).toEqual([{
+            rootCardId: 'root-1',
+            parentId: 'card-1',
+            targetId: 'node-1',
+            startOffset: 3,
+            endOffset: 8,
+            text: 'linked'
+        }]);
+    });
+
+    it('removes text links when their child subtree is deleted', () => {
+        graphNodesStore.upsert({ id: 'node-1', parentId: 'card-1', title: 'child' });
+        graphNodesStore.addLinkMark({
+            rootCardId: 'root-1',
+            parentId: 'card-1',
+            targetId: 'node-1',
+            startOffset: 0,
+            endOffset: 5,
+            text: 'child'
+        });
+
+        graphNodesStore.removeSubtree('node-1');
+
+        expect(graphNodesStore.getLinkMarks('root-1', 'card-1')).toEqual([]);
     });
 
     it('drops corrupted entries on restore', () => {
