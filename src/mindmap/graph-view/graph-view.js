@@ -24,7 +24,7 @@ function escapelessText(parent, text) {
     parent.appendChild(document.createTextNode(text));
 }
 
-class GraphViewController {
+export class GraphViewController {
     constructor() {
         this.isOpen = false;
         this.overlay = null;
@@ -37,8 +37,13 @@ class GraphViewController {
         this.isPanning = false;
         this.panStart = { x: 0, y: 0 };
         this.selectedTextContext = null;
+        this.selectedNodeId = null;
+        this.selectedNodeAt = 0;
         this.justClickedMarkTimestamp = 0;
         this.edgeItems = new Map();
+        this.pendingAiNodeIds = new Set();
+        this.hoverTimer = null;
+        this.chatStream = chatStream;
     }
 
     mount() {
@@ -97,6 +102,7 @@ class GraphViewController {
         this.viewport = overlay.querySelector('.graph-view__viewport');
         this.world = overlay.querySelector('.graph-view__world');
         this.nodesContainer = overlay.querySelector('.graph-view__nodes');
+        this.nodesContainer.setAttribute('role', 'list');
         this.edgesLayer = overlay.querySelector('.graph-view__edges');
         this.titleEl = overlay.querySelector('.graph-view__title');
         this.dialogEl = overlay.querySelector('.graph-view__dialog');
@@ -140,6 +146,7 @@ class GraphViewController {
 
         this.viewport.addEventListener('pointerdown', (e) => {
             if (e.target.closest('.graph-bubble') || e.target.closest('.graph-view__pill')) return;
+            this.setSelectedNode(null);
             this.isPanning = true;
             this.panStart = { x: e.clientX - this.transform.x, y: e.clientY - this.transform.y };
             this.viewport.classList.add('panning');
@@ -186,6 +193,12 @@ class GraphViewController {
         if (mark) {
             const targetChildId = mark.getAttribute('data-target-id');
             const parentCard = mark.closest('.graph-bubble');
+            if (parentCard?.dataset.cardId !== this.selectedNodeId) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.setSelectedNode(parentCard?.dataset.cardId || null);
+                return;
+            }
             if (targetChildId) {
                 e.preventDefault();
                 e.stopPropagation();
@@ -213,8 +226,11 @@ class GraphViewController {
             ? range.commonAncestorContainer.closest('.graph-bubble')
             : range.commonAncestorContainer.parentElement?.closest('.graph-bubble');
 
-        if (!containerBubble) {
+        if (!containerBubble || containerBubble.dataset.cardId !== this.selectedNodeId) {
             this.selectionPill.style.display = 'none';
+            if (containerBubble) {
+                sel.removeAllRanges();
+            }
             return;
         }
 
@@ -234,6 +250,10 @@ class GraphViewController {
         if (!this.isOpen || e.key !== 'Escape') return;
         if (this.dialogEl && !this.dialogEl.hidden) {
             this.hideDialog();
+            return;
+        }
+        if (this.selectedNodeId) {
+            this.setSelectedNode(null);
             return;
         }
         if (document.querySelector('.modal-overlay.active')) return;
@@ -263,6 +283,8 @@ class GraphViewController {
         this.nodes = [];
         this.links = [];
         this.transform = { x: 0, y: 0, scale: 1 };
+        this.selectedNodeId = null;
+        this.selectedNodeAt = 0;
         this.clearGraphDom();
 
         this.titleEl.textContent = this.rawTree.tag;
@@ -298,6 +320,11 @@ class GraphViewController {
         this.nodes = [];
         this.links = [];
         this.selectedTextContext = null;
+        this.selectedNodeId = null;
+        this.selectedNodeAt = 0;
+        this.pendingAiNodeIds.clear();
+        clearTimeout(this.hoverTimer);
+        this.hoverTimer = null;
         this.clearGraphDom();
         window.getSelection()?.removeAllRanges();
     }
@@ -350,6 +377,8 @@ class GraphViewController {
         const toTreeNode = (n) => ({
             id: n.id,
             tag: n.title,
+            question: n.question,
+            titleCustomized: n.titleCustomized,
             text: !n.content || n.content === '（无内容）' ? t('graph.empty') : n.content,
             color: n.kind === 'ai' ? '#a855f7' : '#38bdf8',
             kind: n.kind,
@@ -402,7 +431,7 @@ class GraphViewController {
      * Creates a persisted child node under parentId and refreshes the view.
      * Returns the view node.
      */
-    createChildNode({ parentId, title, content = '', kind = 'manual' }) {
+    createChildNode({ parentId, title, question = '', content = '', kind = 'manual' }) {
         const id = `gv-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
         const storeNode = graphNodesStore.upsert({
             id,
@@ -410,6 +439,7 @@ class GraphViewController {
             rootCardId: this.rawTree?.id || null,
             kind,
             title,
+            question,
             content
         });
         const parentTreeNode = this.nodeById.get(parentId);
@@ -420,6 +450,8 @@ class GraphViewController {
         const treeNode = {
             id: storeNode.id,
             tag: storeNode.title,
+            question: storeNode.question,
+            titleCustomized: storeNode.titleCustomized,
             text: !storeNode.content || storeNode.content === '（无内容）' ? t('graph.empty') : storeNode.content,
             color: storeNode.kind === 'ai' ? '#a855f7' : '#38bdf8',
             kind: storeNode.kind,
@@ -444,7 +476,10 @@ class GraphViewController {
         if (parentTreeNode) {
             parentTreeNode.children = parentTreeNode.children.filter((child) => child.id !== nodeId);
         }
-        graphNodesStore.removeSubtree(nodeId);
+        const removedIds = graphNodesStore.removeSubtree(nodeId);
+        if (this.selectedNodeId && removedIds.includes(this.selectedNodeId)) {
+            this.setSelectedNode(null);
+        }
         this.applyTreeChange();
     }
 
@@ -468,7 +503,7 @@ class GraphViewController {
         const messages = [];
         chain.forEach((node) => {
             if (node.kind === 'ai') {
-                messages.push({ role: 'user', content: node.tag });
+                messages.push({ role: 'user', content: node.question || node.tag });
                 messages.push({ role: 'assistant', content: node.text });
             } else {
                 messages.push({ role: 'user', content: `[${t('graph.excerptContext')} | ${node.tag}]\n${node.text}` });
@@ -512,6 +547,8 @@ class GraphViewController {
                 existing.targetX = targetX;
                 existing.targetY = targetY;
                 existing.tag = d.data.tag;
+                existing.question = d.data.question;
+                existing.titleCustomized = d.data.titleCustomized;
                 existing.text = d.data.text;
                 existing.color = d.data.color;
                 existing.kind = d.data.kind;
@@ -522,6 +559,8 @@ class GraphViewController {
             return {
                 id: d.data.id,
                 tag: d.data.tag,
+                question: d.data.question,
+                titleCustomized: d.data.titleCustomized,
                 text: d.data.text,
                 color: d.data.color,
                 kind: d.data.kind,
@@ -612,6 +651,14 @@ class GraphViewController {
                 this.nodesContainer.appendChild(el);
             } else {
                 el.querySelector('.graph-bubble__tag-title').textContent = node.tag;
+                el.setAttribute('aria-label', node.tag);
+                const tooltip = el.querySelector('.graph-bubble__title-tooltip');
+                if (tooltip) tooltip.textContent = node.tag;
+                const questionInput = el.querySelector('.graph-bubble__question-input');
+                if (questionInput && document.activeElement !== questionInput) {
+                    questionInput.value = node.question || node.tag;
+                }
+                this.syncBubbleSelection(el, node.id === this.selectedNodeId);
             }
         });
 
@@ -624,6 +671,10 @@ class GraphViewController {
         el.className = 'graph-bubble';
         el.dataset.cardId = node.id;
         el.dataset.kind = node.kind || 'card';
+        el.setAttribute('role', 'listitem');
+        el.setAttribute('tabindex', '0');
+        el.setAttribute('aria-expanded', 'false');
+        el.setAttribute('aria-label', node.tag);
 
         const header = document.createElement('div');
         header.className = 'graph-bubble__header';
@@ -639,16 +690,6 @@ class GraphViewController {
         const tagTitle = document.createElement('span');
         tagTitle.className = 'graph-bubble__tag-title';
         escapelessText(tagTitle, node.tag);
-        if (node.kind && node.kind !== 'card') {
-            tagTitle.title = t('graph.editTitle');
-            tagTitle.classList.add('graph-bubble__tag-title--editable');
-            tagTitle.addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.startTitleEdit(node.id, tagTitle);
-            });
-        } else {
-            tagTitle.title = t('graph.managedTitle');
-        }
         tag.appendChild(tagTitle);
 
         const headerActions = document.createElement('div');
@@ -668,15 +709,12 @@ class GraphViewController {
                 kind: 'manual'
             });
             if (childNode) {
-                // 飞向新节点并直接进入标题编辑
                 setTimeout(() => {
                     this.triggerJumpToChild(childNode.id, node.id);
-                    const tagTitle = document.querySelector(
-                        `#${CSS.escape(this.domId(childNode.id))} .graph-bubble__tag-title`
-                    );
-                    if (tagTitle) {
-                        this.startTitleEdit(childNode.id, tagTitle);
-                    }
+                    this.setBubbleExpanded(childNode.id, true);
+                    document.querySelector(
+                        `#${CSS.escape(this.domId(childNode.id))} .graph-bubble__title-input`
+                    )?.focus();
                 }, 100);
             }
         });
@@ -688,17 +726,11 @@ class GraphViewController {
             aiFillBtn.type = 'button';
             aiFillBtn.className = 'graph-bubble__action-btn graph-bubble__action-btn--ai';
             aiFillBtn.textContent = '✨';
-            aiFillBtn.title = t('graph.aiFromTitle');
-            aiFillBtn.addEventListener('click', async (e) => {
+            aiFillBtn.title = t('graph.editQuestion');
+            aiFillBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                // 以树节点的实时标题为准（视图节点可能因刚编辑而不同步）
-                const treeNode = this.nodeById?.get(node.id);
-                if (!treeNode || treeNode.tag === t('graph.newThought') || !treeNode.tag?.trim()) {
-                    emitAppNotification({ message: t('graph.questionRequired'), level: 'info' });
-                    return;
-                }
-                const parentId = this.parentByNodeId?.get(node.id) || null;
-                await this.requestAiAnswer(treeNode, treeNode.tag, parentId);
+                this.setBubbleExpanded(node.id, true);
+                el.querySelector('.graph-bubble__question-input')?.focus();
             });
             headerActions.appendChild(aiFillBtn);
         }
@@ -734,102 +766,273 @@ class GraphViewController {
         header.appendChild(dragIcon);
 
         const body = document.createElement('div');
-        body.className = 'graph-bubble__body graph-bubble__body--md';
-        body.innerHTML = renderSafeMarkdown(node.text);
+        body.className = 'graph-bubble__body';
+
+        if (node.kind && node.kind !== 'card') {
+            const editor = document.createElement('div');
+            editor.className = 'graph-bubble__editor';
+
+            const titleLabel = document.createElement('label');
+            titleLabel.className = 'graph-bubble__field-label';
+            titleLabel.textContent = t('graph.nodeTitle');
+            const titleInput = document.createElement('input');
+            titleInput.type = 'text';
+            titleInput.className = 'graph-bubble__title-input';
+            titleInput.value = node.tag;
+            titleInput.addEventListener('change', () => this.commitNodeTitle(node.id, titleInput.value));
+            titleLabel.appendChild(titleInput);
+
+            const questionLabel = document.createElement('label');
+            questionLabel.className = 'graph-bubble__field-label';
+            questionLabel.textContent = t('graph.userQuestion');
+            const questionInput = document.createElement('textarea');
+            questionInput.className = 'graph-bubble__question-input';
+            questionInput.rows = 3;
+            questionInput.value = node.question || node.tag;
+            questionLabel.appendChild(questionInput);
+
+            const editorActions = document.createElement('div');
+            editorActions.className = 'graph-bubble__editor-actions';
+            const resetTitleBtn = document.createElement('button');
+            resetTitleBtn.type = 'button';
+            resetTitleBtn.className = 'graph-bubble__editor-btn';
+            resetTitleBtn.textContent = t('graph.useQuestionAsTitle');
+            resetTitleBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.resetNodeTitle(node.id);
+            });
+            const regenerateBtn = document.createElement('button');
+            regenerateBtn.type = 'button';
+            regenerateBtn.className = 'graph-bubble__editor-btn graph-bubble__editor-btn--primary';
+            regenerateBtn.textContent = t('graph.regenerate');
+            regenerateBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                await this.regenerateNode(node.id);
+            });
+            editorActions.append(resetTitleBtn, regenerateBtn);
+            editor.append(titleLabel, questionLabel, editorActions);
+            body.appendChild(editor);
+        }
+
+        const answerSection = document.createElement('div');
+        answerSection.className = 'graph-bubble__answer';
+        if (node.kind && node.kind !== 'card') {
+            const answerLabel = document.createElement('div');
+            answerLabel.className = 'graph-bubble__section-label';
+            answerLabel.textContent = t('graph.aiResponse');
+            answerSection.appendChild(answerLabel);
+        }
+        const answerContent = document.createElement('div');
+        answerContent.className = 'graph-bubble__answer-content graph-bubble__body--md';
+        answerContent.innerHTML = renderSafeMarkdown(node.text);
+        answerSection.appendChild(answerContent);
+        body.appendChild(answerSection);
+
         // Markdown 链接在新标签页打开，避免污染画布会话
         body.addEventListener('click', (e) => {
             const anchor = e.target.closest('a');
             if (anchor?.href && isSafeExternalUrl(anchor.href)) {
                 e.preventDefault();
-                window.open(anchor.href, '_blank', 'noopener');
+                if (this.selectedNodeId === node.id) {
+                    window.open(anchor.href, '_blank', 'noopener');
+                } else {
+                    this.setSelectedNode(node.id);
+                }
             }
         });
+
+        const titleTooltip = document.createElement('div');
+        titleTooltip.className = 'graph-bubble__title-tooltip';
+        titleTooltip.hidden = true;
+        titleTooltip.textContent = node.tag;
 
         el.appendChild(header);
         el.appendChild(body);
+        el.appendChild(titleTooltip);
 
-        this.bindNodeDrag(header, node.id);
+        this.bindNodeInteractions(el, node.id);
+        this.bindBubbleTitlePreview(el, tagTitle, titleTooltip);
 
         // 双击标题区/边缘切换放大态；正文内双击保留原生选词。
         // 放大的气泡更宽，需同步放大其碰撞半径并重启模拟，避免与其他气泡重叠。
-        header.addEventListener('dblclick', (e) => {
-            if (e.target.closest('.graph-bubble__action-btn')) return;
-            const expanded = el.classList.toggle('graph-bubble--expanded');
-            const viewNode = this.nodes.find((n) => n.id === node.id);
-            if (viewNode) {
-                viewNode.expanded = expanded;
-                // 圆形碰撞需覆盖矩形对角线，否则放大气泡的角落仍会压到相邻气泡
-                const rect = el.getBoundingClientRect();
-                viewNode.collideRadius = expanded
-                    ? Math.hypot(rect.width, rect.height) / 2 + 12
-                    : 155;
-                this.simulation?.force(
-                    'collide',
-                    forceCollide().radius((d) => d.collideRadius || 155).iterations(4)
-                );
-                this.simulation?.alpha(0.6).restart();
+        el.addEventListener('dblclick', (e) => {
+            if (e.target.closest('button, input, textarea, a, mark')) return;
+            const recentlySelected = this.selectedNodeId === node.id
+                && Date.now() - this.selectedNodeAt < 500;
+            if (!recentlySelected && !e.target.closest('.graph-bubble__header')) {
+                return;
+            }
+            e.preventDefault();
+            window.getSelection()?.removeAllRanges();
+            this.setSelectedNode(node.id);
+            this.setBubbleExpanded(node.id, !el.classList.contains('graph-bubble--expanded'));
+        });
+
+        el.addEventListener('keydown', (e) => {
+            if (e.target !== el) return;
+            if (e.key === ' ' || e.key === 'Enter') {
+                e.preventDefault();
+                this.setSelectedNode(node.id);
+                if (e.key === 'Enter') {
+                    this.setBubbleExpanded(node.id, true);
+                }
             }
         });
 
-        el.addEventListener('pointerup', (e) => {
-            if (Date.now() - this.justClickedMarkTimestamp < 350) return;
-            const sel = window.getSelection();
-            if (sel && sel.toString().trim().length > 0) return;
-
-            if (e.target.closest('.graph-bubble__header') || e.target === el) {
-                this.focusOnNode(node.id, 'self');
-            }
-        });
+        this.syncBubbleSelection(el, node.id === this.selectedNodeId);
 
         return el;
     }
 
-    startTitleEdit(nodeId, tagTitle) {
+    syncNodeMetadata(nodeId, storedNode) {
+        if (!storedNode) return;
         const treeNode = this.nodeById?.get(nodeId);
-        if (!treeNode || tagTitle.querySelector('input')) {
+        const viewNode = this.nodes.find((item) => item.id === nodeId);
+        [treeNode, viewNode].filter(Boolean).forEach((item) => {
+            item.tag = storedNode.title;
+            item.question = storedNode.question;
+            item.titleCustomized = storedNode.titleCustomized;
+            item.kind = storedNode.kind;
+            item.color = storedNode.kind === 'ai' ? '#a855f7' : '#38bdf8';
+        });
+
+        const bubble = document.getElementById(this.domId(nodeId));
+        if (!bubble) return;
+        bubble.dataset.kind = storedNode.kind;
+        bubble.setAttribute('aria-label', storedNode.title);
+        const title = bubble.querySelector('.graph-bubble__tag-title');
+        const titleInput = bubble.querySelector('.graph-bubble__title-input');
+        const questionInput = bubble.querySelector('.graph-bubble__question-input');
+        const tooltip = bubble.querySelector('.graph-bubble__title-tooltip');
+        const dot = bubble.querySelector('.graph-bubble__color-dot');
+        if (title) title.textContent = storedNode.title;
+        if (titleInput && document.activeElement !== titleInput) titleInput.value = storedNode.title;
+        if (questionInput && document.activeElement !== questionInput) questionInput.value = storedNode.question || storedNode.title;
+        if (tooltip) tooltip.textContent = storedNode.title;
+        if (dot) dot.style.backgroundColor = storedNode.kind === 'ai' ? '#a855f7' : '#38bdf8';
+    }
+
+    commitNodeTitle(nodeId, value) {
+        const storedNode = graphNodesStore.setTitle(nodeId, value, { customized: true });
+        this.syncNodeMetadata(nodeId, storedNode);
+        return storedNode;
+    }
+
+    resetNodeTitle(nodeId) {
+        const bubble = document.getElementById(this.domId(nodeId));
+        const question = bubble?.querySelector('.graph-bubble__question-input')?.value.trim();
+        if (question) {
+            graphNodesStore.setQuestion(nodeId, question);
+        }
+        const storedNode = graphNodesStore.resetTitleToQuestion(nodeId);
+        this.syncNodeMetadata(nodeId, storedNode);
+    }
+
+    async regenerateNode(nodeId) {
+        if (this.pendingAiNodeIds.has(nodeId)) return;
+        const treeNode = this.nodeById?.get(nodeId);
+        const bubble = document.getElementById(this.domId(nodeId));
+        const questionInput = bubble?.querySelector('.graph-bubble__question-input');
+        const titleInput = bubble?.querySelector('.graph-bubble__title-input');
+        const question = questionInput?.value.trim() || '';
+        if (!treeNode || !question) {
+            emitAppNotification({ message: t('graph.questionRequired'), level: 'info' });
+            questionInput?.focus();
             return;
         }
 
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.className = 'graph-bubble__title-input';
-        input.value = treeNode.tag;
-        tagTitle.replaceChildren(input);
-        input.focus();
-        input.select();
-
-        const commit = () => {
-            const nextTitle = input.value.trim();
-            if (nextTitle && nextTitle !== treeNode.tag) {
-                treeNode.tag = nextTitle;
-                graphNodesStore.setTitle(nodeId, nextTitle);
-                // 同步视图节点，避免其他交互读到过期标题
-                const viewNode = this.nodes.find((n) => n.id === nodeId);
-                if (viewNode) {
-                    viewNode.tag = nextTitle;
-                }
-            }
-            tagTitle.replaceChildren();
-            escapelessText(tagTitle, treeNode.tag);
-        };
-
-        input.addEventListener('click', (e) => e.stopPropagation());
-        input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                commit();
-            } else if (e.key === 'Escape') {
-                tagTitle.replaceChildren();
-                escapelessText(tagTitle, treeNode.tag);
-            }
-        });
-        input.addEventListener('blur', commit);
+        if (titleInput?.value.trim() && titleInput.value.trim() !== treeNode.tag) {
+            this.commitNodeTitle(nodeId, titleInput.value);
+        }
+        const storedNode = graphNodesStore.setQuestion(nodeId, question);
+        this.syncNodeMetadata(nodeId, storedNode);
+        const parentId = this.parentByNodeId?.get(nodeId) || null;
+        const succeeded = await this.requestAiAnswer(treeNode, question, parentId, { preserveExisting: true });
+        if (succeeded) {
+            graphNodesStore.setKind(nodeId, 'ai');
+            this.syncNodeMetadata(nodeId, graphNodesStore.get(nodeId));
+        }
     }
 
-    bindNodeDrag(dragHandle, nodeId) {
-        dragHandle.addEventListener('pointerdown', (e) => {
+    setSelectedNode(nodeId) {
+        if (nodeId === this.selectedNodeId) return;
+        const previousId = this.selectedNodeId;
+        this.selectedNodeId = nodeId;
+        this.selectedNodeAt = nodeId ? Date.now() : 0;
+        clearTimeout(this.hoverTimer);
+        this.hoverTimer = null;
+
+        if (previousId) {
+            const previous = document.getElementById(this.domId(previousId));
+            this.syncBubbleSelection(previous, false);
+        }
+        if (nodeId) {
+            const next = document.getElementById(this.domId(nodeId));
+            this.syncBubbleSelection(next, true);
+        }
+        this.selectionPill.style.display = 'none';
+        this.selectedTextContext = null;
+        window.getSelection()?.removeAllRanges();
+    }
+
+    syncBubbleSelection(bubble, selected) {
+        if (!bubble) return;
+        bubble.classList.toggle('graph-bubble--selected', selected);
+        bubble.dataset.selected = selected ? 'true' : 'false';
+        bubble.querySelectorAll('input, textarea').forEach((control) => {
+            control.disabled = !selected;
+        });
+        const tooltip = bubble.querySelector('.graph-bubble__title-tooltip');
+        if (tooltip && selected) tooltip.hidden = true;
+    }
+
+    setBubbleExpanded(nodeId, expanded) {
+        const bubble = document.getElementById(this.domId(nodeId));
+        const viewNode = this.nodes.find((item) => item.id === nodeId);
+        if (!bubble || !viewNode) return;
+        bubble.classList.toggle('graph-bubble--expanded', expanded);
+        bubble.setAttribute('aria-expanded', String(expanded));
+        viewNode.expanded = expanded;
+        const rect = bubble.getBoundingClientRect();
+        viewNode.collideRadius = expanded
+            ? Math.hypot(rect.width, rect.height) / 2 + 12
+            : 155;
+        this.simulation?.force(
+            'collide',
+            forceCollide().radius((item) => item.collideRadius || 155).iterations(4)
+        );
+        this.simulation?.alpha(0.6).restart();
+    }
+
+    bindBubbleTitlePreview(bubble, titleElement, tooltip) {
+        const hide = () => {
+            clearTimeout(this.hoverTimer);
+            this.hoverTimer = null;
+            tooltip.hidden = true;
+        };
+        const showIfNeeded = () => {
+            if (this.selectedNodeId === bubble.dataset.cardId || bubble.classList.contains('graph-bubble--expanded')) return;
+            if (titleElement.scrollWidth <= titleElement.clientWidth) return;
+            tooltip.hidden = false;
+        };
+        bubble.addEventListener('pointerenter', () => {
+            hide();
+            this.hoverTimer = setTimeout(showIfNeeded, 650);
+        });
+        bubble.addEventListener('pointerleave', hide);
+        bubble.addEventListener('focus', showIfNeeded);
+        bubble.addEventListener('blur', hide);
+    }
+
+    bindNodeInteractions(bubble, nodeId) {
+        bubble.addEventListener('pointerdown', (e) => {
+            const interactive = e.target.closest('button, input, textarea, a, mark');
+            const selected = this.selectedNodeId === nodeId;
+            const inHeader = Boolean(e.target.closest('.graph-bubble__header'));
+            if (interactive || (selected && !inHeader)) return;
+
             e.stopPropagation();
-            const activeNode = this.nodes.find((n) => n.id === nodeId);
+            const activeNode = this.nodes.find((item) => item.id === nodeId);
             if (!activeNode) return;
 
             let isDragging = false;
@@ -839,25 +1042,34 @@ class GraphViewController {
             const initialNodeY = activeNode.y;
 
             const onPointerMove = (moveEvent) => {
-                const dist = Math.hypot(moveEvent.clientX - startScreenX, moveEvent.clientY - startScreenY);
-                if (dist > 4) {
+                const distance = Math.hypot(moveEvent.clientX - startScreenX, moveEvent.clientY - startScreenY);
+                if (distance <= 5) return;
+                if (!isDragging) {
                     isDragging = true;
+                    bubble.classList.add('graph-bubble--dragging');
+                    bubble.querySelector('.graph-bubble__title-tooltip')?.setAttribute('hidden', '');
                     this.simulation?.alpha(0.85).alphaTarget(0.35).restart();
-
-                    const currentScale = this.transform.scale;
-                    const dx = (moveEvent.clientX - startScreenX) / currentScale;
-                    const dy = (moveEvent.clientY - startScreenY) / currentScale;
-
-                    activeNode.fx = initialNodeX + dx;
-                    activeNode.fy = initialNodeY + dy;
                 }
+                moveEvent.preventDefault();
+                const scale = this.transform.scale;
+                activeNode.fx = initialNodeX + (moveEvent.clientX - startScreenX) / scale;
+                activeNode.fy = initialNodeY + (moveEvent.clientY - startScreenY) / scale;
             };
 
             const onPointerUp = () => {
                 if (isDragging) {
+                    const droppedX = activeNode.fx ?? activeNode.x;
+                    const droppedY = activeNode.fy ?? activeNode.y;
+                    activeNode.x = droppedX;
+                    activeNode.y = droppedY;
+                    activeNode.targetX = droppedX;
+                    activeNode.targetY = droppedY;
                     this.simulation?.alphaTarget(0);
                     activeNode.fx = null;
                     activeNode.fy = null;
+                    bubble.classList.remove('graph-bubble--dragging');
+                } else if (Date.now() - this.justClickedMarkTimestamp >= 350) {
+                    this.setSelectedNode(nodeId);
                 }
                 window.removeEventListener('pointermove', onPointerMove);
                 window.removeEventListener('pointerup', onPointerUp);
@@ -876,6 +1088,7 @@ class GraphViewController {
                 setTimeout(() => item.main.classList.remove('graph-link--active'), 1500);
             }
         }
+        this.setSelectedNode(childId);
         this.focusOnNode(childId, 'child');
     }
 
@@ -967,6 +1180,7 @@ class GraphViewController {
         const node = this.createChildNode({
             parentId,
             title: question,
+            question: mode === 'ai' ? question : '',
             content: mode === 'ai' ? t('graph.aiThinking') : t('graph.pending'),
             kind: mode === 'ai' ? 'ai' : 'manual'
         });
@@ -995,22 +1209,33 @@ class GraphViewController {
         }
     }
 
-    async requestAiAnswer(treeNode, question, parentId) {
+    async requestAiAnswer(treeNode, question, parentId, { preserveExisting = false } = {}) {
+        if (this.pendingAiNodeIds.has(treeNode.id)) {
+            return false;
+        }
         const config = aiConfigManager.get();
         if (!aiConfigManager.isConfigured()) {
-            this.updateNodeContent(treeNode.id, t('graph.aiNotConfigured'));
+            if (!preserveExisting) {
+                this.updateNodeContent(treeNode.id, t('graph.aiNotConfigured'));
+            }
             emitAppNotification({ message: t('graph.aiNotConfiguredNotice'), level: 'warning' });
-            return;
+            return false;
         }
 
         const bubbleEl = document.getElementById(this.domId(treeNode.id));
+        const regenerateBtn = bubbleEl?.querySelector('.graph-bubble__editor-btn--primary');
+        const previousContent = treeNode.text;
+        this.pendingAiNodeIds.add(treeNode.id);
         bubbleEl?.classList.add('graph-bubble--loading');
+        if (regenerateBtn) regenerateBtn.disabled = true;
         // 两种入口（选区延伸 / 气泡 ✨ 按钮）统一进入可见的思考中状态
-        this.updateNodeContent(treeNode.id, t('graph.aiThinking'));
+        if (!preserveExisting) {
+            this.updateNodeContent(treeNode.id, t('graph.aiThinking'));
+        }
 
+        let flushTimer = null;
         try {
             let answer = '';
-            let flushTimer = null;
             const flush = () => {
                 flushTimer = null;
                 // 流式期间只更新内存态和 DOM，完整内容最后统一入库
@@ -1020,7 +1245,7 @@ class GraphViewController {
                 }
                 this.renderNodeBody(treeNode.id, answer);
             };
-            await chatStream(config, {
+            await this.chatStream(config, {
                 system: t('graph.aiSystem'),
                 messages: this.buildConversation(parentId, question),
                 onDelta: (delta, full) => {
@@ -1033,11 +1258,21 @@ class GraphViewController {
             });
             clearTimeout(flushTimer);
             this.updateNodeContent(treeNode.id, answer);
+            return true;
         } catch (error) {
-            this.updateNodeContent(treeNode.id, `(${t('graph.aiRequestFailed', { message: error.message })})`);
+            clearTimeout(flushTimer);
+            if (preserveExisting) {
+                treeNode.text = previousContent;
+                this.renderNodeBody(treeNode.id, previousContent);
+            } else {
+                this.updateNodeContent(treeNode.id, `(${t('graph.aiRequestFailed', { message: error.message })})`);
+            }
             emitAppNotification({ message: t('graph.aiRequestFailed', { message: error.message }), level: 'error' });
+            return false;
         } finally {
+            this.pendingAiNodeIds.delete(treeNode.id);
             bubbleEl?.classList.remove('graph-bubble--loading');
+            if (regenerateBtn) regenerateBtn.disabled = false;
         }
     }
 
@@ -1050,11 +1285,12 @@ class GraphViewController {
     }
 
     renderNodeBody(nodeId, text) {
-        const body = document.querySelector(`#${CSS.escape(this.domId(nodeId))} .graph-bubble__body`);
-        if (body) {
-            body.innerHTML = renderSafeMarkdown(text);
+        const answerContent = document.querySelector(`#${CSS.escape(this.domId(nodeId))} .graph-bubble__answer-content`);
+        if (answerContent) {
+            answerContent.innerHTML = renderSafeMarkdown(text);
             // 流式输出时正文持续增长，钉在底部跟随阅读
-            body.scrollTop = body.scrollHeight;
+            const body = answerContent.closest('.graph-bubble__body');
+            if (body) body.scrollTop = body.scrollHeight;
         }
     }
 

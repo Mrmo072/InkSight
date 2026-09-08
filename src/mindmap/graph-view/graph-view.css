@@ -121,7 +121,23 @@
         0 0 20px var(--graph-accent-faint);
     transform: translate(-50%, -50%);
     pointer-events: auto;
+    cursor: grab;
+    user-select: none;
     transition: border-color 0.25s, box-shadow 0.25s;
+}
+
+.graph-bubble--dragging,
+.graph-bubble--dragging * {
+    cursor: grabbing !important;
+}
+
+.graph-bubble--selected {
+    cursor: default;
+    border-color: var(--graph-accent-hover);
+    box-shadow:
+        0 24px 40px -6px var(--graph-shadow),
+        0 0 0 2px var(--graph-accent),
+        0 0 28px var(--graph-accent-faint);
 }
 
 .graph-bubble:hover {
@@ -223,10 +239,18 @@
     font-size: 13.5px;
     line-height: 1.65;
     color: var(--graph-text-secondary);
+    cursor: grab;
+    user-select: none;
+    max-height: 160px;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.graph-bubble--selected .graph-bubble__body {
     cursor: text;
     user-select: text;
-    max-height: 160px;
     overflow-y: auto;
+    pointer-events: auto;
 }
 
 .graph-bubble__body::-webkit-scrollbar {
@@ -370,10 +394,14 @@ mark.graph-mark:hover {
 /* ---- bubble header actions ---- */
 
 .graph-bubble__actions {
-    display: flex;
+    display: none;
     align-items: center;
     gap: 4px;
     flex: 0 0 auto;
+}
+
+.graph-bubble--selected .graph-bubble__actions {
+    display: flex;
 }
 
 .graph-bubble__action-btn {
@@ -411,16 +439,126 @@ mark.graph-mark:hover {
 }
 
 .graph-bubble__title-input {
+    box-sizing: border-box;
     width: 100%;
-    min-width: 90px;
+    min-width: 0;
     background: var(--graph-surface-strong);
     border: 1px solid var(--graph-accent);
     border-radius: 5px;
     color: var(--graph-text);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 7px 9px;
+    outline: none;
+}
+
+.graph-bubble__editor {
+    display: none;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding: 12px;
+    border: 1px solid var(--graph-border);
+    border-radius: 10px;
+    background: var(--graph-accent-faint);
+}
+
+.graph-bubble--expanded .graph-bubble__editor {
+    display: grid;
+}
+
+.graph-bubble__field-label {
+    display: grid;
+    gap: 5px;
+    color: var(--graph-text-secondary);
     font-size: 11px;
     font-weight: 700;
-    padding: 2px 5px;
-    outline: none;
+    letter-spacing: 0.04em;
+}
+
+.graph-bubble__question-input {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 76px;
+    resize: vertical;
+    border: 1px solid var(--graph-accent-soft);
+    border-radius: 7px;
+    background: var(--graph-surface-strong);
+    color: var(--graph-text);
+    font: inherit;
+    line-height: 1.5;
+    padding: 8px 9px;
+}
+
+.graph-bubble__title-input:focus,
+.graph-bubble__question-input:focus {
+    border-color: var(--graph-accent);
+    box-shadow: 0 0 0 2px var(--graph-accent-faint);
+}
+
+.graph-bubble__editor-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.graph-bubble__editor-btn {
+    min-height: 30px;
+    padding: 5px 9px;
+    border: 1px solid var(--graph-border);
+    border-radius: 7px;
+    background: var(--graph-surface-strong);
+    color: var(--graph-text-secondary);
+    cursor: pointer;
+}
+
+.graph-bubble__editor-btn--primary {
+    border-color: var(--graph-accent);
+    background: var(--graph-accent-soft);
+    color: var(--graph-text);
+}
+
+.graph-bubble__editor-btn:disabled {
+    cursor: wait;
+    opacity: 0.55;
+}
+
+.graph-bubble__section-label {
+    display: none;
+    margin-bottom: 7px;
+    color: var(--graph-accent);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.graph-bubble--expanded .graph-bubble__section-label {
+    display: block;
+}
+
+.graph-bubble__title-tooltip {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 9px);
+    z-index: 20;
+    width: max-content;
+    max-width: 360px;
+    padding: 8px 10px;
+    border: 1px solid var(--graph-accent-soft);
+    border-radius: 8px;
+    background: var(--graph-surface-strong);
+    box-shadow: 0 12px 28px var(--graph-shadow);
+    color: var(--graph-text);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+    pointer-events: none;
+    transform: translateX(-50%);
+}
+
+.graph-bubble__title-tooltip[hidden] {
+    display: none;
 }
 
 /* ---- expanded bubble ---- */
@@ -431,8 +569,11 @@ mark.graph-mark:hover {
 }
 
 .graph-bubble--expanded .graph-bubble__body {
-    max-height: none;
-    overflow-y: visible;
+    max-height: min(62vh, 640px);
+}
+
+.graph-bubble--expanded:not(.graph-bubble--selected) .graph-bubble__body {
+    overflow: hidden;
 }
 
 /* ---- loading state ---- */
