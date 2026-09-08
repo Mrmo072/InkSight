@@ -10,7 +10,7 @@
  * snapshots.
  */
 
-const STORE_VERSION = 2;
+const STORE_VERSION = 3;
 
 function sanitizeNode(node) {
     if (!node || typeof node !== 'object' || typeof node.id !== 'string' || typeof node.parentId !== 'string') {
@@ -42,12 +42,21 @@ class GraphNodesStore {
         this.version = STORE_VERSION;
         // nodeId -> node (non-card nodes only)
         this.nodes = new Map();
+        // rootCardId -> transient-looking but user-visible graph UI state.
+        // Keeping it in the project payload lets the same graph reopen where
+        // the user left it without mixing state between root annotations.
+        this.viewStates = new Map();
     }
 
     getPersistenceData() {
         return {
             version: this.version,
-            nodes: Array.from(this.nodes.values())
+            nodes: Array.from(this.nodes.values()),
+            viewStates: Array.from(this.viewStates.entries()).map(([rootCardId, state]) => ({
+                rootCardId,
+                selectedNodeId: state.selectedNodeId,
+                expandedNodeIds: Array.from(state.expandedNodeIds)
+            }))
         };
     }
 
@@ -60,10 +69,57 @@ class GraphNodesStore {
                 this.nodes.set(node.id, node);
             }
         });
+        this.viewStates = new Map();
+        const states = Array.isArray(data?.viewStates) ? data.viewStates : [];
+        states.forEach((raw) => {
+            if (!raw || typeof raw.rootCardId !== 'string') return;
+            this.viewStates.set(raw.rootCardId, {
+                selectedNodeId: typeof raw.selectedNodeId === 'string' ? raw.selectedNodeId : null,
+                expandedNodeIds: new Set(
+                    Array.isArray(raw.expandedNodeIds)
+                        ? raw.expandedNodeIds.filter((id) => typeof id === 'string')
+                        : []
+                )
+            });
+        });
     }
 
     hasData() {
-        return this.nodes.size > 0;
+        return this.nodes.size > 0 || this.viewStates.size > 0;
+    }
+
+    getViewState(rootCardId) {
+        const state = this.viewStates.get(rootCardId);
+        return state
+            ? {
+                selectedNodeId: state.selectedNodeId,
+                expandedNodeIds: Array.from(state.expandedNodeIds)
+            }
+            : { selectedNodeId: null, expandedNodeIds: [] };
+    }
+
+    setSelectedNode(rootCardId, nodeId) {
+        if (typeof rootCardId !== 'string') return;
+        const state = this.viewStates.get(rootCardId) || {
+            selectedNodeId: null,
+            expandedNodeIds: new Set()
+        };
+        state.selectedNodeId = typeof nodeId === 'string' ? nodeId : null;
+        this.viewStates.set(rootCardId, state);
+    }
+
+    setExpandedNode(rootCardId, nodeId, expanded) {
+        if (typeof rootCardId !== 'string' || typeof nodeId !== 'string') return;
+        const state = this.viewStates.get(rootCardId) || {
+            selectedNodeId: null,
+            expandedNodeIds: new Set()
+        };
+        if (expanded) {
+            state.expandedNodeIds.add(nodeId);
+        } else {
+            state.expandedNodeIds.delete(nodeId);
+        }
+        this.viewStates.set(rootCardId, state);
     }
 
     get(nodeId) {
@@ -203,6 +259,7 @@ class GraphNodesStore {
 
     clear() {
         this.nodes = new Map();
+        this.viewStates = new Map();
     }
 }
 

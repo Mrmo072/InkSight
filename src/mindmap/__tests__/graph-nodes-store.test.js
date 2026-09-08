@@ -35,13 +35,29 @@ describe('GraphNodesStore', () => {
         graphNodesStore.upsert({ id: 'n2', parentId: 'n1', title: 'B', content: 'y' });
 
         const data = graphNodesStore.getPersistenceData();
-        expect(data.version).toBe(2);
+        expect(data.version).toBe(3);
         expect(data.nodes).toHaveLength(2);
 
         graphNodesStore.clear();
         expect(graphNodesStore.hasData()).toBe(false);
         graphNodesStore.restorePersistenceData(data);
         expect(graphNodesStore.get('n2').parentId).toBe('n1');
+    });
+
+    it('persists selected and expanded bubble state per graph root', () => {
+        graphNodesStore.setSelectedNode('root-1', 'node-1');
+        graphNodesStore.setExpandedNode('root-1', 'node-1', true);
+        graphNodesStore.setExpandedNode('root-1', 'node-2', true);
+        const data = graphNodesStore.getPersistenceData();
+
+        graphNodesStore.clear();
+        graphNodesStore.restorePersistenceData(data);
+
+        expect(graphNodesStore.getViewState('root-1')).toEqual({
+            selectedNodeId: 'node-1',
+            expandedNodeIds: ['node-1', 'node-2']
+        });
+        expect(graphNodesStore.hasData()).toBe(true);
     });
 
     it('drops corrupted entries on restore', () => {

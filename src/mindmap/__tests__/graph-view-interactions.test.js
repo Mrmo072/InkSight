@@ -141,16 +141,71 @@ describe('graph bubble interactions', () => {
     });
 
     it('expands an unselected bubble after its selecting double click', () => {
-        const { controller, bubble } = setupNode();
-        const body = bubble.querySelector('.graph-bubble__body');
+        vi.useFakeTimers();
+        try {
+            const { controller, bubble } = setupNode();
+            const body = bubble.querySelector('.graph-bubble__body');
 
-        pointer(body, 'pointerdown');
-        pointer(window, 'pointerup');
-        pointer(body, 'dblclick');
+            pointer(body, 'pointerdown');
+            pointer(window, 'pointerup');
+            vi.advanceTimersByTime(140);
+            pointer(body, 'dblclick');
+
+            expect(controller.selectedNodeId).toBe('node-1');
+            expect(bubble.classList.contains('graph-bubble--expanded')).toBe(true);
+            expect(bubble.getAttribute('aria-expanded')).toBe('true');
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('does not expand an already selected bubble on a rapid double click', () => {
+        vi.useFakeTimers();
+        try {
+            const { bubble } = setupNode();
+            const body = bubble.querySelector('.graph-bubble__body');
+            const header = bubble.querySelector('.graph-bubble__header');
+            pointer(body, 'pointerdown');
+            pointer(window, 'pointerup');
+            vi.advanceTimersByTime(100);
+
+            pointer(header, 'pointerdown');
+            pointer(window, 'pointerup');
+            pointer(header, 'dblclick');
+
+            expect(bubble.classList.contains('graph-bubble--expanded')).toBe(false);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('does not expand when the second click arrives outside the deliberate double-click window', () => {
+        vi.useFakeTimers();
+        try {
+            const { bubble } = setupNode();
+            const body = bubble.querySelector('.graph-bubble__body');
+
+            pointer(body, 'pointerdown');
+            pointer(window, 'pointerup');
+            vi.advanceTimersByTime(361);
+            pointer(body, 'dblclick');
+
+            expect(bubble.classList.contains('graph-bubble--expanded')).toBe(false);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('restores selected and expanded state for the same graph root', () => {
+        const { controller, bubble } = setupNode();
+        graphNodesStore.setSelectedNode('card-root', 'node-1');
+        graphNodesStore.setExpandedNode('card-root', 'node-1', true);
+
+        controller.restoreViewState();
 
         expect(controller.selectedNodeId).toBe('node-1');
+        expect(bubble.classList.contains('graph-bubble--selected')).toBe(true);
         expect(bubble.classList.contains('graph-bubble--expanded')).toBe(true);
-        expect(bubble.getAttribute('aria-expanded')).toBe('true');
     });
 
     it('shows the full truncated title after the hover delay', () => {

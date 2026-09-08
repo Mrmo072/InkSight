@@ -39,6 +39,7 @@ export class GraphViewController {
         this.selectedTextContext = null;
         this.selectedNodeId = null;
         this.selectedNodeAt = 0;
+        this.lastSelectionGesture = null;
         this.justClickedMarkTimestamp = 0;
         this.edgeItems = new Map();
         this.pendingAiNodeIds = new Set();
@@ -307,6 +308,7 @@ export class GraphViewController {
         this.titleEl.textContent = this.rawTree.tag;
         this.calculateLayout();
         this.renderGraph();
+        this.restoreViewState();
         this.setupSimulation();
 
         // 根气泡居中。容器可能刚从隐藏切换为可见（尺寸仍为 0 或在过渡中），
@@ -339,6 +341,7 @@ export class GraphViewController {
         this.selectedTextContext = null;
         this.selectedNodeId = null;
         this.selectedNodeAt = 0;
+        this.lastSelectionGesture = null;
         this.pendingAiNodeIds.clear();
         clearTimeout(this.hoverTimer);
         this.hoverTimer = null;
@@ -870,19 +873,27 @@ export class GraphViewController {
         this.bindNodeInteractions(el, node.id);
         this.bindBubbleTitlePreview(el, tagTitle, titleTooltip);
 
-        // 双击标题区/边缘切换放大态；正文内双击保留原生选词。
+        // 仅允许从“未选中”状态开始的稳定双击放大；已经选中的节点
+        // 不再把两次普通操作误判为展开。正文内双击仍保留原生选词。
         // 放大的气泡更宽，需同步放大其碰撞半径并重启模拟，避免与其他气泡重叠。
         el.addEventListener('dblclick', (e) => {
             if (e.target.closest('button, input, textarea, a, mark')) return;
-            const recentlySelected = this.selectedNodeId === node.id
-                && Date.now() - this.selectedNodeAt < 500;
-            if (!recentlySelected && !e.target.closest('.graph-bubble__header')) {
+            const gesture = this.lastSelectionGesture;
+            const elapsed = gesture ? Date.now() - gesture.at : Infinity;
+            const distance = gesture
+                ? Math.hypot(e.clientX - gesture.x, e.clientY - gesture.y)
+                : Infinity;
+            const deliberateDoubleClick = gesture?.nodeId === node.id
+                && gesture.wasSelected === false
+                && elapsed <= 360
+                && distance <= 10;
+            if (!deliberateDoubleClick) {
                 return;
             }
             e.preventDefault();
             window.getSelection()?.removeAllRanges();
-            this.setSelectedNode(node.id);
-            this.setBubbleExpanded(node.id, !el.classList.contains('graph-bubble--expanded'));
+            this.lastSelectionGesture = null;
+            this.setBubbleExpanded(node.id, true);
         });
 
         el.addEventListener('keydown', (e) => {
@@ -976,6 +987,7 @@ export class GraphViewController {
         const previousId = this.selectedNodeId;
         this.selectedNodeId = nodeId;
         this.selectedNodeAt = nodeId ? Date.now() : 0;
+        graphNodesStore.setSelectedNode(this.rawTree?.id, nodeId);
         clearTimeout(this.hoverTimer);
         this.hoverTimer = null;
 
@@ -1010,6 +1022,7 @@ export class GraphViewController {
         bubble.classList.toggle('graph-bubble--expanded', expanded);
         bubble.setAttribute('aria-expanded', String(expanded));
         viewNode.expanded = expanded;
+        graphNodesStore.setExpandedNode(this.rawTree?.id, nodeId, expanded);
         const rect = bubble.getBoundingClientRect();
         viewNode.collideRadius = expanded
             ? Math.hypot(rect.width, rect.height) / 2 + 12
@@ -1019,6 +1032,21 @@ export class GraphViewController {
             forceCollide().radius((item) => item.collideRadius || 155).iterations(4)
         );
         this.simulation?.alpha(0.6).restart();
+    }
+
+    restoreViewState() {
+        const rootCardId = this.rawTree?.id;
+        if (!rootCardId) return;
+        const state = graphNodesStore.getViewState(rootCardId);
+        const availableIds = new Set(this.nodes.map((node) => node.id));
+        state.expandedNodeIds
+            .filter((nodeId) => availableIds.has(nodeId))
+            .forEach((nodeId) => this.setBubbleExpanded(nodeId, true));
+        if (state.selectedNodeId && availableIds.has(state.selectedNodeId)) {
+            this.setSelectedNode(state.selectedNodeId);
+        } else if (state.selectedNodeId) {
+            graphNodesStore.setSelectedNode(rootCardId, null);
+        }
     }
 
     bindBubbleTitlePreview(bubble, titleElement, tooltip) {
@@ -1046,6 +1074,16 @@ export class GraphViewController {
             const interactive = e.target.closest('button, input, textarea, a, mark');
             const selected = this.selectedNodeId === nodeId;
             const inHeader = Boolean(e.target.closest('.graph-bubble__header'));
+            if (selected && this.lastSelectionGesture?.nodeId === nodeId) {
+                const elapsed = Date.now() - this.lastSelectionGesture.at;
+                const distance = Math.hypot(
+                    e.clientX - this.lastSelectionGesture.x,
+                    e.clientY - this.lastSelectionGesture.y
+                );
+                if (e.detail !== 2 || elapsed > 360 || distance > 10) {
+                    this.lastSelectionGesture = null;
+                }
+            }
             if (interactive || (selected && !inHeader)) return;
 
             e.stopPropagation();
@@ -1073,7 +1111,7 @@ export class GraphViewController {
                 activeNode.fy = initialNodeY + (moveEvent.clientY - startScreenY) / scale;
             };
 
-            const onPointerUp = () => {
+            const onPointerUp = (upEvent) => {
                 if (isDragging) {
                     const droppedX = activeNode.fx ?? activeNode.x;
                     const droppedY = activeNode.fy ?? activeNode.y;
@@ -1086,6 +1124,15 @@ export class GraphViewController {
                     activeNode.fy = null;
                     bubble.classList.remove('graph-bubble--dragging');
                 } else if (Date.now() - this.justClickedMarkTimestamp >= 350) {
+                    if (!selected) {
+                        this.lastSelectionGesture = {
+                            nodeId,
+                            at: Date.now(),
+                            x: upEvent?.clientX ?? startScreenX,
+                            y: upEvent?.clientY ?? startScreenY,
+                            wasSelected: false
+                        };
+                    }
                     this.setSelectedNode(nodeId);
                 }
                 window.removeEventListener('pointermove', onPointerMove);
