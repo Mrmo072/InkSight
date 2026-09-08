@@ -53,7 +53,10 @@ export function createWorkspaceEventListeners({
                     return;
                 }
 
-                ui.setWorkspaceMode('map');
+                // The graph overlay lives inside the mind-map pane. Force that
+                // pane to full width so compact/split layouts cannot collapse
+                // the interactive viewport to zero pixels.
+                ui.setWorkspaceMode('map', { force: true, notesView: 'mindmap' });
                 openGraphView({ rootCardId: cardId });
             }
         },

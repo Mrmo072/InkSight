@@ -4,9 +4,20 @@ vi.mock('../recovery-panel-actions.js', () => ({
     handleRecoveryPanelClick: vi.fn(() => false)
 }));
 
+vi.mock('../app-context.js', () => ({
+    getAppContext: vi.fn(() => ({
+        cardSystem: { cards: { has: () => true } }
+    }))
+}));
+
+vi.mock('../../mindmap/graph-view/graph-view.js', () => ({
+    openGraphView: vi.fn()
+}));
+
 describe('workspace-events', () => {
     let createWorkspaceEventListeners;
     let handleRecoveryPanelClick;
+    let openGraphView;
     let elements;
     let callbacks;
     let draggedFileId;
@@ -15,6 +26,7 @@ describe('workspace-events', () => {
         vi.resetModules();
         ({ createWorkspaceEventListeners } = await import('../workspace-events.js'));
         ({ handleRecoveryPanelClick } = await import('../recovery-panel-actions.js'));
+        ({ openGraphView } = await import('../../mindmap/graph-view/graph-view.js'));
 
         document.body.innerHTML = `
             <input id="file-input" />
@@ -173,5 +185,24 @@ describe('workspace-events', () => {
 
         expect(callbacks.ui.matchRecoveredDocument).toHaveBeenCalledWith('doc-9');
         expect(callbacks.ui.promptBulkRelink).toHaveBeenCalled();
+    });
+
+    it('opens graph view with the mind-map pane forced to full width', () => {
+        const listeners = createWorkspaceEventListeners({
+            elements,
+            windowTarget: window,
+            ...callbacks
+        });
+        bindAll(listeners);
+
+        window.dispatchEvent(new CustomEvent('open-graph-view', {
+            detail: { cardId: 'card-1' }
+        }));
+
+        expect(callbacks.ui.setWorkspaceMode).toHaveBeenCalledWith('map', {
+            force: true,
+            notesView: 'mindmap'
+        });
+        expect(openGraphView).toHaveBeenCalledWith({ rootCardId: 'card-1' });
     });
 });

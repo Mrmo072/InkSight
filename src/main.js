@@ -654,7 +654,7 @@ function setupFloatingSelectionToolbar() {
     setAppService('refreshFloatingToolbarPosition', () => window.requestAnimationFrame(applyStoredToolbarPosition));
 }
 
-function applyWorkspaceLayout(mode) {
+function applyWorkspaceLayout(mode, { notesView } = {}) {
     beginWorkspaceModeTransition(mode);
     state.workspaceMode = mode;
     syncWorkspaceModeButtons(mode);
@@ -688,7 +688,7 @@ function applyWorkspaceLayout(mode) {
         if (!isMobile && !isCompact) {
             splitView.setPanelWidth('right', mode === 'capture' ? CAPTURE_NOTES_FOCUS_WIDTH : getMapNotesFocusWidth());
         }
-        setMobileNotesView(mode === 'capture' ? 'annotations' : 'split');
+        setMobileNotesView(notesView || (mode === 'capture' ? 'annotations' : 'split'));
     }
 
     updatePanelControls();
@@ -702,7 +702,7 @@ function setWorkspaceMode(mode, options = {}) {
         return;
     }
 
-    applyWorkspaceLayout(nextMode);
+    applyWorkspaceLayout(nextMode, options);
 }
 
 function isCompactLayout() {
