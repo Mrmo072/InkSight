@@ -159,24 +159,53 @@ describe('graph bubble interactions', () => {
         }
     });
 
-    it('does not expand an already selected bubble on a rapid double click', () => {
+    it('toggles an expanded unselected bubble closed on double click', () => {
         vi.useFakeTimers();
         try {
-            const { bubble } = setupNode();
+            const { controller, bubble } = setupNode();
             const body = bubble.querySelector('.graph-bubble__body');
-            const header = bubble.querySelector('.graph-bubble__header');
+            controller.setBubbleExpanded('node-1', true);
+            controller.setSelectedNode(null);
+
             pointer(body, 'pointerdown');
             pointer(window, 'pointerup');
-            vi.advanceTimersByTime(100);
-
-            pointer(header, 'pointerdown');
-            pointer(window, 'pointerup');
-            pointer(header, 'dblclick');
+            vi.advanceTimersByTime(140);
+            pointer(body, 'dblclick');
 
             expect(bubble.classList.contains('graph-bubble--expanded')).toBe(false);
+            expect(bubble.getAttribute('aria-expanded')).toBe('false');
         } finally {
             vi.useRealTimers();
         }
+    });
+
+    it('does not create a child when the second click lands on a newly revealed action', () => {
+        vi.useFakeTimers();
+        try {
+            const { controller, bubble } = setupNode();
+            const header = bubble.querySelector('.graph-bubble__header');
+            const addChild = bubble.querySelector('.graph-bubble__action-btn');
+            const createChildNode = vi.spyOn(controller, 'createChildNode');
+
+            pointer(header, 'pointerdown', 40, 20);
+            pointer(window, 'pointerup', 40, 20);
+            vi.advanceTimersByTime(120);
+            pointer(addChild, 'click', 40, 20);
+
+            expect(createChildNode).not.toHaveBeenCalled();
+            expect(bubble.classList.contains('graph-bubble--expanded')).toBe(true);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('does not expand an already selected bubble on a rapid double click', () => {
+        const { controller, bubble } = setupNode();
+        controller.setSelectedNode('node-1');
+
+        pointer(bubble.querySelector('.graph-bubble__header'), 'dblclick');
+
+        expect(bubble.classList.contains('graph-bubble--expanded')).toBe(false);
     });
 
     it('does not expand when the second click arrives outside the deliberate double-click window', () => {

@@ -714,6 +714,29 @@ export class GraphViewController {
 
         const headerActions = document.createElement('div');
         headerActions.className = 'graph-bubble__actions';
+        // Selecting a bubble reveals these actions. During a double click the
+        // second press can therefore land on a button that did not exist under
+        // the first press (most visibly the “add child” button). Treat that
+        // same-position second click as the intended bubble double click,
+        // rather than executing the newly revealed action.
+        headerActions.addEventListener('click', (e) => {
+            const gesture = this.lastSelectionGesture;
+            const elapsed = gesture ? Date.now() - gesture.at : Infinity;
+            const distance = gesture
+                ? Math.hypot(e.clientX - gesture.x, e.clientY - gesture.y)
+                : Infinity;
+            if (
+                gesture?.nodeId === node.id
+                && gesture.wasSelected === false
+                && elapsed <= 360
+                && distance <= 10
+            ) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                this.lastSelectionGesture = null;
+                this.setBubbleExpanded(node.id, !el.classList.contains('graph-bubble--expanded'));
+            }
+        }, true);
 
         const addChildBtn = document.createElement('button');
         addChildBtn.type = 'button';
@@ -893,7 +916,7 @@ export class GraphViewController {
             e.preventDefault();
             window.getSelection()?.removeAllRanges();
             this.lastSelectionGesture = null;
-            this.setBubbleExpanded(node.id, true);
+            this.setBubbleExpanded(node.id, !el.classList.contains('graph-bubble--expanded'));
         });
 
         el.addEventListener('keydown', (e) => {
@@ -1074,16 +1097,6 @@ export class GraphViewController {
             const interactive = e.target.closest('button, input, textarea, a, mark');
             const selected = this.selectedNodeId === nodeId;
             const inHeader = Boolean(e.target.closest('.graph-bubble__header'));
-            if (selected && this.lastSelectionGesture?.nodeId === nodeId) {
-                const elapsed = Date.now() - this.lastSelectionGesture.at;
-                const distance = Math.hypot(
-                    e.clientX - this.lastSelectionGesture.x,
-                    e.clientY - this.lastSelectionGesture.y
-                );
-                if (e.detail !== 2 || elapsed > 360 || distance > 10) {
-                    this.lastSelectionGesture = null;
-                }
-            }
             if (interactive || (selected && !inHeader)) return;
 
             e.stopPropagation();
