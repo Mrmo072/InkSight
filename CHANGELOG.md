@@ -2,6 +2,22 @@
 
 All notable changes to InkSight are documented in this file. This project follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Added delayed full-title previews for truncated graph bubbles and in-bubble editing for node titles and complete AI questions.
+
+### Changed
+
+- Graph bubbles now use an explicit selected state: unselected bubbles can be dragged from any point or double-clicked to expand, while editing, scrolling, highlighting, node actions, and AI generation are available only after selection.
+- AI questions are stored separately from display titles, remain synchronized until the title is customized, and can be edited before regenerating an answer.
+
+### Fixed
+
+- Opening graph view now forces the mind-map pane to a usable width instead of allowing compact split layouts to collapse its interactive viewport.
+- Regeneration keeps the previous AI answer visible when a replacement request fails, and dropped bubbles retain their new layout position.
+
 ## [1.1.0] - 2026-09-07
 
 ### Added
