@@ -176,6 +176,23 @@ export class GraphViewController {
 
     onWheel = (e) => {
         if (!this.isOpen) return;
+        const bubble = e.target.closest?.('.graph-bubble');
+        if (bubble?.dataset.cardId === this.selectedNodeId) {
+            e.preventDefault();
+            e.stopPropagation();
+            const body = bubble.querySelector('.graph-bubble__body');
+            const scrollTarget = e.target.closest?.('textarea') || body;
+            if (scrollTarget) {
+                const multiplier = e.deltaMode === WheelEvent.DOM_DELTA_LINE
+                    ? 16
+                    : e.deltaMode === WheelEvent.DOM_DELTA_PAGE
+                        ? Math.max(scrollTarget.clientHeight, 1)
+                        : 1;
+                scrollTarget.scrollTop += e.deltaY * multiplier;
+                scrollTarget.scrollLeft += e.deltaX * multiplier;
+            }
+            return;
+        }
         e.preventDefault();
         const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
         const newScale = Math.min(Math.max(this.transform.scale * zoomFactor, 0.4), 2.2);

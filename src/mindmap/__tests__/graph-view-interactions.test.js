@@ -73,6 +73,52 @@ describe('graph bubble interactions', () => {
         expect(bubble.classList.contains('graph-bubble--targeted-self')).toBe(false);
     });
 
+    it('scrolls selected bubble content instead of zooming the graph', () => {
+        const { controller, bubble } = setupNode();
+        const viewport = document.createElement('div');
+        viewport.appendChild(bubble);
+        document.body.appendChild(viewport);
+        viewport.addEventListener('wheel', controller.onWheel, { passive: false });
+        controller.isOpen = true;
+        controller.transform = { x: 20, y: 30, scale: 1 };
+        controller.setSelectedNode('node-1');
+        const body = bubble.querySelector('.graph-bubble__body');
+        body.scrollTop = 12;
+
+        const event = new WheelEvent('wheel', {
+            bubbles: true,
+            cancelable: true,
+            deltaY: 40
+        });
+        body.dispatchEvent(event);
+
+        expect(event.defaultPrevented).toBe(true);
+        expect(body.scrollTop).toBe(52);
+        expect(controller.transform).toEqual({ x: 20, y: 30, scale: 1 });
+    });
+
+    it('keeps wheel zoom on the graph when the bubble is not selected', () => {
+        const { controller, bubble } = setupNode();
+        const viewport = document.createElement('div');
+        viewport.appendChild(bubble);
+        document.body.appendChild(viewport);
+        viewport.addEventListener('wheel', controller.onWheel, { passive: false });
+        controller.isOpen = true;
+        controller.transform = { x: 0, y: 0, scale: 1 };
+        controller.applyTransform = vi.fn();
+
+        bubble.dispatchEvent(new WheelEvent('wheel', {
+            bubbles: true,
+            cancelable: true,
+            deltaY: 40,
+            clientX: 100,
+            clientY: 100
+        }));
+
+        expect(controller.transform.scale).toBe(0.92);
+        expect(controller.applyTransform).toHaveBeenCalled();
+    });
+
     it('drags an unselected bubble from its content without selecting it', () => {
         const { controller, bubble } = setupNode();
         const body = bubble.querySelector('.graph-bubble__body');
