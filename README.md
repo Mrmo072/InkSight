@@ -12,7 +12,27 @@
 
 InkSight aims to solve the pain point of separation between "reading" and "thinking" in traditional reading tools. It seamlessly integrates a multi-format document reader (PDF/EPUB/Markdown) with an infinite canvas mind map, supporting **drag-and-drop node creation** and **bi-directional linking**. Whether you are conducting academic research by reading papers or building a knowledge system by reading technical books, InkSight helps you transform information into knowledge more efficiently.
 
-![InkSight Preview](./docs/images/preview.png)
+![InkSight reading workspace](./docs/images/workspace-overview.png)
+
+## 🖼️ Product Tour
+
+### Read and capture without leaving the document
+
+Keep the source text visible while reviewing highlights, notes, trace-back status, and mind-map actions in the annotation panel.
+
+![InkSight reading and annotation workflow](./docs/images/reading-annotations.png)
+
+### Turn passages into connected lines of thought
+
+Open an annotation as a bubble graph, select a bubble before operating on it, double-click to expand it, and click a highlighted passage to locate the corresponding child bubble. Bubble selection, expansion, generated nodes, and text-to-child links are preserved in project snapshots.
+
+![InkSight bubble graph view](./docs/images/graph-view.png)
+
+### Work in Chinese or English
+
+Switch the application language and visual theme from Settings. Changes take effect immediately and are stored on the current device.
+
+![InkSight language and appearance settings](./docs/images/settings-language.png)
 
 ## 🚀 Quick Start
 
@@ -55,6 +75,8 @@ Visit `http://localhost:5173` to start using it.
 - **Outline Navigation**: Integrated document outline sidebar for easy navigation.
 - **Smart Layout**: Powerful automatic layout algorithms to clarify your train of thought with one click.
 - **Bi-directional Tracing**: Click on a note node to instantly jump back to the original source in the text.
+- **Interactive Bubble Graph**: Select, drag, expand, edit, branch, and regenerate thought bubbles while keeping clickable parent-to-child text links across reloads.
+- **Bilingual Interface**: Switch the application shell and primary workflows between Simplified Chinese and English.
 - **Privacy & Security**: Documents and projects stay on your device. Internet access is only required when you explicitly use a configured AI provider; prompts and related context are then sent to that provider.
 
 ## 📦 Packaging (Windows Application)
