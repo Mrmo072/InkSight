@@ -16,7 +16,7 @@ All notable changes to InkSight are documented in this file. This project follow
 ### Fixed
 
 - Opening graph view now forces the mind-map pane to a usable width instead of allowing compact split layouts to collapse its interactive viewport.
-- Regeneration keeps the previous AI answer visible when a replacement request fails, dropped bubbles retain their new layout position, wheel input over a selected bubble scrolls its content without zooming the graph, graph selection/expansion survives project reloads, and double-clicking an unselected bubble reliably toggles its expanded state without accidentally creating an extension node. Saving a project also updates the reload-recovery snapshot, and long project names no longer exceed the browser directory-picker ID limit.
+- Regeneration keeps the previous AI answer visible when a replacement request fails, dropped bubbles retain their new layout position, wheel input over a selected bubble scrolls its content without zooming the graph, graph selection/expansion survives project reloads, and double-clicking an unselected bubble reliably toggles its expanded state while keeping it unselected so extension controls do not appear. Saving a project also updates the reload-recovery snapshot, and long project names no longer exceed the browser directory-picker ID limit.
 
 ## [1.1.0] - 2026-09-07
 

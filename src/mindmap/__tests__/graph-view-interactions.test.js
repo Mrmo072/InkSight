@@ -151,7 +151,8 @@ describe('graph bubble interactions', () => {
             vi.advanceTimersByTime(140);
             pointer(body, 'dblclick');
 
-            expect(controller.selectedNodeId).toBe('node-1');
+            expect(controller.selectedNodeId).toBeNull();
+            expect(bubble.classList.contains('graph-bubble--selected')).toBe(false);
             expect(bubble.classList.contains('graph-bubble--expanded')).toBe(true);
             expect(bubble.getAttribute('aria-expanded')).toBe('true');
         } finally {
@@ -193,6 +194,8 @@ describe('graph bubble interactions', () => {
             pointer(addChild, 'click', 40, 20);
 
             expect(createChildNode).not.toHaveBeenCalled();
+            expect(controller.selectedNodeId).toBeNull();
+            expect(bubble.classList.contains('graph-bubble--selected')).toBe(false);
             expect(bubble.classList.contains('graph-bubble--expanded')).toBe(true);
         } finally {
             vi.useRealTimers();

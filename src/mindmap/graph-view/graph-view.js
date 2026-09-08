@@ -735,6 +735,7 @@ export class GraphViewController {
                 e.stopImmediatePropagation();
                 this.lastSelectionGesture = null;
                 this.setBubbleExpanded(node.id, !el.classList.contains('graph-bubble--expanded'));
+                this.setSelectedNode(null);
             }
         }, true);
 
@@ -917,6 +918,7 @@ export class GraphViewController {
             window.getSelection()?.removeAllRanges();
             this.lastSelectionGesture = null;
             this.setBubbleExpanded(node.id, !el.classList.contains('graph-bubble--expanded'));
+            this.setSelectedNode(null);
         });
 
         el.addEventListener('keydown', (e) => {
