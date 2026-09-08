@@ -21,15 +21,15 @@ import { useContext } from 'react';
 import { MenuContentPropsContext } from '../../menu/common';
 import { EVENT } from '../../../constants';
 import { getShortcutKey } from '../../../utils/common';
-import { saveCurrentProject, openProjectFile } from '../../../../../../inksight-file/inksight-project-actions.js';
+import { openProjectFile } from '../../../../../../inksight-file/inksight-project-actions.js';
+import { APP_EVENTS } from '../../../../../../core/event-names.js';
 
 export const SaveToFile = () => {
-  const board = useBoard();
   return (
     <MenuItem
       data-testid="save-button"
       onSelect={() => {
-        void saveCurrentProject(board);
+        window.dispatchEvent(new CustomEvent(APP_EVENTS.PROJECT_SAVE_REQUESTED));
       }}
       icon={SaveFileIcon}
       aria-label="Save Project Folder"

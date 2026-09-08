@@ -22,6 +22,10 @@ function sanitizeDirectoryPickerIdSegment(value, fallback = 'workspace') {
     return sanitized || fallback;
 }
 
+export function buildDirectoryPickerId(name) {
+    return `inksight-project-${sanitizeDirectoryPickerIdSegment(name)}`.slice(0, 32);
+}
+
 function ensureDirectoryApi() {
     if (typeof window?.showDirectoryPicker !== 'function') {
         throw new Error('Directory project storage is not supported in this browser.');
@@ -100,7 +104,9 @@ export async function saveInksightProjectDirectory({
     ensureDirectoryApi();
 
     const payload = buildInksightFilePayload({ appContext, board, lastPage });
-    const pickerId = `inksight-project-${sanitizeDirectoryPickerIdSegment(name)}`;
+    // Chromium limits File System Access picker ids to 32 characters.
+    // Keep the stable prefix while capping user-derived project names.
+    const pickerId = buildDirectoryPickerId(name);
     const targetDirectoryHandle = directoryHandle
         || await window.showDirectoryPicker({ id: pickerId, mode: 'readwrite' });
     const { manifest, assetEntries, documentEntries } = await bundleProjectData({

@@ -42,6 +42,7 @@ export const APP_EVENTS = Object.freeze({
 
     // Workspace / project shell
     REQUEST_SAVE: 'request-save',
+    PROJECT_SAVE_REQUESTED: 'project-save-requested',
     PROJECT_OPENED: 'project-opened',
     PROJECT_SAVE_COMPLETED: 'project-save-completed',
     RECOVERY_VALIDATE_REQUESTED: 'recovery-validate-requested',

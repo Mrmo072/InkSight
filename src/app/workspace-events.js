@@ -39,6 +39,11 @@ export function createWorkspaceEventListeners({
         },
         {
             target: windowTarget,
+            event: APP_EVENTS.PROJECT_SAVE_REQUESTED,
+            handler: () => void projectWorkspace.promptSaveProject()
+        },
+        {
+            target: windowTarget,
             event: APP_EVENTS.OPEN_GRAPH_VIEW,
             handler: (e) => {
                 const cardId = e.detail?.cardId;

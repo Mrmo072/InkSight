@@ -170,12 +170,19 @@ describe('project-workspace', () => {
 
     it('exports the project folder when promptSaveProject is called with a board', async () => {
         saveCurrentProject.mockResolvedValue({ ok: true });
+        saveRuntimeProjectSnapshot.mockResolvedValue({
+            success: true,
+            snapshotId: 'snapshot-after-save',
+            savedAt: '2026-04-16T10:21:00.000Z',
+            summary: {}
+        });
         const controller = createController();
 
         await controller.promptSaveProject();
 
         expect(saveCurrentProject).toHaveBeenCalledWith(window.inksight.board);
-        expect(document.getElementById('save-status').textContent).toBe('Project exported to local folder.');
+        expect(saveRuntimeProjectSnapshot).toHaveBeenCalled();
+        expect(document.getElementById('save-status').textContent).toBe('Project saved and reload recovery updated.');
     });
 
     it('records recent runtime workspaces after autosave', async () => {

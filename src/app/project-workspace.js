@@ -482,22 +482,43 @@ export function createProjectWorkspaceController({
     async function promptSaveProject() {
         const board = getAppContext().board;
         if (board) {
+            let payload = null;
             try {
-                await saveCurrentProject(board);
-                projectStatusState.lastSavedAt = Date.now();
-                projectStatusState.lastMode = 'Local project export';
-                recordRecentProjectEntry({
-                    projectId: getAppContext().currentProjectId || ensureRuntimeProjectId(localStorage),
-                    projectName: getAppContext().currentBook?.name || 'workspace',
-                    directoryName: getAppContext().currentProjectDirectoryHandle?.name || null,
-                    savedAt: projectStatusState.lastSavedAt,
-                    lastOpenedAt: Date.now(),
-                    source: 'project-folder'
-                });
-                showSaveStatus('success', 'Project exported to local folder.');
+                payload = await saveCurrentProject(board);
             } catch (error) {
                 logger.warn('Save project folder failed', error);
+                return;
             }
+            if (!payload) {
+                return;
+            }
+
+            const savedAt = Date.now();
+            projectStatusState.lastSavedAt = savedAt;
+            projectStatusState.lastMode = 'Local project export';
+            recordRecentProjectEntry({
+                projectId: getAppContext().currentProjectId || ensureRuntimeProjectId(localStorage),
+                projectName: getAppContext().currentBook?.name || 'workspace',
+                directoryName: getAppContext().currentProjectDirectoryHandle?.name || null,
+                savedAt,
+                lastOpenedAt: savedAt,
+                source: 'project-folder'
+            });
+
+            try {
+                const runtimeSaved = await persistRuntimeProjectSnapshot({ note: 'Saved project state' });
+                if (!runtimeSaved) {
+                    showSaveStatus('error', 'Project folder saved, but reload recovery could not be updated.', 2800);
+                    return;
+                }
+            } catch (error) {
+                logger.warn('Runtime snapshot sync after project save failed', error);
+                showSaveStatus('error', 'Project folder saved, but reload recovery could not be updated.', 2800);
+                return;
+            }
+
+            projectStatusState.lastSavedAt = Date.now();
+            showSaveStatus('success', 'Project saved and reload recovery updated.');
             return;
         }
 

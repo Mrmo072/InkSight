@@ -11,7 +11,7 @@ import { BoardCreationMode, setCreationMode } from '@plait/common';
 import { MindPointerType } from '@plait/mind';
 import { FreehandShape } from './freehand/type';
 import { ArrowLineShape, BasicShapes } from '@plait/draw';
-import { saveCurrentProject } from '../../../../inksight-file/inksight-project-actions.js';
+import { APP_EVENTS } from '../../../../core/event-names.js';
 
 export const buildDrawnixHotkeyPlugin = (
   updateAppState: (appState: Partial<DrawnixState>) => void
@@ -34,7 +34,7 @@ export const buildDrawnixHotkeyPlugin = (
           return;
         }
         if (isHotkey(['mod+s'], { byKey: true })(event)) {
-          void saveCurrentProject(board);
+          window.dispatchEvent(new CustomEvent(APP_EVENTS.PROJECT_SAVE_REQUESTED));
           event.preventDefault();
           return;
         }

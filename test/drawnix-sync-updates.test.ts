@@ -182,8 +182,10 @@ describe('Drawnix synced updates', () => {
     expect(setFontSize).toHaveBeenCalledWith(board, '18', 14);
   });
 
-  it('routes hotkey save through the InkSight file adapter', async () => {
+  it('routes hotkey save through the synchronized workspace save flow', async () => {
     const { buildDrawnixHotkeyPlugin } = await import('../src/drawnix/drawnix/src/plugins/with-hotkey.ts');
+    const saveRequest = vi.fn();
+    window.addEventListener('project-save-requested', saveRequest);
     const board = {
       globalKeyDown: vi.fn(),
       keyDown: vi.fn(),
@@ -199,7 +201,8 @@ describe('Drawnix synced updates', () => {
     board.globalKeyDown(event);
     await Promise.resolve();
 
-    expect(saveCurrentProject).toHaveBeenCalledWith(board);
+    expect(saveRequest).toHaveBeenCalledTimes(1);
+    window.removeEventListener('project-save-requested', saveRequest);
   });
 
   it('stops handled slider keyboard events from bubbling', async () => {

@@ -121,6 +121,20 @@ describe('workspace-events', () => {
         return event;
     }
 
+    it('routes every shared save request through the synchronized project save flow', () => {
+        const saveTarget = new EventTarget();
+        const listeners = createWorkspaceEventListeners({
+            elements,
+            windowTarget: saveTarget,
+            ...callbacks
+        });
+        bindAll(listeners);
+
+        saveTarget.dispatchEvent(new CustomEvent('project-save-requested'));
+
+        expect(callbacks.projectWorkspace.promptSaveProject).toHaveBeenCalledTimes(1);
+    });
+
     it('routes file list actions to the correct handlers', () => {
         const listeners = createWorkspaceEventListeners({
             elements,
