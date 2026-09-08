@@ -149,12 +149,14 @@ describe('graph bubble interactions', () => {
             pointer(body, 'pointerdown');
             pointer(window, 'pointerup');
             vi.advanceTimersByTime(140);
+            controller.selectionPill.style.display = 'flex';
             pointer(body, 'dblclick');
 
-            expect(controller.selectedNodeId).toBeNull();
-            expect(bubble.classList.contains('graph-bubble--selected')).toBe(false);
+            expect(controller.selectedNodeId).toBe('node-1');
+            expect(bubble.classList.contains('graph-bubble--selected')).toBe(true);
             expect(bubble.classList.contains('graph-bubble--expanded')).toBe(true);
             expect(bubble.getAttribute('aria-expanded')).toBe('true');
+            expect(controller.selectionPill.style.display).toBe('none');
         } finally {
             vi.useRealTimers();
         }
@@ -194,8 +196,8 @@ describe('graph bubble interactions', () => {
             pointer(addChild, 'click', 40, 20);
 
             expect(createChildNode).not.toHaveBeenCalled();
-            expect(controller.selectedNodeId).toBeNull();
-            expect(bubble.classList.contains('graph-bubble--selected')).toBe(false);
+            expect(controller.selectedNodeId).toBe('node-1');
+            expect(bubble.classList.contains('graph-bubble--selected')).toBe(true);
             expect(bubble.classList.contains('graph-bubble--expanded')).toBe(true);
         } finally {
             vi.useRealTimers();
@@ -223,6 +225,23 @@ describe('graph bubble interactions', () => {
             pointer(body, 'dblclick');
 
             expect(bubble.classList.contains('graph-bubble--expanded')).toBe(false);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('suppresses text-selection actions caused by the bubble double click', () => {
+        vi.useFakeTimers();
+        try {
+            const { controller } = setupNode();
+            controller.isOpen = true;
+            controller.suppressDoubleClickTextSelection();
+            controller.selectionPill.style.display = 'flex';
+
+            controller.onSelectionChange();
+
+            expect(controller.selectionPill.style.display).toBe('none');
+            expect(controller.selectedTextContext).toBeNull();
         } finally {
             vi.useRealTimers();
         }

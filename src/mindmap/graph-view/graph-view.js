@@ -40,6 +40,7 @@ export class GraphViewController {
         this.selectedNodeId = null;
         this.selectedNodeAt = 0;
         this.lastSelectionGesture = null;
+        this.suppressSelectionPillUntil = 0;
         this.justClickedMarkTimestamp = 0;
         this.edgeItems = new Map();
         this.pendingAiNodeIds = new Set();
@@ -234,6 +235,14 @@ export class GraphViewController {
     onSelectionChange = () => {
         if (!this.isOpen) return;
         const sel = window.getSelection();
+        if (Date.now() < this.suppressSelectionPillUntil) {
+            this.selectionPill.style.display = 'none';
+            this.selectedTextContext = null;
+            if (sel && !sel.isCollapsed) {
+                sel.removeAllRanges();
+            }
+            return;
+        }
         if (!sel || sel.isCollapsed || !sel.rangeCount) return;
 
         const text = sel.toString().trim();
@@ -303,6 +312,7 @@ export class GraphViewController {
         this.transform = { x: 0, y: 0, scale: 1 };
         this.selectedNodeId = null;
         this.selectedNodeAt = 0;
+        this.suppressSelectionPillUntil = 0;
         this.clearGraphDom();
 
         this.titleEl.textContent = this.rawTree.tag;
@@ -342,6 +352,7 @@ export class GraphViewController {
         this.selectedNodeId = null;
         this.selectedNodeAt = 0;
         this.lastSelectionGesture = null;
+        this.suppressSelectionPillUntil = 0;
         this.pendingAiNodeIds.clear();
         clearTimeout(this.hoverTimer);
         this.hoverTimer = null;
@@ -735,7 +746,8 @@ export class GraphViewController {
                 e.stopImmediatePropagation();
                 this.lastSelectionGesture = null;
                 this.setBubbleExpanded(node.id, !el.classList.contains('graph-bubble--expanded'));
-                this.setSelectedNode(null);
+                this.setSelectedNode(node.id);
+                this.suppressDoubleClickTextSelection();
             }
         }, true);
 
@@ -918,7 +930,8 @@ export class GraphViewController {
             window.getSelection()?.removeAllRanges();
             this.lastSelectionGesture = null;
             this.setBubbleExpanded(node.id, !el.classList.contains('graph-bubble--expanded'));
-            this.setSelectedNode(null);
+            this.setSelectedNode(node.id);
+            this.suppressDoubleClickTextSelection();
         });
 
         el.addEventListener('keydown', (e) => {
@@ -1027,6 +1040,23 @@ export class GraphViewController {
         this.selectionPill.style.display = 'none';
         this.selectedTextContext = null;
         window.getSelection()?.removeAllRanges();
+    }
+
+    suppressDoubleClickTextSelection() {
+        this.suppressSelectionPillUntil = Date.now() + 300;
+        this.selectionPill.style.display = 'none';
+        this.selectedTextContext = null;
+        const clearSelection = () => {
+            const selection = window.getSelection();
+            if (selection && !selection.isCollapsed) {
+                selection.removeAllRanges();
+            }
+            if (this.selectionPill) {
+                this.selectionPill.style.display = 'none';
+            }
+        };
+        clearSelection();
+        setTimeout(clearSelection, 0);
     }
 
     syncBubbleSelection(bubble, selected) {
