@@ -17,7 +17,7 @@
     --graph-hairline: color-mix(in srgb, var(--text-main) 7%, transparent);
     --graph-text: var(--text-main);
     --graph-text-secondary: var(--text-secondary);
-    --graph-shadow: var(--theme-shadow-md);
+    --graph-shadow: color-mix(in srgb, var(--text-main) 18%, transparent);
 }
 
 .graph-view {
@@ -140,7 +140,7 @@
         0 0 28px var(--graph-accent-faint);
 }
 
-.graph-bubble:hover {
+.graph-bubble:not(.graph-bubble--selected):hover {
     border-color: var(--graph-accent);
     box-shadow:
         0 24px 40px -6px var(--graph-shadow),
