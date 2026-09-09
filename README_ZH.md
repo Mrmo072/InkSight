@@ -7,7 +7,7 @@
 > 一个集成了深度阅读、思维导图与知识管理的现代化 Web 应用。
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-1.1.0-green.svg)](https://github.com/MrmoLabs/InkSight/releases)
+[![Version](https://img.shields.io/badge/version-1.2.0-green.svg)](https://github.com/MrmoLabs/InkSight/releases)
 
 ## 📖 简介 (Introduction)
 

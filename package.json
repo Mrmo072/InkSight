@@ -1,7 +1,7 @@
 {
   "name": "inksight",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "A local-first workspace for deep reading, visual notes, and knowledge mapping.",
   "author": "MrmoLabs",
   "license": "MIT",
@@ -31,7 +31,7 @@
       "target": "dir",
       "icon": "assets/icon.ico"
     },
-    "buildVersion": "1.1.0",
+    "buildVersion": "1.2.0",
     "asar": true,
     "files": [
       "dist/**/*",

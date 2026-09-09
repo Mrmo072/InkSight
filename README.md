@@ -4,7 +4,7 @@
 > A modern Web application integrating deep reading, mind mapping, and knowledge management.
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-1.1.0-green.svg)](https://github.com/MrmoLabs/InkSight/releases)
+[![Version](https://img.shields.io/badge/version-1.2.0-green.svg)](https://github.com/MrmoLabs/InkSight/releases)
 
 [中文](./README_ZH.md) | **English**
 

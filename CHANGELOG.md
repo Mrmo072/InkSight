@@ -4,6 +4,8 @@ All notable changes to InkSight are documented in this file. This project follow
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-09-09
+
 ### Added
 
 - Added delayed full-title previews for truncated graph bubbles and in-bubble editing for node titles and complete AI questions.
@@ -55,5 +57,7 @@ All notable changes to InkSight are documented in this file. This project follow
 
 - Initial public release.
 
+[Unreleased]: https://github.com/MrmoLabs/InkSight/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/MrmoLabs/InkSight/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/MrmoLabs/InkSight/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/MrmoLabs/InkSight/releases/tag/v1.0.0
